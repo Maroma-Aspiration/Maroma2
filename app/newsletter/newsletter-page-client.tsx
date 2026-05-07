@@ -424,6 +424,7 @@ export default function NewsletterPageClient({ initialState, editMode }: Props) 
   const [selectedEditorTarget, setSelectedEditorTarget] = useState<EditableTarget | null>(null);
   const [selectedStoryEdit, setSelectedStoryEdit] = useState<{ storyId: string; field: StoryEditField } | null>(null);
   const [openDrawer, setOpenDrawer] = useState<ToolDrawer>(null);
+  const [showGlobalControls, setShowGlobalControls] = useState(false);
   const [importUrls, setImportUrls] = useState("");
   const [webSearchQuery, setWebSearchQuery] = useState("Maroma Auroville");
   const [webSearchMax, setWebSearchMax] = useState(12);
@@ -1264,7 +1265,7 @@ export default function NewsletterPageClient({ initialState, editMode }: Props) 
           } as Record<string, string>
         }
       >
-        {canEdit ? (
+        {canEdit && showGlobalControls ? (
           <div className="newsletter-inline-toolbar">
             <button
               type="button"
@@ -1315,7 +1316,7 @@ export default function NewsletterPageClient({ initialState, editMode }: Props) 
           </div>
         ) : null}
 
-        {canEdit && openDrawer ? (
+        {canEdit && showGlobalControls && openDrawer ? (
           <div className="newsletter-tool-drawer">
             <div className="newsletter-tool-drawer-head">
               <strong>
@@ -1599,7 +1600,7 @@ export default function NewsletterPageClient({ initialState, editMode }: Props) 
           {renderInlineControls("logoImage")}
         </div>
 
-        {topImageSrc || canEdit ? (
+        {topImageSrc || (canEdit && showGlobalControls) ? (
           <div className="newsletter-editable-row">
             <div className="newsletter-asset-row newsletter-top-image-row">
               <div
@@ -1649,6 +1650,7 @@ export default function NewsletterPageClient({ initialState, editMode }: Props) 
 
         <section className="newsletter-top-block" aria-label="Newsletter opening message">
           <div className="newsletter-top-grid">
+            {portraitSrc || (canEdit && showGlobalControls) ? (
             <div className="newsletter-editable-row">
               <div className="newsletter-asset-row newsletter-portrait-row">
               <div
@@ -1689,7 +1691,9 @@ export default function NewsletterPageClient({ initialState, editMode }: Props) 
               </div>
               {renderInlineControls("portraitImage")}
             </div>
+            ) : null}
 
+            {heroSrc || (canEdit && showGlobalControls) ? (
             <div className="newsletter-editable-row">
               <div className="newsletter-asset-row newsletter-hero-row">
               <div
@@ -1729,6 +1733,7 @@ export default function NewsletterPageClient({ initialState, editMode }: Props) 
               </div>
               {renderInlineControls("heroImage")}
             </div>
+            ) : null}
           </div>
 
           {canTransformImages ? (
@@ -1813,6 +1818,7 @@ export default function NewsletterPageClient({ initialState, editMode }: Props) 
           </div>
           <hr className="newsletter-rule" />
 
+          {hasMission || (canEdit && showGlobalControls) ? (
           <div className={`newsletter-mission-block${hasMission || canEdit ? "" : " is-placeholder"}`}>
             <div className="newsletter-editable-row">
               {canEdit ? (
@@ -1850,8 +1856,10 @@ export default function NewsletterPageClient({ initialState, editMode }: Props) 
               {renderInlineControls("missionBody")}
             </div>
           </div>
-          <hr className="newsletter-rule" />
+          ) : null}
+          {hasMission || (canEdit && showGlobalControls) ? <hr className="newsletter-rule" /> : null}
 
+          {hasWelcome || (canEdit && showGlobalControls) ? (
           <div className={`newsletter-greeting-block${hasWelcome || canEdit ? "" : " is-placeholder"}`}>
             <div className="newsletter-editable-row">
               {canEdit ? (
@@ -1953,6 +1961,7 @@ export default function NewsletterPageClient({ initialState, editMode }: Props) 
               {renderInlineControls("greetingBody")}
             </div>
           </div>
+          ) : null}
           <hr className="newsletter-rule" />
         </section>
 
@@ -2076,7 +2085,7 @@ export default function NewsletterPageClient({ initialState, editMode }: Props) 
           )}
         </div>
 
-        {canEdit ? (
+        {canEdit && showGlobalControls ? (
           <div className="newsletter-inline-toolbar">
             <button
               type="button"
@@ -2103,6 +2112,21 @@ export default function NewsletterPageClient({ initialState, editMode }: Props) 
           </div>
         ) : null}
       </section>
+      {canEdit ? (
+        <button
+          type="button"
+          className={`newsletter-edit-pill${showGlobalControls ? " is-active" : ""}`}
+          onClick={() => {
+            const next = !showGlobalControls;
+            setShowGlobalControls(next);
+            if (!next) setOpenDrawer(null);
+          }}
+          aria-pressed={showGlobalControls}
+          aria-label={showGlobalControls ? "Hide edit menu" : "Show edit menu"}
+        >
+          {showGlobalControls ? "Done" : "Edit menu"}
+        </button>
+      ) : null}
     </main>
   );
 }
