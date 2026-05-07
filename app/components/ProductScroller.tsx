@@ -3,6 +3,7 @@
 import React, { useRef, useState, useEffect } from "react";
 import Link from "next/link";
 import { AddToBagButton } from "./cart/AddToBagButton";
+import type { CSSProperties } from "react";
 
 interface ScrollerItem {
   id?: string;
@@ -19,9 +20,10 @@ interface ProductScrollerProps {
   subtitle?: string;
   items: ScrollerItem[];
   className?: string;
+  sectionStyle?: CSSProperties;
 }
 
-export const ProductScroller: React.FC<ProductScrollerProps> = ({ title, subtitle, items, className = "" }) => {
+export const ProductScroller: React.FC<ProductScrollerProps> = ({ title, subtitle, items, className = "", sectionStyle }) => {
   const scrollRef = useRef<HTMLDivElement>(null);
   const [isAtStart, setIsAtStart] = useState(true);
   const [isAtEnd, setIsAtEnd] = useState(false);
@@ -78,10 +80,32 @@ export const ProductScroller: React.FC<ProductScrollerProps> = ({ title, subtitl
     setIsDragging(false);
   };
 
+  const lovedVeils = className.includes("scroller-loved-for-a-reason");
+
   return (
-    <section className={`scroller-section ${className}`}>
+    <section
+      className={`scroller-section ${className}`}
+      style={sectionStyle}
+      {...(lovedVeils ? { "data-maroma-loved-section": "true" } : {})}
+    >
+      {lovedVeils ? (
+        <>
+          <div
+            className="loved-veil loved-veil-wash"
+            aria-hidden
+            data-maroma-loved-layer="full-wash"
+            title="Loved section: full-bleed tint (the grey behind the headline is this layer)"
+          />
+          <div
+            className="loved-veil loved-veil-band"
+            aria-hidden
+            data-maroma-loved-layer="band-on-wash"
+            title="Loved section: optional horizontal band (opacity 0 = invisible)"
+          />
+        </>
+      ) : null}
       {(title || subtitle) && (
-        <div className="scroller-header">
+        <div className="scroller-header" data-maroma-loved-target={lovedVeils ? "headline-row" : undefined}>
           {title && <h2 className="scroller-title scroll-zoom">{title}</h2>}
           {subtitle && <p className="scroller-subtitle scroll-zoom">{subtitle}</p>}
         </div>

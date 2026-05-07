@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import Script from "next/script";
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import { ProductListingWithFilters } from "./components/ProductListingWithFilters";
 import { ProductScroller } from "./components/ProductScroller";
 import { DynamicProductShowcase } from "./components/DynamicProductShowcase";
@@ -38,9 +38,15 @@ type HeroOverlayLayer = HeroLayerSettings & {
 
 type HeroVisualApiState = {
   layout?: HeroMediaLayout;
+  backgroundVisible?: boolean;
+  headlineVisible?: boolean;
+  eyebrowVisible?: boolean;
+  actionsVisible?: boolean;
+  ritualsVisible?: boolean;
   heroPos?: { x: number; y: number };
   headlinePos?: { x: number; y: number };
   headlineSizeRem?: number;
+  eyebrowPos?: { x: number; y: number };
   eyebrowPosRatio?: { x: number; y: number };
   heroActionsPos?: { x: number; y: number };
   heroCopyWidthVw?: number;
@@ -51,6 +57,21 @@ type HeroVisualApiState = {
   ritualCarouselPos?: { x: number; y: number };
   bgColors?: string[];
   bgAngle?: number;
+  lovedSectionVisible?: boolean;
+  lovedFloralsVisible?: boolean;
+  lovedWashVisible?: boolean;
+  lovedBandVisible?: boolean;
+  lovedDividerOffsetY?: number;
+  lovedFloralOffsetY?: number;
+  lovedFloralOpacity?: number;
+  lovedTintOffsetX?: number;
+  lovedTintOffsetY?: number;
+  lovedTintOpacity?: number;
+  lovedTint2OffsetX?: number;
+  lovedTint2OffsetY?: number;
+  lovedTint2Opacity?: number;
+  lovedTint2TopPct?: number;
+  lovedTint2HeightPct?: number;
   heroSectionHeight?: number;
   error?: string;
 };
@@ -58,6 +79,42 @@ type HeroVisualApiState = {
 type HomePageClientProps = {
   initialHeroVisual: HeroVisualState;
   initialSiteContent: SiteContent;
+};
+
+const FLOATING_ADMIN_CHROME_KEY = "maroma-floating-admin-chrome";
+
+type FloatingAdminChrome = {
+  bgOpacity: number;
+  bottomPx: number;
+  sideInsetPx: number;
+};
+
+const defaultFloatingChrome: FloatingAdminChrome = {
+  bgOpacity: 0.94,
+  bottomPx: 20,
+  sideInsetPx: 20
+};
+
+const imageHasTransparency = (image: HTMLImageElement): boolean => {
+  const sampleMax = 300;
+  const scale = Math.min(1, sampleMax / Math.max(image.width, image.height));
+  const w = Math.max(1, Math.round(image.width * scale));
+  const h = Math.max(1, Math.round(image.height * scale));
+  const canvas = document.createElement("canvas");
+  canvas.width = w;
+  canvas.height = h;
+  const ctx = canvas.getContext("2d");
+  if (!ctx) {
+    return false;
+  }
+  ctx.drawImage(image, 0, 0, w, h);
+  const data = ctx.getImageData(0, 0, w, h).data;
+  for (let i = 3; i < data.length; i += 4) {
+    if (data[i] < 250) {
+      return true;
+    }
+  }
+  return false;
 };
 
 export default function HomePageClient({ initialHeroVisual, initialSiteContent }: HomePageClientProps) {
@@ -68,10 +125,14 @@ export default function HomePageClient({ initialHeroVisual, initialSiteContent }
   const [heroActionsPos, setHeroActionsPos] = useState(initialHeroVisual.heroActionsPos);
   const [ritualCarouselPos, setRitualCarouselPos] = useState(initialHeroVisual.ritualCarouselPos);
 
-  const [eyebrowPosRatio, setEyebrowPosRatio] = useState(initialHeroVisual.eyebrowPosRatio);
-  const [heroCopySize, setHeroCopySize] = useState({ width: 1, height: 1 });
+  const [eyebrowPos, setEyebrowPos] = useState(initialHeroVisual.eyebrowPos);
   const [heroCopyWidthVw, setHeroCopyWidthVw] = useState(initialHeroVisual.heroCopyWidthVw);
   const [heroMediaLayout, setHeroMediaLayout] = useState<HeroMediaLayout>(initialHeroVisual.layout);
+  const [backgroundVisible, setBackgroundVisible] = useState<boolean>(initialHeroVisual.backgroundVisible ?? true);
+  const [headlineVisible, setHeadlineVisible] = useState<boolean>(initialHeroVisual.headlineVisible ?? true);
+  const [eyebrowVisible, setEyebrowVisible] = useState<boolean>(initialHeroVisual.eyebrowVisible ?? true);
+  const [actionsVisible, setActionsVisible] = useState<boolean>(initialHeroVisual.actionsVisible ?? true);
+  const [ritualsVisible, setRitualsVisible] = useState<boolean>(initialHeroVisual.ritualsVisible ?? true);
   const [heroPrimarySettings, setHeroPrimarySettings] = useState<HeroLayerSettings>(() => ({
     ...initialHeroVisual.primarySettings
   }));
@@ -87,26 +148,67 @@ export default function HomePageClient({ initialHeroVisual, initialSiteContent }
   const [saveStatus, setSaveStatus] = useState<"idle" | "saving" | "saved">("idle");
   const [bgColors, setBgColors] = useState<string[]>(initialHeroVisual.bgColors || ["#dbe3d0", "#cbd5c0", "#d6deca"]);
   const [bgAngle, setBgAngle] = useState<number>(initialHeroVisual.bgAngle || 135);
+  const [lovedSectionVisible, setLovedSectionVisible] = useState<boolean>(initialHeroVisual.lovedSectionVisible ?? true);
+  const [lovedFloralsVisible, setLovedFloralsVisible] = useState<boolean>(initialHeroVisual.lovedFloralsVisible ?? true);
+  const [lovedWashVisible, setLovedWashVisible] = useState<boolean>(initialHeroVisual.lovedWashVisible ?? true);
+  const [lovedBandVisible, setLovedBandVisible] = useState<boolean>(initialHeroVisual.lovedBandVisible ?? true);
+  const [lovedDividerOffsetY, setLovedDividerOffsetY] = useState<number>(initialHeroVisual.lovedDividerOffsetY || 0);
+  const [lovedFloralOffsetY, setLovedFloralOffsetY] = useState<number>(initialHeroVisual.lovedFloralOffsetY || 0);
+  const [lovedFloralOpacity, setLovedFloralOpacity] = useState<number>(
+    typeof initialHeroVisual.lovedFloralOpacity === "number" ? initialHeroVisual.lovedFloralOpacity : 1
+  );
+  const [lovedTintOffsetX, setLovedTintOffsetX] = useState<number>(
+    typeof initialHeroVisual.lovedTintOffsetX === "number" ? initialHeroVisual.lovedTintOffsetX : 0
+  );
+  const [lovedTintOffsetY, setLovedTintOffsetY] = useState<number>(initialHeroVisual.lovedTintOffsetY || 0);
+  const [lovedTintOpacity, setLovedTintOpacity] = useState<number>(
+    typeof initialHeroVisual.lovedTintOpacity === "number" ? initialHeroVisual.lovedTintOpacity : 0.38
+  );
+  const [lovedTint2OffsetX, setLovedTint2OffsetX] = useState<number>(
+    typeof initialHeroVisual.lovedTint2OffsetX === "number" ? initialHeroVisual.lovedTint2OffsetX : 0
+  );
+  const [lovedTint2OffsetY, setLovedTint2OffsetY] = useState<number>(
+    typeof initialHeroVisual.lovedTint2OffsetY === "number" ? initialHeroVisual.lovedTint2OffsetY : 0
+  );
+  const [lovedTint2Opacity, setLovedTint2Opacity] = useState<number>(
+    typeof initialHeroVisual.lovedTint2Opacity === "number" ? initialHeroVisual.lovedTint2Opacity : 0
+  );
+  const [lovedTint2TopPct, setLovedTint2TopPct] = useState<number>(
+    typeof initialHeroVisual.lovedTint2TopPct === "number" ? initialHeroVisual.lovedTint2TopPct : 38
+  );
+  const [lovedTint2HeightPct, setLovedTint2HeightPct] = useState<number>(
+    typeof initialHeroVisual.lovedTint2HeightPct === "number" ? initialHeroVisual.lovedTint2HeightPct : 22
+  );
   const [productShowcasePos, setProductShowcasePos] = useState(initialHeroVisual.productShowcasePos || { x: 0, y: 0 });
   const [heroSectionHeight, setHeroSectionHeight] = useState(initialHeroVisual.heroSectionHeight || 100);
+  const [isMobileViewport, setIsMobileViewport] = useState(false);
+  const [floatingChrome, setFloatingChrome] = useState<FloatingAdminChrome>(defaultFloatingChrome);
 
-  type AdminLayerId = 'background' | 'primary' | 'overlay' | 'headline' | 'eyebrow' | 'actions' | 'rituals';
+  type AdminLayerId =
+    | "primary"
+    | "overlay"
+    | "background"
+    | "headline"
+    | "eyebrow"
+    | "actions"
+    | "rituals"
+    | "loved-florals"
+    | "loved-wash"
+    | "loved-band"
+    | "loved-section";
   const [adminEditLayer, setAdminEditLayer] = useState<AdminLayerId>('primary');
 
   const [productSearch, setProductSearch] = useState("");
   const [products, setProducts] = useState<ProductRecord[]>([]);
   const [productStatus, setProductStatus] = useState("Loading products...");
-  const heroCopyRef = useRef<HTMLDivElement | null>(null);
   const heroSectionRef = useRef<HTMLElement | null>(null);
   const dragStart = useRef<{ x: number; y: number } | null>(null);
   const basePos = useRef(initialHeroVisual.headlinePos);
   const heroActionsDragStart = useRef<{ x: number; y: number } | null>(null);
   const heroActionsBaseRef = useRef({ x: 0, y: 0 });
   const heroActionsPosRef = useRef(initialHeroVisual.heroActionsPos);
-  const eyebrowRatioRef = useRef(initialHeroVisual.eyebrowPosRatio);
   const floatingPanelDragStart = useRef<{ x: number; y: number } | null>(null);
   const floatingPanelBase = useRef({ x: 0, y: 0 });
-  const lastRitualLocalEditAt = useRef(0);
   const floatingPanelRef = useRef<HTMLDivElement | null>(null);
 
   const clampFloatingPanelPos = useCallback((pos: { x: number; y: number }) => {
@@ -116,8 +218,8 @@ export default function HomePageClient({ initialHeroVisual, initialSiteContent }
     const iw = window.innerWidth;
     const ih = window.innerHeight;
     const pad = 12;
-    const rightOffset = 20;
-    const bottomOffset = 20;
+    const rightOffset = floatingChrome.sideInsetPx;
+    const bottomOffset = floatingChrome.bottomPx;
     const el = floatingPanelRef.current;
     const panelW = Math.max(el?.offsetWidth ?? 260, 120);
     const panelH = Math.max(el?.offsetHeight ?? 260, 120);
@@ -134,7 +236,7 @@ export default function HomePageClient({ initialHeroVisual, initialSiteContent }
       x: Math.max(minX, Math.min(maxX, pos.x)),
       y: Math.max(minY, Math.min(maxY, pos.y))
     };
-  }, []);
+  }, [floatingChrome.bottomPx, floatingChrome.sideInsetPx]);
 
   const mediaDragStart = useRef<{ x: number; y: number } | null>(null);
   const mediaResizeStart = useRef<{ x: number; y: number } | null>(null);
@@ -158,6 +260,17 @@ export default function HomePageClient({ initialHeroVisual, initialSiteContent }
       // keep server-provided content
     }
   }, [initialSiteContent]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") {
+      return;
+    }
+    const media = window.matchMedia("(max-width: 900px)");
+    const updateViewportMode = () => setIsMobileViewport(media.matches);
+    updateViewportMode();
+    media.addEventListener("change", updateViewportMode);
+    return () => media.removeEventListener("change", updateViewportMode);
+  }, []);
 
   useEffect(() => {
     const loadContent = async () => {
@@ -290,6 +403,40 @@ export default function HomePageClient({ initialHeroVisual, initialSiteContent }
   }, []);
 
   useEffect(() => {
+    const stored = window.localStorage.getItem(FLOATING_ADMIN_CHROME_KEY);
+    if (!stored) {
+      return;
+    }
+    try {
+      const raw = JSON.parse(stored) as Partial<FloatingAdminChrome>;
+      setFloatingChrome({
+        bgOpacity:
+          typeof raw.bgOpacity === "number"
+            ? Math.min(1, Math.max(0.08, raw.bgOpacity))
+            : defaultFloatingChrome.bgOpacity,
+        bottomPx:
+          typeof raw.bottomPx === "number"
+            ? Math.min(160, Math.max(0, Math.round(raw.bottomPx)))
+            : defaultFloatingChrome.bottomPx,
+        sideInsetPx:
+          typeof raw.sideInsetPx === "number"
+            ? Math.min(64, Math.max(0, Math.round(raw.sideInsetPx)))
+            : defaultFloatingChrome.sideInsetPx
+      });
+    } catch {
+      // keep defaults
+    }
+  }, []);
+
+  useEffect(() => {
+    try {
+      window.localStorage.setItem(FLOATING_ADMIN_CHROME_KEY, JSON.stringify(floatingChrome));
+    } catch {
+      // ignore
+    }
+  }, [floatingChrome]);
+
+  useEffect(() => {
     const stored = window.localStorage.getItem(VISUAL_STATE_STORAGE_KEY);
     if (stored) {
       try {
@@ -304,6 +451,26 @@ export default function HomePageClient({ initialHeroVisual, initialSiteContent }
         if (data.heroActionsPos) setHeroActionsPos(data.heroActionsPos);
         if (data.bgColors) setBgColors(data.bgColors);
         if (data.bgAngle) setBgAngle(data.bgAngle);
+        if (typeof data.backgroundVisible === "boolean") setBackgroundVisible(data.backgroundVisible);
+        if (typeof data.headlineVisible === "boolean") setHeadlineVisible(data.headlineVisible);
+        if (typeof data.eyebrowVisible === "boolean") setEyebrowVisible(data.eyebrowVisible);
+        if (typeof data.actionsVisible === "boolean") setActionsVisible(data.actionsVisible);
+        if (typeof data.ritualsVisible === "boolean") setRitualsVisible(data.ritualsVisible);
+        if (typeof data.lovedSectionVisible === "boolean") setLovedSectionVisible(data.lovedSectionVisible);
+        if (typeof data.lovedFloralsVisible === "boolean") setLovedFloralsVisible(data.lovedFloralsVisible);
+        if (typeof data.lovedWashVisible === "boolean") setLovedWashVisible(data.lovedWashVisible);
+        if (typeof data.lovedBandVisible === "boolean") setLovedBandVisible(data.lovedBandVisible);
+        if (typeof data.lovedDividerOffsetY === "number") setLovedDividerOffsetY(data.lovedDividerOffsetY);
+        if (typeof data.lovedFloralOffsetY === "number") setLovedFloralOffsetY(data.lovedFloralOffsetY);
+        if (typeof data.lovedFloralOpacity === "number") setLovedFloralOpacity(data.lovedFloralOpacity);
+        if (typeof data.lovedTintOffsetX === "number") setLovedTintOffsetX(data.lovedTintOffsetX);
+        if (typeof data.lovedTintOffsetY === "number") setLovedTintOffsetY(data.lovedTintOffsetY);
+        if (typeof data.lovedTintOpacity === "number") setLovedTintOpacity(data.lovedTintOpacity);
+        if (typeof data.lovedTint2OffsetX === "number") setLovedTint2OffsetX(data.lovedTint2OffsetX);
+        if (typeof data.lovedTint2OffsetY === "number") setLovedTint2OffsetY(data.lovedTint2OffsetY);
+        if (typeof data.lovedTint2Opacity === "number") setLovedTint2Opacity(data.lovedTint2Opacity);
+        if (typeof data.lovedTint2TopPct === "number") setLovedTint2TopPct(data.lovedTint2TopPct);
+        if (typeof data.lovedTint2HeightPct === "number") setLovedTint2HeightPct(data.lovedTint2HeightPct);
         if (typeof data.heroSectionHeight === "number") setHeroSectionHeight(data.heroSectionHeight);
       } catch { }
     }
@@ -333,35 +500,64 @@ export default function HomePageClient({ initialHeroVisual, initialSiteContent }
     return () => observer.disconnect();
   }, [adminDragEnabled, clampFloatingPanelPos]);
 
-  // Intentionally skip async visual-state rehydrate in preview/editor mode.
-  // The page is already initialized from server props and local backup;
-  // late async payloads can overwrite in-progress edits and cause snap-back.
-
   useEffect(() => {
-    eyebrowRatioRef.current = eyebrowPosRatio;
-  }, [eyebrowPosRatio]);
+    let active = true;
+    const loadLatestVisualState = async () => {
+      try {
+        const response = await fetch("/api/hero-media-layout", { cache: "no-store" });
+        if (!response.ok) {
+          return;
+        }
+        const data = (await response.json()) as HeroVisualApiState;
+        if (!active || data.error) {
+          return;
+        }
+        if (data.layout) setHeroMediaLayout(data.layout);
+        if (data.primarySettings) setHeroPrimarySettings(data.primarySettings);
+        if (data.overlayLayer) setHeroOverlayLayer(data.overlayLayer);
+        if (typeof data.headlineSizeRem === "number") setHeadlineSizeRem(data.headlineSizeRem);
+        if (typeof data.heroCopyWidthVw === "number") setHeroCopyWidthVw(data.heroCopyWidthVw);
+        if (data.heroLayout) setHeroLayout(data.heroLayout);
+        if (data.headlinePos) setHeadlinePos(data.headlinePos);
+        if (data.heroActionsPos) setHeroActionsPos(data.heroActionsPos);
+        if (data.eyebrowPos) setEyebrowPos(data.eyebrowPos);
+        if (data.ritualCarouselPos) setRitualCarouselPos(data.ritualCarouselPos);
+        if (data.bgColors) setBgColors(data.bgColors);
+        if (typeof data.bgAngle === "number") setBgAngle(data.bgAngle);
+        if (typeof data.backgroundVisible === "boolean") setBackgroundVisible(data.backgroundVisible);
+        if (typeof data.headlineVisible === "boolean") setHeadlineVisible(data.headlineVisible);
+        if (typeof data.eyebrowVisible === "boolean") setEyebrowVisible(data.eyebrowVisible);
+        if (typeof data.actionsVisible === "boolean") setActionsVisible(data.actionsVisible);
+        if (typeof data.ritualsVisible === "boolean") setRitualsVisible(data.ritualsVisible);
+        if (typeof data.lovedSectionVisible === "boolean") setLovedSectionVisible(data.lovedSectionVisible);
+        if (typeof data.lovedFloralsVisible === "boolean") setLovedFloralsVisible(data.lovedFloralsVisible);
+        if (typeof data.lovedWashVisible === "boolean") setLovedWashVisible(data.lovedWashVisible);
+        if (typeof data.lovedBandVisible === "boolean") setLovedBandVisible(data.lovedBandVisible);
+        if (typeof data.lovedDividerOffsetY === "number") setLovedDividerOffsetY(data.lovedDividerOffsetY);
+        if (typeof data.lovedFloralOffsetY === "number") setLovedFloralOffsetY(data.lovedFloralOffsetY);
+        if (typeof data.lovedFloralOpacity === "number") setLovedFloralOpacity(data.lovedFloralOpacity);
+        if (typeof data.lovedTintOffsetX === "number") setLovedTintOffsetX(data.lovedTintOffsetX);
+        if (typeof data.lovedTintOffsetY === "number") setLovedTintOffsetY(data.lovedTintOffsetY);
+        if (typeof data.lovedTintOpacity === "number") setLovedTintOpacity(data.lovedTintOpacity);
+        if (typeof data.lovedTint2OffsetX === "number") setLovedTint2OffsetX(data.lovedTint2OffsetX);
+        if (typeof data.lovedTint2OffsetY === "number") setLovedTint2OffsetY(data.lovedTint2OffsetY);
+        if (typeof data.lovedTint2Opacity === "number") setLovedTint2Opacity(data.lovedTint2Opacity);
+        if (typeof data.lovedTint2TopPct === "number") setLovedTint2TopPct(data.lovedTint2TopPct);
+        if (typeof data.lovedTint2HeightPct === "number") setLovedTint2HeightPct(data.lovedTint2HeightPct);
+        if (typeof data.heroSectionHeight === "number") setHeroSectionHeight(data.heroSectionHeight);
+      } catch {
+        // Keep current state when API is unavailable.
+      }
+    };
+    void loadLatestVisualState();
+    return () => {
+      active = false;
+    };
+  }, []);
 
   useEffect(() => {
     heroActionsPosRef.current = heroActionsPos;
   }, [heroActionsPos]);
-
-  useLayoutEffect(() => {
-    const element = heroCopyRef.current;
-    if (!element) {
-      return;
-    }
-    const updateSize = () => {
-      const rect = element.getBoundingClientRect();
-      setHeroCopySize({
-        width: Math.max(rect.width, 1),
-        height: Math.max(rect.height, 1)
-      });
-    };
-    updateSize();
-    const observer = new ResizeObserver(updateSize);
-    observer.observe(element);
-    return () => observer.disconnect();
-  }, [content, heroCopyWidthVw]);
 
   const handlePointerDown = (event: React.PointerEvent<HTMLHeadingElement>) => {
     if (!adminDragEnabled) {
@@ -430,74 +626,32 @@ export default function HomePageClient({ initialHeroVisual, initialSiteContent }
     });
   };
 
-  const eyebrowDragStart = useRef<{ x: number; y: number } | null>(null);
-  const eyebrowBase = useRef({ x: 0, y: 0 });
-  const eyebrowDragBounds = useRef({ width: 1, height: 1 });
-
-  const handleEyebrowDown = (event: React.PointerEvent<HTMLSpanElement>) => {
-    if (!adminDragEnabled) {
-      return;
-    }
-    eyebrowDragStart.current = { x: event.clientX, y: event.clientY };
-    eyebrowBase.current = eyebrowPosRatio;
-    const rect = heroCopyRef.current?.getBoundingClientRect();
-    eyebrowDragBounds.current = {
-      width: rect ? Math.max(rect.width, 1) : heroCopySize.width,
-      height: rect ? Math.max(rect.height, 1) : heroCopySize.height
-    };
-    event.currentTarget.setPointerCapture(event.pointerId);
-  };
-
-  const handleEyebrowMove = (event: React.PointerEvent<HTMLSpanElement>) => {
-    if (!eyebrowDragStart.current || !adminDragEnabled) {
-      return;
-    }
-    const dx = event.clientX - eyebrowDragStart.current.x;
-    const dy = event.clientY - eyebrowDragStart.current.y;
-    const next = {
-      x: eyebrowBase.current.x + dx / eyebrowDragBounds.current.width,
-      y: eyebrowBase.current.y + dy / eyebrowDragBounds.current.height
-    };
-    eyebrowRatioRef.current = next;
-    setEyebrowPosRatio(next);
-  };
-
-  const handleEyebrowUp = (event: React.PointerEvent<HTMLSpanElement>) => {
-    if (!adminDragEnabled) {
-      return;
-    }
-    eyebrowDragStart.current = null;
-    event.currentTarget.releasePointerCapture(event.pointerId);
-    void persistHeroVisualPatch({
-      eyebrowPosRatio: {
-        x: eyebrowRatioRef.current.x,
-        y: eyebrowRatioRef.current.y
+  const clearSavedVisualPositions = useCallback(() => {
+    try {
+      const stored = window.localStorage.getItem(VISUAL_STATE_STORAGE_KEY);
+      if (stored) {
+        const data = JSON.parse(stored) as HeroVisualApiState;
+        delete data.eyebrowPos;
+        delete data.eyebrowPosRatio;
+        delete data.ritualCarouselPos;
+        window.localStorage.setItem(VISUAL_STATE_STORAGE_KEY, JSON.stringify(data));
       }
-    });
-  };
-
-  const eyebrowPos = {
-    x: eyebrowPosRatio.x * heroCopySize.width,
-    y: eyebrowPosRatio.y * heroCopySize.height
-  };
-
-  const setEyebrowXFromPx = useCallback((nextX: number) => {
-    const nextRatio = { ...eyebrowRatioRef.current, x: nextX / (heroCopySize.width || 1) };
-    eyebrowRatioRef.current = nextRatio;
-    setEyebrowPosRatio(nextRatio);
-  }, [heroCopySize.width]);
-
-  const setEyebrowYFromPx = useCallback((nextY: number) => {
-    const nextRatio = { ...eyebrowRatioRef.current, y: nextY / (heroCopySize.height || 1) };
-    eyebrowRatioRef.current = nextRatio;
-    setEyebrowPosRatio(nextRatio);
-  }, [heroCopySize.height]);
-
-  const commitEyebrowRatio = useCallback(() => {
-    void persistHeroVisualPatch({ eyebrowPosRatio: eyebrowRatioRef.current });
+      window.localStorage.removeItem(RITUAL_TEASER_POS_STORAGE_KEY);
+    } catch {
+      window.localStorage.removeItem(VISUAL_STATE_STORAGE_KEY);
+      window.localStorage.removeItem(RITUAL_TEASER_POS_STORAGE_KEY);
+    }
   }, []);
 
   const persistHeroVisualPatch = async (patch: HeroVisualApiState) => {
+    try {
+      const stored = window.localStorage.getItem(VISUAL_STATE_STORAGE_KEY);
+      const backup = stored ? JSON.parse(stored) as HeroVisualApiState : {};
+      window.localStorage.setItem(VISUAL_STATE_STORAGE_KEY, JSON.stringify({ ...backup, ...patch }));
+    } catch {
+      // Server persistence is the source of truth.
+    }
+
     try {
       await fetch("/api/hero-media-layout", {
         method: "POST",
@@ -509,10 +663,27 @@ export default function HomePageClient({ initialHeroVisual, initialSiteContent }
     }
   };
 
+  const setEyebrowXFromPx = useCallback((nextX: number) => {
+    const next = { ...eyebrowPos, x: nextX };
+    setEyebrowPos(next);
+    void persistHeroVisualPatch({ eyebrowPos: next });
+  }, [eyebrowPos]);
+
+  const setEyebrowYFromPx = useCallback((nextY: number) => {
+    const next = { ...eyebrowPos, y: nextY };
+    setEyebrowPos(next);
+    void persistHeroVisualPatch({ eyebrowPos: next });
+  }, [eyebrowPos]);
+
   const handleSaveAll = async () => {
     setSaveStatus("saving");
     const visualData = {
       layout: heroMediaLayout,
+      backgroundVisible,
+      headlineVisible,
+      eyebrowVisible,
+      actionsVisible,
+      ritualsVisible,
       primarySettings: heroPrimarySettings,
       overlayLayer: heroOverlayLayer,
       headlineSizeRem,
@@ -521,9 +692,24 @@ export default function HomePageClient({ initialHeroVisual, initialSiteContent }
       headlinePos,
       heroActionsPos,
       ritualCarouselPos,
-      eyebrowPosRatio,
+      eyebrowPos,
       bgColors,
       bgAngle,
+      lovedSectionVisible,
+      lovedFloralsVisible,
+      lovedWashVisible,
+      lovedBandVisible,
+      lovedDividerOffsetY,
+      lovedFloralOffsetY,
+      lovedFloralOpacity,
+      lovedTintOffsetX,
+      lovedTintOffsetY,
+      lovedTintOpacity,
+      lovedTint2OffsetX,
+      lovedTint2OffsetY,
+      lovedTint2Opacity,
+      lovedTint2TopPct,
+      lovedTint2HeightPct,
       heroSectionHeight
     };
 
@@ -557,6 +743,11 @@ export default function HomePageClient({ initialHeroVisual, initialSiteContent }
     const config = {
       visual: {
         layout: heroMediaLayout,
+        backgroundVisible,
+        headlineVisible,
+        eyebrowVisible,
+        actionsVisible,
+        ritualsVisible,
         primarySettings: heroPrimarySettings,
         overlayLayer: heroOverlayLayer,
         headlineSizeRem,
@@ -564,10 +755,25 @@ export default function HomePageClient({ initialHeroVisual, initialSiteContent }
         heroLayout,
         headlinePos,
         heroActionsPos,
-        eyebrowPosRatio,
+        eyebrowPos,
         bgColors,
         bgAngle,
         ritualCarouselPos,
+        lovedSectionVisible,
+        lovedFloralsVisible,
+        lovedWashVisible,
+        lovedBandVisible,
+        lovedDividerOffsetY,
+        lovedFloralOffsetY,
+        lovedFloralOpacity,
+        lovedTintOffsetX,
+        lovedTintOffsetY,
+        lovedTintOpacity,
+        lovedTint2OffsetX,
+        lovedTint2OffsetY,
+        lovedTint2Opacity,
+        lovedTint2TopPct,
+        lovedTint2HeightPct,
         heroSectionHeight
       },
       content
@@ -629,11 +835,85 @@ export default function HomePageClient({ initialHeroVisual, initialSiteContent }
         return;
       }
       if (selectedHeroLayer === "overlay") {
-        setOverlayLayerAndSave({
-          ...heroOverlayLayer,
-          src: dataUrl,
-          visible: true
-        });
+        if (file.type.startsWith("image/")) {
+          const image = new Image();
+          image.onload = () => {
+            const hasTransparency = imageHasTransparency(image);
+            if (!hasTransparency) {
+              window.alert("This image has no transparency (alpha). Please upload a real transparent PNG/WebP.");
+            }
+            const maxWidth = 1920;
+            const maxHeight = 1080;
+            const scale = Math.min(maxWidth / image.width, maxHeight / image.height, 1);
+            const canvas = document.createElement("canvas");
+            canvas.width = Math.round(image.width * scale);
+            canvas.height = Math.round(image.height * scale);
+            const ctx = canvas.getContext("2d");
+            if (!ctx) {
+              return;
+            }
+            ctx.drawImage(image, 0, 0, canvas.width, canvas.height);
+            const keepAlpha =
+              file.type === "image/png" || file.type === "image/webp" || file.type === "image/gif";
+            const compressed = keepAlpha
+              ? canvas.toDataURL("image/png")
+              : canvas.toDataURL("image/jpeg", 0.76);
+            setOverlayLayerAndSave({
+              ...heroOverlayLayer,
+              src: compressed,
+              visible: true
+            });
+          };
+          image.src = dataUrl;
+        } else {
+          setOverlayLayerAndSave({
+            ...heroOverlayLayer,
+            src: dataUrl,
+            visible: true
+          });
+        }
+        return;
+      }
+      if (file.type.startsWith("image/")) {
+        const image = new Image();
+        image.onload = () => {
+          const hasTransparency = imageHasTransparency(image);
+          if (!hasTransparency) {
+            window.alert("This image has no transparency (alpha). Please upload a real transparent PNG/WebP.");
+          }
+          const maxWidth = 1920;
+          const maxHeight = 1080;
+          const scale = Math.min(maxWidth / image.width, maxHeight / image.height, 1);
+          const canvas = document.createElement("canvas");
+          canvas.width = Math.round(image.width * scale);
+          canvas.height = Math.round(image.height * scale);
+          const ctx = canvas.getContext("2d");
+          if (!ctx) {
+            return;
+          }
+          ctx.drawImage(image, 0, 0, canvas.width, canvas.height);
+          const keepAlpha =
+            file.type === "image/png" || file.type === "image/webp" || file.type === "image/gif";
+          const compressed = keepAlpha
+            ? canvas.toDataURL("image/png")
+            : canvas.toDataURL("image/jpeg", 0.76);
+          setContent((prev) => {
+            const next = {
+              ...prev,
+              hero: {
+                ...prev.hero,
+                video: {
+                  ...prev.hero.video,
+                  poster: compressed,
+                  src: ""
+                }
+              }
+            };
+            void persistSiteContentToServer(next);
+            return next;
+          });
+        };
+        image.src = dataUrl;
         return;
       }
       setContent((prev) => {
@@ -641,16 +921,10 @@ export default function HomePageClient({ initialHeroVisual, initialSiteContent }
           ...prev,
           hero: {
             ...prev.hero,
-            video: file.type.startsWith("video/")
-              ? {
-                  ...prev.hero.video,
-                  src: dataUrl
-                }
-              : {
-                  ...prev.hero.video,
-                  poster: dataUrl,
-                  src: ""
-                }
+            video: {
+              ...prev.hero.video,
+              src: dataUrl
+            }
           }
         };
         void persistSiteContentToServer(next);
@@ -705,16 +979,34 @@ export default function HomePageClient({ initialHeroVisual, initialSiteContent }
     };
   };
 
-  const handleRitualPositionChange = useCallback((next: { x: number; y: number }) => {
-    lastRitualLocalEditAt.current = Date.now();
-    setRitualCarouselPos(next);
-  }, []);
-
-  const handleRitualPositionCommit = useCallback((next: { x: number; y: number }) => {
-    lastRitualLocalEditAt.current = Date.now();
-    setRitualCarouselPos(next);
-    void persistHeroVisualPatch({ ritualCarouselPos: next });
-  }, []);
+  const floatingPanelChromeStyle = useMemo((): CSSProperties => {
+    if (floatingPanelMinimized) {
+      if (!isMobileViewport) {
+        return { transform: `translate(${floatingPanelPos.x}px, ${floatingPanelPos.y}px)` };
+      }
+      return {};
+    }
+    const chrome: CSSProperties = {
+      backgroundColor: `rgba(246, 245, 241, ${floatingChrome.bgOpacity})`,
+      bottom: floatingChrome.bottomPx
+    };
+    if (isMobileViewport) {
+      chrome.left = floatingChrome.sideInsetPx;
+      chrome.right = floatingChrome.sideInsetPx;
+    } else {
+      chrome.right = floatingChrome.sideInsetPx;
+      chrome.transform = `translate(${floatingPanelPos.x}px, ${floatingPanelPos.y}px)`;
+    }
+    return chrome;
+  }, [
+    floatingPanelMinimized,
+    isMobileViewport,
+    floatingPanelPos.x,
+    floatingPanelPos.y,
+    floatingChrome.bgOpacity,
+    floatingChrome.bottomPx,
+    floatingChrome.sideInsetPx
+  ]);
 
   const bestSellersItems = useMemo(() => {
     return products
@@ -886,7 +1178,29 @@ export default function HomePageClient({ initialHeroVisual, initialSiteContent }
   const { hero, carousel, highlights, brand } = content;
   const hasHeroMedia = Boolean(hero.video.src || hero.video.poster);
   const hasOverlayMedia = Boolean(heroOverlayLayer.visible && heroOverlayLayer.src);
-  const hasAnyHeroVisualLayer = hasHeroMedia || hasOverlayMedia;
+  // `hero-bg` adds a full-section darkening overlay via CSS (`.hero-bg::before`).
+  // Only enable `hero-bg` when there is actually visible hero media.
+  const hasAnyHeroVisualLayer =
+    (hasHeroMedia && heroPrimarySettings.visible && heroPrimarySettings.opacity > 0.01) ||
+    (hasOverlayMedia && heroOverlayLayer.visible && heroOverlayLayer.opacity > 0.01);
+  const safeHeroSectionHeight = isMobileViewport ? Math.min(heroSectionHeight, 115) : heroSectionHeight;
+  const mobileNeutralPos = { x: 0, y: 0 };
+  const mobileHeroLayout = isMobileViewport
+    ? { x: 0, y: 0, width: 100, height: 100 }
+    : heroLayout;
+  const mobilePrimaryLayout = isMobileViewport
+    ? { x: 50, y: 52, width: 92, height: 74 }
+    : heroMediaLayout;
+  const mobileOverlayLayout = isMobileViewport
+    ? { ...heroOverlayLayer.layout, x: 50, y: 52, width: 94, height: 76 }
+    : heroOverlayLayer.layout;
+  const mobilePrimaryScale = isMobileViewport ? Math.min(heroPrimarySettings.scale || 1, 1) : (heroPrimarySettings.scale || 1);
+  const mobileOverlayScale = isMobileViewport ? Math.min(heroOverlayLayer.scale || 1, 1) : (heroOverlayLayer.scale || 1);
+  const copyWidth = isMobileViewport ? 92 : heroCopyWidthVw;
+  const eyebrowRenderPos = isMobileViewport ? mobileNeutralPos : eyebrowPos;
+  const headlineRenderPos = isMobileViewport ? mobileNeutralPos : headlinePos;
+  const heroActionsRenderPos = isMobileViewport ? mobileNeutralPos : heroActionsPos;
+  const ritualRenderPos = isMobileViewport ? mobileNeutralPos : ritualCarouselPos;
   const primaryMediaPointerEvents =
     hasHeroMedia && adminDragEnabled && selectedHeroLayer === "overlay" ? "none" : "auto";
   const overlayMediaPointerEvents =
@@ -898,50 +1212,60 @@ export default function HomePageClient({ initialHeroVisual, initialSiteContent }
         className={`hero ${hasAnyHeroVisualLayer ? "hero-bg" : ""}`}
         id="hero"
         ref={heroSectionRef}
-        style={{ minHeight: `${heroSectionHeight}vh` }}
+        style={{ minHeight: `${safeHeroSectionHeight}vh` }}
       >
-        <div
-          className="hero-background-layer"
-          aria-hidden="true"
-          style={{
-            transform: `translate(${heroLayout.x}vw, ${heroLayout.y}vh)`,
-            width: `${heroLayout.width}vw`,
-            minHeight: `${heroLayout.height}vh`,
-            background: `linear-gradient(${bgAngle}deg, ${bgColors.join(", ")})`
-          }}
-        />
-        <div className="hero-copy" ref={heroCopyRef}>
-          <div style={{ width: `${heroCopyWidthVw}vw`, maxWidth: "100%" }}>
-          <span
-            className="eyebrow hero-eyebrow scroll-zoom"
-            style={{ transform: `translate(${eyebrowPos.x}px, ${eyebrowPos.y}px)` }}
-          >
-            {hero.eyebrow}
-          </span>
-          <h1
-            className="hero-headline scroll-zoom"
-            style={{
-              transform: `translate(${headlinePos.x}px, ${headlinePos.y}px)`,
-              fontSize: `${headlineSizeRem}rem`
-            }}
-          >
-            {hero.headline}
-          </h1>
-          {hero.subhead ? <p className="scroll-zoom">{hero.subhead}</p> : null}
+        {backgroundVisible ? (
           <div
-            className={`hero-actions${adminDragEnabled ? " hero-cta-drag" : ""}`}
-            style={{ transform: `translate(${heroActionsPos.x}px, ${heroActionsPos.y}px)` }}
-          >
-            <Link href="/special" className="button primary button-gold">
-              {hero.ctaPrimary}
-            </Link>
-            <Link href="/rituals" className="button primary button-sage">
-              {hero.ctaSecondary}
-            </Link>
-            <Link href="#shop" className="button secondary">
-              Search Products
-            </Link>
-          </div>
+            className="hero-background-layer"
+            aria-hidden="true"
+            style={{
+              transform: `translate(${mobileHeroLayout.x}vw, ${mobileHeroLayout.y}vh)`,
+              width: `${mobileHeroLayout.width}vw`,
+              // Always cover the hero section; otherwise the hero's ::before overlay darkens the
+              // underlying page background and reads as an uncontrolled "grey band".
+              minHeight: `${safeHeroSectionHeight}vh`,
+              background: `linear-gradient(${bgAngle}deg, ${bgColors.join(", ")})`
+            }}
+          />
+        ) : null}
+        <div className="hero-copy">
+          <div style={{ width: `${copyWidth}vw`, maxWidth: "100%" }}>
+          {eyebrowVisible ? (
+            <span
+              className="eyebrow hero-eyebrow scroll-zoom"
+              style={{ transform: `translate(${eyebrowRenderPos.x}px, ${eyebrowRenderPos.y}px)` }}
+            >
+              {hero.eyebrow}
+            </span>
+          ) : null}
+          {headlineVisible ? (
+            <h1
+              className="hero-headline scroll-zoom"
+              style={{
+                transform: `translate(${headlineRenderPos.x}px, ${headlineRenderPos.y}px)`,
+                fontSize: `${headlineSizeRem}rem`
+              }}
+            >
+              {hero.headline}
+            </h1>
+          ) : null}
+          {hero.subhead ? <p className="scroll-zoom">{hero.subhead}</p> : null}
+          {actionsVisible ? (
+            <div
+              className={`hero-actions${adminDragEnabled ? " hero-cta-drag" : ""}`}
+              style={{ transform: `translate(${heroActionsRenderPos.x}px, ${heroActionsRenderPos.y}px)` }}
+            >
+              <Link href="/special" className="button primary button-gold">
+                {hero.ctaPrimary}
+              </Link>
+              <Link href="/rituals" className="button primary button-sage">
+                {hero.ctaSecondary}
+              </Link>
+              <Link href="#shop" className="button secondary">
+                Search Products
+              </Link>
+            </div>
+          ) : null}
           {hero.phrases.length > 0 ? (
             <div className="phrase-cycle" aria-live="polite">
               {hero.phrases.map((phrase, index) => (
@@ -967,11 +1291,11 @@ export default function HomePageClient({ initialHeroVisual, initialSiteContent }
                   adminDragEnabled && selectedHeroLayer === "overlay" ? "hero-media-editable" : ""
                 }`}
                 style={{
-                  left: `${heroOverlayLayer.layout.x}%`,
-                  top: `${heroOverlayLayer.layout.y}%`,
-                  width: `${heroOverlayLayer.layout.width}%`,
-                  height: `${heroOverlayLayer.layout.height}%`,
-                  transform: `rotate(${heroOverlayLayer.rotateDeg}deg) scale(${heroOverlayLayer.scale || 1})`,
+                  left: `${mobileOverlayLayout.x}%`,
+                  top: `${mobileOverlayLayout.y}%`,
+                  width: `${mobileOverlayLayout.width}%`,
+                  height: `${mobileOverlayLayout.height}%`,
+                  transform: `translate(-50%, -50%) rotate(${heroOverlayLayer.rotateDeg}deg) scale(${mobileOverlayScale})`,
                   opacity: heroOverlayLayer.opacity,
                   zIndex: heroOverlayLayer.zIndex,
                   pointerEvents: overlayMediaPointerEvents
@@ -990,11 +1314,11 @@ export default function HomePageClient({ initialHeroVisual, initialSiteContent }
             <div
               className={`hero-media-frame ${adminDragEnabled && selectedHeroLayer === "primary" ? "hero-media-editable" : ""}`}
               style={{
-                left: `${heroMediaLayout.x}%`,
-                top: `${heroMediaLayout.y}%`,
-                width: `${heroMediaLayout.width}%`,
-                height: `${heroMediaLayout.height}%`,
-                transform: `rotate(${heroPrimarySettings.rotateDeg}deg) scale(${heroPrimarySettings.scale || 1})`,
+                left: `${mobilePrimaryLayout.x}%`,
+                top: `${mobilePrimaryLayout.y}%`,
+                width: `${mobilePrimaryLayout.width}%`,
+                height: `${mobilePrimaryLayout.height}%`,
+                transform: `translate(-50%, -50%) rotate(${heroPrimarySettings.rotateDeg}deg) scale(${mobilePrimaryScale})`,
                 opacity: heroPrimarySettings.opacity,
                 zIndex: heroPrimarySettings.zIndex,
                 display: heroPrimarySettings.visible ? "block" : "none",
@@ -1026,30 +1350,45 @@ export default function HomePageClient({ initialHeroVisual, initialSiteContent }
           </div>
         ) : null}
 
-        <RitualFaceTeaser
-          products={products}
-          position={ritualCarouselPos}
-          onPositionChange={handleRitualPositionChange}
-          onPositionCommit={handleRitualPositionCommit}
-        />
+        {ritualsVisible ? (
+          <RitualFaceTeaser
+            products={products}
+            position={ritualRenderPos}
+          />
+        ) : null}
       </section>
 
-      <ProductScroller
-        className="scroller-loved-for-a-reason"
-        title={carousel.title}
-        subtitle={carousel.subtitle}
-        items={carousel.slides.map((s) => {
-          const product = products.find(p => p.name === s.label || p.id === s.id);
-          return {
-            label: s.label,
-            description: s.description,
-            image: s.image,
-            color: s.color,
-            href: `/product/${s.label.toLowerCase().replace(/\s+/g, "-")}`,
-            product
-          };
-        })}
-      />
+      {lovedSectionVisible ? (
+        <ProductScroller
+          className="scroller-loved-for-a-reason"
+          sectionStyle={{
+            "--loved-divider-offset-y": `${lovedDividerOffsetY}px`,
+            "--loved-floral-offset-y": `${lovedFloralOffsetY}px`,
+            "--loved-floral-opacity": String(lovedFloralsVisible ? lovedFloralOpacity : 0),
+            "--loved-tint-offset-x": `${lovedTintOffsetX}px`,
+            "--loved-tint-offset-y": `${lovedTintOffsetY}px`,
+            "--loved-tint-opacity": String(lovedWashVisible ? lovedTintOpacity : 0),
+            "--loved-tint2-offset-x": `${lovedTint2OffsetX}px`,
+            "--loved-tint2-offset-y": `${lovedTint2OffsetY}px`,
+            "--loved-tint2-opacity": String(lovedBandVisible ? lovedTint2Opacity : 0),
+            "--loved-tint2-top-pct": `${lovedTint2TopPct}%`,
+            "--loved-tint2-height-pct": `${lovedTint2HeightPct}%`
+          } as CSSProperties}
+          title={carousel.title}
+          subtitle={carousel.subtitle}
+          items={carousel.slides.map((s) => {
+            const product = products.find(p => p.name === s.label || p.id === s.id);
+            return {
+              label: s.label,
+              description: s.description,
+              image: s.image,
+              color: s.color,
+              href: `/product/${s.label.toLowerCase().replace(/\s+/g, "-")}`,
+              product
+            };
+          })}
+        />
+      ) : null}
 
       <section className="instagram-section">
         <div className="scroller-header">
@@ -1106,13 +1445,13 @@ export default function HomePageClient({ initialHeroVisual, initialSiteContent }
 
       <div
         ref={floatingPanelRef}
-        className={`floating-admin-toggle${floatingPanelMinimized ? " is-minimized" : ""}`}
+        className={`floating-admin-toggle${floatingPanelMinimized ? " is-minimized" : ""}${isMobileViewport ? " is-mobile-controls" : ""}`}
         role="complementary"
         aria-label="Admin controls"
-        onPointerDown={handleFloatingPanelPointerDown}
-        onPointerMove={handleFloatingPanelPointerMove}
-        onPointerUp={handleFloatingPanelPointerUp}
-        style={{ transform: `translate(${floatingPanelPos.x}px, ${floatingPanelPos.y}px)` }}
+        onPointerDown={isMobileViewport ? undefined : handleFloatingPanelPointerDown}
+        onPointerMove={isMobileViewport ? undefined : handleFloatingPanelPointerMove}
+        onPointerUp={isMobileViewport ? undefined : handleFloatingPanelPointerUp}
+        style={floatingPanelChromeStyle}
       >
         {floatingPanelMinimized ? (
           <button
@@ -1173,6 +1512,79 @@ export default function HomePageClient({ initialHeroVisual, initialSiteContent }
             >
               Switch to {adminDragEnabled ? "Non-admin" : "Admin"}
             </button>
+
+            <div className="floating-admin-grid">
+              <span className="floating-admin-hint" style={{ color: "var(--soft-ink)", gridColumn: "1 / -1" }}>
+                Bottom toolbar / floating panel (position & opacity — saved in this browser only).
+              </span>
+              <label>
+                Panel opacity{" "}
+                <input
+                  type="range"
+                  min={0.08}
+                  max={1}
+                  step={0.02}
+                  value={floatingChrome.bgOpacity}
+                  onChange={(e) =>
+                    setFloatingChrome((prev) => ({
+                      ...prev,
+                      bgOpacity: Number(e.target.value)
+                    }))
+                  }
+                />{" "}
+                <span>{floatingChrome.bgOpacity.toFixed(2)}</span>
+              </label>
+              <label>
+                Bottom offset{" "}
+                <input
+                  type="range"
+                  min={0}
+                  max={160}
+                  step={1}
+                  value={floatingChrome.bottomPx}
+                  onChange={(e) =>
+                    setFloatingChrome((prev) => ({
+                      ...prev,
+                      bottomPx: Math.round(Number(e.target.value))
+                    }))
+                  }
+                />{" "}
+                <span>{floatingChrome.bottomPx}px</span>
+              </label>
+              <label>
+                Side inset{" "}
+                <input
+                  type="range"
+                  min={0}
+                  max={56}
+                  step={1}
+                  value={floatingChrome.sideInsetPx}
+                  onChange={(e) =>
+                    setFloatingChrome((prev) => ({
+                      ...prev,
+                      sideInsetPx: Math.round(Number(e.target.value))
+                    }))
+                  }
+                />{" "}
+                <span>{floatingChrome.sideInsetPx}px</span>
+              </label>
+              <button
+                type="button"
+                className="button secondary"
+                onClick={() => {
+                  const next = { ...defaultFloatingChrome };
+                  setFloatingChrome(next);
+                  try {
+                    window.localStorage.setItem(FLOATING_ADMIN_CHROME_KEY, JSON.stringify(next));
+                  } catch {
+                    // ignore
+                  }
+                }}
+              >
+                Reset panel chrome
+              </button>
+            </div>
+
             {adminDragEnabled ? (
               <>
             <label className="floating-admin-upload">
@@ -1183,50 +1595,8 @@ export default function HomePageClient({ initialHeroVisual, initialSiteContent }
                 onChange={handleHeroMediaUpload}
               />
             </label>
-            <div className="floating-admin-grid">
-              <span className="floating-admin-hint" style={{ color: "var(--soft-ink)" }}>
-                Primary draws on top. If the scene looks zoomed full-width, open Primary and reduce W/H (it is often
-                100% while Overlay is smaller).
-              </span>
-              <label>
-                Visible
-                <input
-                  type="checkbox"
-                  checked={activeLayerSettings.visible}
-                  onChange={(event) => {
-                    if (selectedHeroLayer === "primary") {
-                      setPrimarySettingsAndSave({
-                        ...heroPrimarySettings,
-                        visible: event.target.checked
-                      });
-                    } else {
-                      setOverlayLayerAndSave({
-                        ...heroOverlayLayer,
-                        visible: event.target.checked
-                      });
-                    }
-                  }}
-                />
-              </label>
-              <label className="floating-admin-select-group">
-                Fit
-                <select
-                  value={activeLayerSettings.fit}
-                  onChange={(event) => {
-                    const fit = event.target.value as "cover" | "contain";
-                    if (selectedHeroLayer === "primary") {
-                      setPrimarySettingsAndSave({ ...heroPrimarySettings, fit });
-                    } else {
-                      setOverlayLayerAndSave({ ...heroOverlayLayer, fit });
-                    }
-                  }}
-                  style={{ background: "#fff", border: "1px solid #ccc", borderRadius: "4px", padding: "2px 4px", fontSize: "0.8rem", color: "var(--ink)" }}
-                >
-                  <option value="cover">Cover</option>
-                  <option value="contain">Contain</option>
-                </select>
-              </label>
-            </div>
+
+            {/* Loved veil controls moved into Select Layer dropdown (Layer 1/2/3). */}
 
             <div className="floating-admin-grid">
               <label className="floating-admin-select-group">
@@ -1243,11 +1613,15 @@ export default function HomePageClient({ initialHeroVisual, initialSiteContent }
                 >
                   <option value="primary">Primary Media</option>
                   <option value="overlay">Overlay Media</option>
-                  <option value="background">Background</option>
+                  <option value="background">Background (gradient)</option>
                   <option value="headline">Headline</option>
                   <option value="eyebrow">Eyebrow</option>
-                  <option value="actions">Hero Actions</option>
-                  <option value="rituals">Ritual Carousel</option>
+                  <option value="actions">Hero actions row</option>
+                  <option value="rituals">Ritual carousel</option>
+                  <option value="loved-section">Loved section (position)</option>
+                  <option value="loved-florals">Layer 1 — Loved florals</option>
+                  <option value="loved-wash">Layer 2 — Loved wash veil</option>
+                  <option value="loved-band">Layer 3 — Loved band veil</option>
                 </select>
               </label>
             </div>
@@ -1256,81 +1630,234 @@ export default function HomePageClient({ initialHeroVisual, initialSiteContent }
             <div className="floating-admin-grid">
               {adminEditLayer === "background" && (
                 <>
-                  <label>X <input type="range" min={-100} max={100} step={0.1} value={heroLayout.x} onChange={e => { const next = {...heroLayout, x: Number(e.target.value)}; setHeroLayout(next); void persistHeroVisualPatch({heroLayout: next}); }} /> <span>{heroLayout.x.toFixed(1)}vw</span></label>
-                  <label>Y <input type="range" min={-100} max={100} step={0.1} value={heroLayout.y} onChange={e => { const next = {...heroLayout, y: Number(e.target.value)}; setHeroLayout(next); void persistHeroVisualPatch({heroLayout: next}); }} /> <span>{heroLayout.y.toFixed(1)}vh</span></label>
-                  <label>Width <input type="range" min={30} max={200} step={1} value={heroLayout.width} onChange={e => { const next = {...heroLayout, width: Number(e.target.value)}; setHeroLayout(next); void persistHeroVisualPatch({heroLayout: next}); }} /> <span>{heroLayout.width.toFixed(0)}vw</span></label>
-                  <label>Background Height <input type="range" min={30} max={500} step={1} value={heroLayout.height} onChange={e => { const next = {...heroLayout, height: Number(e.target.value)}; setHeroLayout(next); void persistHeroVisualPatch({heroLayout: next}); }} /> <span>{heroLayout.height.toFixed(0)}vh</span></label>
-                  <label>Total Section Height <input type="range" min={50} max={500} step={1} value={heroSectionHeight} onChange={e => { const next = Number(e.target.value); setHeroSectionHeight(next); void persistHeroVisualPatch({heroSectionHeight: next}); }} /> <span>{heroSectionHeight}vh</span></label>
-                  <label>Gradient Angle <input type="range" min={0} max={360} step={1} value={bgAngle} onChange={e => { const next = Number(e.target.value); setBgAngle(next); void persistHeroVisualPatch({bgAngle: next}); }} /> <span>{bgAngle.toFixed(0)}deg</span></label>
                   <label>
-                    Background Colors
-                    <div style={{ display: "flex", gap: "8px", marginTop: "4px" }}>
-                      {bgColors.map((color, index) => (
-                        <input
-                          key={index}
-                          type="color"
-                          value={color}
-                          onChange={(event) => {
-                            const next = [...bgColors];
-                            next[index] = event.target.value;
-                            setBgColors(next);
-                            void persistHeroVisualPatch({ bgColors: next });
-                          }}
-                          style={{ width: "40px", height: "40px", border: "1px solid #ddd", borderRadius: "4px", padding: 0, cursor: "pointer" }}
-                        />
-                      ))}
-                    </div>
+                    Visible{" "}
+                    <input
+                      type="checkbox"
+                      checked={backgroundVisible}
+                      onChange={(e) => {
+                        const next = e.target.checked;
+                        setBackgroundVisible(next);
+                        void persistHeroVisualPatch({ backgroundVisible: next });
+                      }}
+                    />
                   </label>
+                  <label>
+                    X{" "}
+                    <input
+                      type="range"
+                      min={-100}
+                      max={100}
+                      step={0.1}
+                      value={heroLayout.x}
+                      onChange={(e) => {
+                        const next = { ...heroLayout, x: Number(e.target.value) };
+                        setHeroLayout(next);
+                        void persistHeroVisualPatch({ heroLayout: next });
+                      }}
+                    />{" "}
+                    <span>{heroLayout.x.toFixed(1)}vw</span>
+                  </label>
+                  <label>
+                    Y{" "}
+                    <input
+                      type="range"
+                      min={-100}
+                      max={100}
+                      step={0.1}
+                      value={heroLayout.y}
+                      onChange={(e) => {
+                        const next = { ...heroLayout, y: Number(e.target.value) };
+                        setHeroLayout(next);
+                        void persistHeroVisualPatch({ heroLayout: next });
+                      }}
+                    />{" "}
+                    <span>{heroLayout.y.toFixed(1)}vh</span>
+                  </label>
+                  <span className="floating-admin-hint" style={{ gridColumn: "1 / -1", fontSize: "0.74rem" }}>
+                    (Only X/Y are shown now. Gradient colors/size moved out for clarity.)
+                  </span>
                 </>
               )}
               {adminEditLayer === "primary" && (
                 <>
-                  <label>X <input type="range" min={-100} max={100} step={0.1} value={heroMediaLayout.x} onChange={e => setHeroMediaLayoutAndSave({...heroMediaLayout, x: Number(e.target.value)})} /> <span>{heroMediaLayout.x.toFixed(1)}%</span></label>
-                  <label>Y <input type="range" min={-100} max={100} step={0.1} value={heroMediaLayout.y} onChange={e => setHeroMediaLayoutAndSave({...heroMediaLayout, y: Number(e.target.value)})} /> <span>{heroMediaLayout.y.toFixed(1)}%</span></label>
-                  <label>Width <input type="range" min={5} max={200} step={1} value={heroMediaLayout.width} onChange={e => setHeroMediaLayoutAndSave({...heroMediaLayout, width: Number(e.target.value)})} /> <span>{heroMediaLayout.width.toFixed(0)}%</span></label>
-                  <label>Height <input type="range" min={5} max={200} step={1} value={heroMediaLayout.height} onChange={e => setHeroMediaLayoutAndSave({...heroMediaLayout, height: Number(e.target.value)})} /> <span>{heroMediaLayout.height.toFixed(0)}%</span></label>
-                  <label>Scale <input type="range" min={0.1} max={3} step={0.01} value={heroPrimarySettings.scale} onChange={e => setPrimarySettingsAndSave({...heroPrimarySettings, scale: Number(e.target.value)})} /> <span>{heroPrimarySettings.scale.toFixed(2)}x</span></label>
-                  <label className="floating-admin-select-group">
-                    Fit
-                    <select
-                      value={heroPrimarySettings.fit}
-                      onChange={e => setPrimarySettingsAndSave({...heroPrimarySettings, fit: e.target.value as any})}
-                    >
-                      <option value="cover">Cover</option>
-                      <option value="contain">Contain</option>
-                    </select>
+                  <label>
+                    Visible{" "}
+                    <input
+                      type="checkbox"
+                      checked={heroPrimarySettings.visible}
+                      onChange={(e) =>
+                        setPrimarySettingsAndSave({
+                          ...heroPrimarySettings,
+                          visible: e.target.checked
+                        })
+                      }
+                    />
+                  </label>
+                  <label>
+                    X{" "}
+                    <input
+                      type="range"
+                      min={-100}
+                      max={100}
+                      step={0.1}
+                      value={heroMediaLayout.x}
+                      onChange={(e) => setHeroMediaLayoutAndSave({ ...heroMediaLayout, x: Number(e.target.value) })}
+                    />{" "}
+                    <span>{heroMediaLayout.x.toFixed(1)}%</span>
+                  </label>
+                  <label>
+                    Y{" "}
+                    <input
+                      type="range"
+                      min={-100}
+                      max={100}
+                      step={0.1}
+                      value={heroMediaLayout.y}
+                      onChange={(e) => setHeroMediaLayoutAndSave({ ...heroMediaLayout, y: Number(e.target.value) })}
+                    />{" "}
+                    <span>{heroMediaLayout.y.toFixed(1)}%</span>
+                  </label>
+                  <label>
+                    Opacity{" "}
+                    <input
+                      type="range"
+                      min={0}
+                      max={1}
+                      step={0.01}
+                      value={heroPrimarySettings.opacity}
+                      onChange={(e) =>
+                        setPrimarySettingsAndSave({
+                          ...heroPrimarySettings,
+                          opacity: Number(e.target.value)
+                        })
+                      }
+                    />{" "}
+                    <span>{heroPrimarySettings.opacity.toFixed(2)}</span>
                   </label>
                 </>
               )}
               {adminEditLayer === "overlay" && (
                 <>
-                  <label>X <input type="range" min={-100} max={100} step={0.1} value={heroOverlayLayer.layout.x} onChange={e => setOverlayLayerAndSave({...heroOverlayLayer, layout: {...heroOverlayLayer.layout, x: Number(e.target.value)}})} /> <span>{heroOverlayLayer.layout.x.toFixed(1)}%</span></label>
-                  <label>Y <input type="range" min={-100} max={100} step={0.1} value={heroOverlayLayer.layout.y} onChange={e => setOverlayLayerAndSave({...heroOverlayLayer, layout: {...heroOverlayLayer.layout, y: Number(e.target.value)}})} /> <span>{heroOverlayLayer.layout.y.toFixed(1)}%</span></label>
-                  <label>Width <input type="range" min={5} max={200} step={1} value={heroOverlayLayer.layout.width} onChange={e => setOverlayLayerAndSave({...heroOverlayLayer, layout: {...heroOverlayLayer.layout, width: Number(e.target.value)}})} /> <span>{heroOverlayLayer.layout.width.toFixed(0)}%</span></label>
-                  <label>Height <input type="range" min={5} max={200} step={1} value={heroOverlayLayer.layout.height} onChange={e => setOverlayLayerAndSave({...heroOverlayLayer, layout: {...heroOverlayLayer.layout, height: Number(e.target.value)}})} /> <span>{heroOverlayLayer.layout.height.toFixed(0)}%</span></label>
-                  <label>Scale <input type="range" min={0.1} max={3} step={0.01} value={heroOverlayLayer.scale} onChange={e => setOverlayLayerAndSave({...heroOverlayLayer, scale: Number(e.target.value)})} /> <span>{heroOverlayLayer.scale.toFixed(2)}x</span></label>
                   <label>
-                    Visible
-                    <input type="checkbox" checked={heroOverlayLayer.visible} onChange={e => setOverlayLayerAndSave({...heroOverlayLayer, visible: e.target.checked})} />
+                    Visible{" "}
+                    <input
+                      type="checkbox"
+                      checked={heroOverlayLayer.visible}
+                      onChange={(e) =>
+                        setOverlayLayerAndSave({
+                          ...heroOverlayLayer,
+                          visible: e.target.checked
+                        })
+                      }
+                    />
+                  </label>
+                  <label>
+                    X{" "}
+                    <input
+                      type="range"
+                      min={-100}
+                      max={100}
+                      step={0.1}
+                      value={heroOverlayLayer.layout.x}
+                      onChange={(e) =>
+                        setOverlayLayerAndSave({
+                          ...heroOverlayLayer,
+                          layout: { ...heroOverlayLayer.layout, x: Number(e.target.value) }
+                        })
+                      }
+                    />{" "}
+                    <span>{heroOverlayLayer.layout.x.toFixed(1)}%</span>
+                  </label>
+                  <label>
+                    Y{" "}
+                    <input
+                      type="range"
+                      min={-100}
+                      max={100}
+                      step={0.1}
+                      value={heroOverlayLayer.layout.y}
+                      onChange={(e) =>
+                        setOverlayLayerAndSave({
+                          ...heroOverlayLayer,
+                          layout: { ...heroOverlayLayer.layout, y: Number(e.target.value) }
+                        })
+                      }
+                    />{" "}
+                    <span>{heroOverlayLayer.layout.y.toFixed(1)}%</span>
+                  </label>
+                  <label>
+                    Opacity{" "}
+                    <input
+                      type="range"
+                      min={0}
+                      max={1}
+                      step={0.01}
+                      value={heroOverlayLayer.opacity}
+                      onChange={(e) =>
+                        setOverlayLayerAndSave({
+                          ...heroOverlayLayer,
+                          opacity: Number(e.target.value)
+                        })
+                      }
+                    />{" "}
+                    <span>{heroOverlayLayer.opacity.toFixed(2)}</span>
                   </label>
                 </>
               )}
               {adminEditLayer === "headline" && (
                 <>
+                  <label>
+                    Visible{" "}
+                    <input
+                      type="checkbox"
+                      checked={headlineVisible}
+                      onChange={(e) => {
+                        const next = e.target.checked;
+                        setHeadlineVisible(next);
+                        void persistHeroVisualPatch({ headlineVisible: next });
+                      }}
+                    />
+                  </label>
                   <label>X <input type="range" min={-1000} max={1000} step={1} value={headlinePos.x} onChange={e => { const next = {...headlinePos, x: Number(e.target.value)}; setHeadlinePos(next); void persistHeroVisualPatch({headlinePos: next}); }} /> <span>{headlinePos.x}px</span></label>
                   <label>Y <input type="range" min={-1000} max={1000} step={1} value={headlinePos.y} onChange={e => { const next = {...headlinePos, y: Number(e.target.value)}; setHeadlinePos(next); void persistHeroVisualPatch({headlinePos: next}); }} /> <span>{headlinePos.y}px</span></label>
-                  <label>Scale (Size) <input type="range" min={2.2} max={7} step={0.05} value={headlineSizeRem} onChange={e => { const next = Number(e.target.value); setHeadlineSizeRem(next); void persistHeroVisualPatch({headlineSizeRem: next}); }} /> <span>{headlineSizeRem.toFixed(2)}rem</span></label>
-                  <label>Text Width <input type="range" min={24} max={92} step={1} value={heroCopyWidthVw} onChange={e => { const next = Number(e.target.value); setHeroCopyWidthVw(next); void persistHeroVisualPatch({heroCopyWidthVw: next}); }} /> <span>{heroCopyWidthVw}vw</span></label>
+                  <span className="floating-admin-hint" style={{ gridColumn: "1 / -1", fontSize: "0.74rem" }}>
+                    (Opacity control for headline can be added next if you want; keeping this pass to X/Y/Opacity only where it already exists.)
+                  </span>
                 </>
               )}
               {adminEditLayer === "eyebrow" && (
                 <>
-                  <label>X <input type="range" min={-1000} max={1000} step={1} value={eyebrowPos.x} onChange={e => setEyebrowXFromPx(Number(e.target.value))} onMouseUp={commitEyebrowRatio} onTouchEnd={commitEyebrowRatio} onPointerUp={commitEyebrowRatio} /> <span>{Math.round(eyebrowPos.x)}px</span></label>
-                  <label>Y <input type="range" min={-1000} max={1000} step={1} value={eyebrowPos.y} onChange={e => setEyebrowYFromPx(Number(e.target.value))} onMouseUp={commitEyebrowRatio} onTouchEnd={commitEyebrowRatio} onPointerUp={commitEyebrowRatio} /> <span>{Math.round(eyebrowPos.y)}px</span></label>
+                  <label>
+                    Visible{" "}
+                    <input
+                      type="checkbox"
+                      checked={eyebrowVisible}
+                      onChange={(e) => {
+                        const next = e.target.checked;
+                        setEyebrowVisible(next);
+                        void persistHeroVisualPatch({ eyebrowVisible: next });
+                      }}
+                    />
+                  </label>
+                  <label>X <input type="range" min={-1000} max={1000} step={1} value={eyebrowPos.x} onChange={e => setEyebrowXFromPx(Number(e.target.value))} /> <span>{Math.round(eyebrowPos.x)}px</span></label>
+                  <label>Y <input type="range" min={-1000} max={1000} step={1} value={eyebrowPos.y} onChange={e => setEyebrowYFromPx(Number(e.target.value))} /> <span>{Math.round(eyebrowPos.y)}px</span></label>
                 </>
               )}
               {adminEditLayer === "actions" && (
                 <>
+                  <label>
+                    Visible{" "}
+                    <input
+                      type="checkbox"
+                      checked={actionsVisible}
+                      onChange={(e) => {
+                        const next = e.target.checked;
+                        setActionsVisible(next);
+                        void persistHeroVisualPatch({ actionsVisible: next });
+                      }}
+                    />
+                  </label>
                   <label>X <input type="range" min={-1000} max={1000} step={1} value={heroActionsPos.x} onChange={e => { const next = {...heroActionsPos, x: Number(e.target.value)}; setHeroActionsPos(next); void persistHeroVisualPatch({heroActionsPos: next}); }} /> <span>{heroActionsPos.x}px</span></label>
                   <label>Y <input type="range" min={-1000} max={1000} step={1} value={heroActionsPos.y} onChange={e => { const next = {...heroActionsPos, y: Number(e.target.value)}; setHeroActionsPos(next); void persistHeroVisualPatch({heroActionsPos: next}); }} /> <span>{heroActionsPos.y}px</span></label>
                 </>
@@ -1338,8 +1865,228 @@ export default function HomePageClient({ initialHeroVisual, initialSiteContent }
 
               {adminEditLayer === "rituals" && (
                 <>
-                  <label>X <input type="range" min={-1000} max={1000} step={1} value={ritualCarouselPos?.x ?? 0} onChange={e => { const next = { x: Number(e.target.value), y: ritualCarouselPos?.y ?? 0 }; lastRitualLocalEditAt.current = Date.now(); setRitualCarouselPos(next); void persistHeroVisualPatch({ ritualCarouselPos: next }); }} /> <span>{ritualCarouselPos?.x ?? 0}px</span></label>
-                  <label>Y <input type="range" min={-1000} max={1000} step={1} value={ritualCarouselPos?.y ?? 0} onChange={e => { const next = { x: ritualCarouselPos?.x ?? 0, y: Number(e.target.value) }; lastRitualLocalEditAt.current = Date.now(); setRitualCarouselPos(next); void persistHeroVisualPatch({ ritualCarouselPos: next }); }} /> <span>{ritualCarouselPos?.y ?? 0}px</span></label>
+                  <label>
+                    Visible{" "}
+                    <input
+                      type="checkbox"
+                      checked={ritualsVisible}
+                      onChange={(e) => {
+                        const next = e.target.checked;
+                        setRitualsVisible(next);
+                        void persistHeroVisualPatch({ ritualsVisible: next });
+                      }}
+                    />
+                  </label>
+                  <label>X <input type="range" min={-1000} max={1000} step={1} value={ritualCarouselPos?.x ?? 0} onChange={e => { const next = { x: Number(e.target.value), y: ritualCarouselPos?.y ?? 0 }; setRitualCarouselPos(next); void persistHeroVisualPatch({ ritualCarouselPos: next }); }} /> <span>{ritualCarouselPos?.x ?? 0}px</span></label>
+                  <label>Y <input type="range" min={-1000} max={1000} step={1} value={ritualCarouselPos?.y ?? 0} onChange={e => { const next = { x: ritualCarouselPos?.x ?? 0, y: Number(e.target.value) }; setRitualCarouselPos(next); void persistHeroVisualPatch({ ritualCarouselPos: next }); }} /> <span>{ritualCarouselPos?.y ?? 0}px</span></label>
+                </>
+              )}
+              {adminEditLayer === "loved-section" && (
+                <>
+                  <label>
+                    Visible{" "}
+                    <input
+                      type="checkbox"
+                      checked={lovedSectionVisible}
+                      onChange={(e) => {
+                        const next = e.target.checked;
+                        setLovedSectionVisible(next);
+                        void persistHeroVisualPatch({ lovedSectionVisible: next });
+                      }}
+                    />
+                  </label>
+                  <label>
+                    Y{" "}
+                    <input
+                      type="range"
+                      min={-500}
+                      max={500}
+                      step={1}
+                      value={lovedDividerOffsetY}
+                      onChange={(e) => {
+                        const next = Number(e.target.value);
+                        setLovedDividerOffsetY(next);
+                        void persistHeroVisualPatch({ lovedDividerOffsetY: next });
+                      }}
+                    />{" "}
+                    <span>{lovedDividerOffsetY}px</span>
+                  </label>
+                </>
+              )}
+              {adminEditLayer === "loved-florals" && (
+                <>
+                  <label>
+                    Visible{" "}
+                    <input
+                      type="checkbox"
+                      checked={lovedFloralsVisible}
+                      onChange={(e) => {
+                        const next = e.target.checked;
+                        setLovedFloralsVisible(next);
+                        void persistHeroVisualPatch({ lovedFloralsVisible: next });
+                      }}
+                    />
+                  </label>
+                  <label>
+                    Y{" "}
+                    <input
+                      type="range"
+                      min={-500}
+                      max={500}
+                      step={1}
+                      value={lovedFloralOffsetY}
+                      onChange={(e) => {
+                        const next = Number(e.target.value);
+                        setLovedFloralOffsetY(next);
+                        void persistHeroVisualPatch({ lovedFloralOffsetY: next });
+                      }}
+                    />{" "}
+                    <span>{lovedFloralOffsetY}px</span>
+                  </label>
+                  <label>
+                    Opacity{" "}
+                    <input
+                      type="range"
+                      min={0}
+                      max={1}
+                      step={0.01}
+                      value={lovedFloralOpacity}
+                      onChange={(e) => {
+                        const next = Number(e.target.value);
+                        setLovedFloralOpacity(next);
+                        void persistHeroVisualPatch({ lovedFloralOpacity: next });
+                      }}
+                    />{" "}
+                    <span>{lovedFloralOpacity.toFixed(2)}</span>
+                  </label>
+                </>
+              )}
+              {adminEditLayer === "loved-wash" && (
+                <>
+                  <label>
+                    Visible{" "}
+                    <input
+                      type="checkbox"
+                      checked={lovedWashVisible}
+                      onChange={(e) => {
+                        const next = e.target.checked;
+                        setLovedWashVisible(next);
+                        void persistHeroVisualPatch({ lovedWashVisible: next });
+                      }}
+                    />
+                  </label>
+                  <label>
+                    X{" "}
+                    <input
+                      type="range"
+                      min={-500}
+                      max={500}
+                      step={1}
+                      value={lovedTintOffsetX}
+                      onChange={(e) => {
+                        const next = Number(e.target.value);
+                        setLovedTintOffsetX(next);
+                        void persistHeroVisualPatch({ lovedTintOffsetX: next });
+                      }}
+                    />{" "}
+                    <span>{lovedTintOffsetX}px</span>
+                  </label>
+                  <label>
+                    Y{" "}
+                    <input
+                      type="range"
+                      min={-500}
+                      max={500}
+                      step={1}
+                      value={lovedTintOffsetY}
+                      onChange={(e) => {
+                        const next = Number(e.target.value);
+                        setLovedTintOffsetY(next);
+                        void persistHeroVisualPatch({ lovedTintOffsetY: next });
+                      }}
+                    />{" "}
+                    <span>{lovedTintOffsetY}px</span>
+                  </label>
+                  <label>
+                    Opacity{" "}
+                    <input
+                      type="range"
+                      min={0}
+                      max={1}
+                      step={0.01}
+                      value={lovedTintOpacity}
+                      onChange={(e) => {
+                        const next = Number(e.target.value);
+                        setLovedTintOpacity(next);
+                        void persistHeroVisualPatch({ lovedTintOpacity: next });
+                      }}
+                    />{" "}
+                    <span>{lovedTintOpacity.toFixed(2)}</span>
+                  </label>
+                </>
+              )}
+              {adminEditLayer === "loved-band" && (
+                <>
+                  <label>
+                    Visible{" "}
+                    <input
+                      type="checkbox"
+                      checked={lovedBandVisible}
+                      onChange={(e) => {
+                        const next = e.target.checked;
+                        setLovedBandVisible(next);
+                        void persistHeroVisualPatch({ lovedBandVisible: next });
+                      }}
+                    />
+                  </label>
+                  <label>
+                    X{" "}
+                    <input
+                      type="range"
+                      min={-500}
+                      max={500}
+                      step={1}
+                      value={lovedTint2OffsetX}
+                      onChange={(e) => {
+                        const next = Number(e.target.value);
+                        setLovedTint2OffsetX(next);
+                        void persistHeroVisualPatch({ lovedTint2OffsetX: next });
+                      }}
+                    />{" "}
+                    <span>{lovedTint2OffsetX}px</span>
+                  </label>
+                  <label>
+                    Y{" "}
+                    <input
+                      type="range"
+                      min={-500}
+                      max={500}
+                      step={1}
+                      value={lovedTint2OffsetY}
+                      onChange={(e) => {
+                        const next = Number(e.target.value);
+                        setLovedTint2OffsetY(next);
+                        void persistHeroVisualPatch({ lovedTint2OffsetY: next });
+                      }}
+                    />{" "}
+                    <span>{lovedTint2OffsetY}px</span>
+                  </label>
+                  <label>
+                    Opacity{" "}
+                    <input
+                      type="range"
+                      min={0}
+                      max={1}
+                      step={0.01}
+                      value={lovedTint2Opacity}
+                      onChange={(e) => {
+                        const next = Number(e.target.value);
+                        setLovedTint2Opacity(next);
+                        void persistHeroVisualPatch({ lovedTint2Opacity: next });
+                      }}
+                    />{" "}
+                    <span>{lovedTint2Opacity.toFixed(2)}</span>
+                  </label>
                 </>
               )}
             </div>
@@ -1365,8 +2112,8 @@ export default function HomePageClient({ initialHeroVisual, initialSiteContent }
               className="button secondary"
               onClick={() => {
                 const reset = { x: 0, y: 0 };
-                lastRitualLocalEditAt.current = Date.now();
                 setRitualCarouselPos(reset);
+                clearSavedVisualPositions();
                 void persistHeroVisualPatch({ ritualCarouselPos: reset });
               }}
 
@@ -1378,9 +2125,9 @@ export default function HomePageClient({ initialHeroVisual, initialSiteContent }
               className="button secondary"
               onClick={() => {
                 const reset = { x: 0, y: 0 };
-                eyebrowRatioRef.current = reset;
-                setEyebrowPosRatio(reset);
-                void persistHeroVisualPatch({ eyebrowPosRatio: reset });
+                setEyebrowPos(reset);
+                clearSavedVisualPositions();
+                void persistHeroVisualPatch({ eyebrowPos: reset });
               }}
             >
               Clear saved eyebrow position
@@ -1390,9 +2137,8 @@ export default function HomePageClient({ initialHeroVisual, initialSiteContent }
               className="button secondary"
               onClick={() => {
                 const reset = { x: 0, y: 0 };
-                lastRitualLocalEditAt.current = Date.now();
                 setRitualCarouselPos(reset);
-                window.localStorage.removeItem(RITUAL_TEASER_POS_STORAGE_KEY);
+                clearSavedVisualPositions();
                 void persistHeroVisualPatch({ ritualCarouselPos: reset });
               }}
             >

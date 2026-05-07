@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { contentStorageKey, siteContent, type SiteContent } from "../content";
 import { getNavHref } from "../../lib/catalog-categories";
 
@@ -15,7 +15,15 @@ export function SiteHeader({ initialNav }: SiteHeaderProps) {
   const [navContent, setNavContent] = useState<Pick<SiteContent, "brand" | "nav">>(initialNav);
   const [scrolled, setScrolled] = useState(false);
   const [navLiftUp, setNavLiftUp] = useState(false);
+  const { brand, nav } = navContent;
+  const navItems = useMemo(() => [...nav, "Journal"], [nav]);
   const lastScrollY = useRef(0);
+  const navLinksRef = useRef<HTMLDivElement | null>(null);
+  const mobileLinkRefs = useRef<Array<HTMLAnchorElement | null>>([]);
+  const [activeNavIndex, setActiveNavIndex] = useState(0);
+  const [isMobileNav, setIsMobileNav] = useState(false);
+  const userInteractingRef = useRef(false);
+  const resumeAutoplayTimerRef = useRef<number | null>(null);
 
   const refreshFromStorage = useCallback(() => {
     const stored = window.localStorage.getItem(contentStorageKey);
@@ -116,7 +124,107 @@ export function SiteHeader({ initialNav }: SiteHeaderProps) {
     return () => window.removeEventListener("scroll", onScroll);
   }, []);
 
-  const { brand, nav } = navContent;
+  useEffect(() => {
+    if (typeof window === "undefined") {
+      return;
+    }
+    const media = window.matchMedia("(max-width: 720px)");
+    const syncMobile = () => setIsMobileNav(media.matches);
+    syncMobile();
+    media.addEventListener("change", syncMobile);
+    return () => media.removeEventListener("change", syncMobile);
+  }, []);
+
+  const setInteractionPause = useCallback((pauseForMs = 3500) => {
+    userInteractingRef.current = true;
+    if (resumeAutoplayTimerRef.current) {
+      window.clearTimeout(resumeAutoplayTimerRef.current);
+    }
+    resumeAutoplayTimerRef.current = window.setTimeout(() => {
+      userInteractingRef.current = false;
+    }, pauseForMs);
+  }, []);
+
+  const scrollToNavIndex = useCallback(
+    (index: number, behavior: ScrollBehavior = "smooth") => {
+      const wrap = navLinksRef.current;
+      const target = mobileLinkRefs.current[index];
+      if (!wrap || !target) {
+        return;
+      }
+      const wrapRect = wrap.getBoundingClientRect();
+      const targetRect = target.getBoundingClientRect();
+      const targetCenterX = target.offsetLeft + targetRect.width / 2;
+      const nextLeft = Math.max(0, targetCenterX - wrapRect.width / 2);
+      wrap.scrollTo({ left: nextLeft, behavior });
+      setActiveNavIndex(index);
+    },
+    []
+  );
+
+  useEffect(() => {
+    if (!isMobileNav || navItems.length <= 1) {
+      return;
+    }
+    const wrap = navLinksRef.current;
+    if (!wrap) {
+      return;
+    }
+
+    const updateActiveFromCenter = () => {
+      const centerX = wrap.scrollLeft + wrap.clientWidth / 2;
+      let bestIdx = 0;
+      let bestDist = Number.POSITIVE_INFINITY;
+      navItems.forEach((_, idx) => {
+        const el = mobileLinkRefs.current[idx];
+        if (!el) {
+          return;
+        }
+        const elCenter = el.offsetLeft + el.offsetWidth / 2;
+        const dist = Math.abs(elCenter - centerX);
+        if (dist < bestDist) {
+          bestDist = dist;
+          bestIdx = idx;
+        }
+      });
+      setActiveNavIndex(bestIdx);
+    };
+
+    let scrollIdleTimer: number | null = null;
+    const onScroll = () => {
+      if (scrollIdleTimer) {
+        window.clearTimeout(scrollIdleTimer);
+      }
+      scrollIdleTimer = window.setTimeout(() => {
+        updateActiveFromCenter();
+      }, 90);
+    };
+    wrap.addEventListener("scroll", onScroll, { passive: true });
+    updateActiveFromCenter();
+    const interval = window.setInterval(() => {
+      if (userInteractingRef.current) {
+        return;
+      }
+      const next = (activeNavIndex + 1) % navItems.length;
+      scrollToNavIndex(next, "smooth");
+    }, 2600);
+
+    return () => {
+      wrap.removeEventListener("scroll", onScroll);
+      window.clearInterval(interval);
+      if (scrollIdleTimer) {
+        window.clearTimeout(scrollIdleTimer);
+      }
+    };
+  }, [activeNavIndex, isMobileNav, navItems, scrollToNavIndex]);
+
+  useEffect(() => {
+    return () => {
+      if (resumeAutoplayTimerRef.current) {
+        window.clearTimeout(resumeAutoplayTimerRef.current);
+      }
+    };
+  }, []);
 
   if (pathname?.startsWith("/admin")) {
     return null;
@@ -129,9 +237,28 @@ export function SiteHeader({ initialNav }: SiteHeaderProps) {
       <Link href="/" className="brand">
         <img src="/maroma-logo.png" alt={brand} className="brand-logo" />
       </Link>
-      <div className="nav-links">
-        {nav.map((item) => (
-          <Link key={item} href={getNavHref(item)}>
+      <div
+        className={`nav-links${isMobileNav ? " nav-links-carousel" : ""}`}
+        ref={navLinksRef}
+        onPointerDown={() => setInteractionPause()}
+        onTouchStart={() => setInteractionPause()}
+        onWheel={() => setInteractionPause(2200)}
+      >
+        {navItems.map((item, index) => (
+          <Link
+            key={item}
+            href={item === "Journal" ? "/blog" : getNavHref(item)}
+            ref={(el) => {
+              mobileLinkRefs.current[index] = el;
+            }}
+            className={isMobileNav && index === activeNavIndex ? "is-centered" : ""}
+            onClick={() => {
+              if (isMobileNav) {
+                setInteractionPause(2400);
+                scrollToNavIndex(index, "smooth");
+              }
+            }}
+          >
             {item}
           </Link>
         ))}

@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { decodeBasicHtmlEntities } from "../../lib/decode-html-entities";
 import { getDisplayImageUrl } from "../../lib/product-image";
 import type { ProductRecord } from "../../lib/product-types";
+import { SignOutButton } from "../components/SignOutButton";
 import {
   contentStorageKey,
   siteContent,
@@ -22,6 +23,28 @@ const emptySlide: CarouselSlide = {
 const emptyHighlight: Highlight = {
   title: "",
   detail: ""
+};
+
+const imageHasTransparency = (image: HTMLImageElement): boolean => {
+  const sampleMax = 300;
+  const scale = Math.min(1, sampleMax / Math.max(image.width, image.height));
+  const w = Math.max(1, Math.round(image.width * scale));
+  const h = Math.max(1, Math.round(image.height * scale));
+  const canvas = document.createElement("canvas");
+  canvas.width = w;
+  canvas.height = h;
+  const ctx = canvas.getContext("2d");
+  if (!ctx) {
+    return false;
+  }
+  ctx.drawImage(image, 0, 0, w, h);
+  const data = ctx.getImageData(0, 0, w, h).data;
+  for (let i = 3; i < data.length; i += 4) {
+    if (data[i] < 250) {
+      return true;
+    }
+  }
+  return false;
 };
 
 export default function AdminPage() {
@@ -397,18 +420,46 @@ export default function AdminPage() {
         return;
       }
       if (file.type.startsWith("image/")) {
-        setContent((prev) => ({
-          ...prev,
-          hero: {
-            ...prev.hero,
-            video: {
-              ...prev.hero.video,
-              poster: dataUrl,
-              src: ""
-            }
+        const image = new Image();
+        image.onload = () => {
+          const hasTransparency = imageHasTransparency(image);
+          if (!hasTransparency) {
+            setStatus("This image has no transparency (alpha). Please upload a real transparent PNG/WebP.");
           }
-        }));
-        setStatus("Uploaded image for hero background. Click Save to persist.");
+          const maxWidth = 1920;
+          const maxHeight = 1080;
+          const scale = Math.min(
+            maxWidth / image.width,
+            maxHeight / image.height,
+            1
+          );
+          const canvas = document.createElement("canvas");
+          canvas.width = Math.round(image.width * scale);
+          canvas.height = Math.round(image.height * scale);
+          const ctx = canvas.getContext("2d");
+          if (!ctx) {
+            return;
+          }
+          ctx.drawImage(image, 0, 0, canvas.width, canvas.height);
+          const keepAlpha =
+            file.type === "image/png" || file.type === "image/webp" || file.type === "image/gif";
+          const compressed = keepAlpha
+            ? canvas.toDataURL("image/png")
+            : canvas.toDataURL("image/jpeg", 0.76);
+          setContent((prev) => ({
+            ...prev,
+            hero: {
+              ...prev.hero,
+              video: {
+                ...prev.hero.video,
+                poster: compressed,
+                src: ""
+              }
+            }
+          }));
+          setStatus("Uploaded image for hero background. Click Save to persist.");
+        };
+        image.src = dataUrl;
       }
     };
     reader.readAsDataURL(file);
@@ -457,6 +508,10 @@ export default function AdminPage() {
     <div className="admin">
       <nav className="admin-top-nav" aria-label="Admin sections">
         <a href="/">Home</a>
+        <a href="/newsletter?edit=1">Newsletter editor</a>
+        <a href="/admin/users">Manage Users</a>
+        <a href="/blog">Blog</a>
+        <a href="/newsletter">Newsletter</a>
         <a href="#brand-nav">Brand + Navigation</a>
         <a href="#hero">Hero</a>
         <a href="#carousel">Carousel</a>
@@ -473,6 +528,7 @@ export default function AdminPage() {
           </p>
         </div>
         <div className="admin-actions">
+          <SignOutButton />
           <button className="button secondary" type="button" onClick={resetContent}>
             Reset
           </button>

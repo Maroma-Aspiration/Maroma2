@@ -14,6 +14,10 @@
     "y": -386
   },
   "headlineSizeRem": 5.28,
+  "eyebrowPos": {
+    "x": 0,
+    "y": 0
+  },
   "eyebrowPosRatio": {
     "x": 0,
     "y": 0
@@ -56,6 +60,9 @@
     "#d6deca"
   ],
   "bgAngle": 135,
+  "lovedDividerOffsetY": 0,
+  "lovedFloralOffsetY": 0,
+  "lovedTintOffsetY": 0,
   "heroLayout": {
     "x": -0.1,
     "y": -16.7,

@@ -4,26 +4,15 @@ import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties }
 import Link from "next/link";
 import { decodeBasicHtmlEntities } from "../../lib/decode-html-entities";
 import { selectFaceCareProducts } from "../../lib/face-products";
-import { type RitualTeaserPos } from "../../lib/ritual-teaser-pos";
 import { getDisplayImageUrl, hasDisplayImage } from "../../lib/product-image";
 import type { ProductRecord } from "../../lib/product-types";
 
 type Props = {
   products: ProductRecord[];
   position?: { x: number; y: number };
-  onPositionChange?: (next: { x: number; y: number }) => void;
-  onPositionCommit?: (next: { x: number; y: number }) => void;
 };
 
-
-const isDragExempt = (target: EventTarget | null): boolean => {
-  if (!(target instanceof Element)) {
-    return false;
-  }
-  return Boolean(target.closest("a, button, input, select, textarea, label"));
-};
-
-export function RitualFaceTeaser({ products, position, onPositionChange, onPositionCommit }: Props) {
+export function RitualFaceTeaser({ products, position }: Props) {
 
   const visibleTiles = 6;
   const rotationMs = 3800;
@@ -51,19 +40,7 @@ export function RitualFaceTeaser({ products, position, onPositionChange, onPosit
   const pos = position ?? { x: 0, y: 0 };
 
   const [focusMap, setFocusMap] = useState<Record<string, number>>({});
-  const dragStart = useRef<{ clientX: number; clientY: number } | null>(null);
-  const posAtDrag = useRef<RitualTeaserPos>({ x: 0, y: 0 });
   const resetSlideTimer = useRef<number | null>(null);
-
-
-  const persistPos = useCallback((next: RitualTeaserPos) => {
-    onPositionChange?.({ x: Math.round(next.x), y: Math.round(next.y) });
-  }, [onPositionChange]);
-
-  const commitPos = useCallback((next: RitualTeaserPos) => {
-    onPositionCommit?.({ x: Math.round(next.x), y: Math.round(next.y) });
-  }, [onPositionCommit]);
-
 
   useEffect(() => {
     if (pool.length === 0) {
@@ -217,72 +194,16 @@ export function RitualFaceTeaser({ products, position, onPositionChange, onPosit
     });
   };
 
-  const handlePanelPointerDown = (event: React.PointerEvent<HTMLDivElement>) => {
-    // Ignore if clicking inside the track itself or on any interactive element (Link/button)
-    // to allow scrolling without moving the base panel.
-    const target = event.target as HTMLElement;
-    if (target.closest(".ritual-face-track") || target.closest("a") || target.closest("button")) {
-      return;
-    }
-    
-    event.preventDefault();
-    event.stopPropagation();
-    dragStart.current = { clientX: event.clientX, clientY: event.clientY };
-    posAtDrag.current = { ...pos };
-    event.currentTarget.setPointerCapture(event.pointerId);
-  };
-
-  const handlePanelPointerMove = (event: React.PointerEvent<HTMLDivElement>) => {
-    if (!dragStart.current) {
-      return;
-    }
-    const dx = event.clientX - dragStart.current.clientX;
-    const dy = event.clientY - dragStart.current.clientY;
-    const next = {
-      x: posAtDrag.current.x + dx,
-      y: posAtDrag.current.y + dy
-    };
-    persistPos(next);
-  };
-
-  const handlePanelPointerUp = (event: React.PointerEvent<HTMLDivElement>) => {
-    if (!dragStart.current) {
-      return;
-    }
-    const dx = event.clientX - dragStart.current.clientX;
-    const dy = event.clientY - dragStart.current.clientY;
-    const next = {
-      x: posAtDrag.current.x + dx,
-      y: posAtDrag.current.y + dy
-    };
-    persistPos(next);
-    commitPos(next);
-    dragStart.current = null;
-    try {
-      event.currentTarget.releasePointerCapture(event.pointerId);
-    } catch {
-      // ignore
-    }
-  };
-
   return (
     <div
       className="hero-ritual-panel"
       role="group"
-      aria-label="Face care — drag from the grip or empty space to move"
+      aria-label="Face care products"
       style={{
-        transform: `translate(calc(-50% + ${pos.x}px), calc(-50% + ${pos.y}px - 5vh - 1cm))`,
-        touchAction: "none"
+        transform: `translate(${pos.x}px, ${pos.y}px)`
       }}
-      onPointerDown={handlePanelPointerDown}
-      onPointerMove={handlePanelPointerMove}
-      onPointerUp={handlePanelPointerUp}
-      onPointerCancel={handlePanelPointerUp}
     >
       <div className="ritual-face-teaser">
-        <div className="hero-ritual-drag-handle" aria-hidden="true">
-          <span className="hero-ritual-drag-grip" />
-        </div>
         <div className="ritual-face-teaser-inner">
           {strip.length > 0 ? (
             <div
