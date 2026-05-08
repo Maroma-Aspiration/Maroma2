@@ -4743,6 +4743,19 @@ img {
   max-height: calc(100vh - 100px);
   overflow-y: auto;
   pointer-events: auto;
+  box-sizing: border-box;
+}
+
+.newsletter-top-tools * { box-sizing: border-box; }
+
+.newsletter-bottom-toolbar {
+  position: fixed;
+  bottom: 16px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 80;
+  width: min(560px, calc(100vw - 32px));
+  box-sizing: border-box;
 }
 
 .newsletter-top-tools .newsletter-inline-toolbar {
@@ -5346,17 +5359,74 @@ img {
 
 .newsletter-element-controls.is-floating {
   position: fixed;
-  right: 16px;
-  top: 140px;
-  z-index: 9999;
+  left: 16px;
+  top: 80px;
+  z-index: 95;
   width: min(340px, calc(100vw - 32px));
-  max-height: calc(100vh - 160px);
+  max-height: calc(100vh - 100px);
   overflow: auto;
+  padding: 14px;
+  border-radius: 14px;
   background: rgba(12, 22, 30, 0.96);
   border: 1px solid rgba(112, 201, 217, 0.55);
   box-shadow: 0 18px 40px rgba(0, 0, 0, 0.5);
   backdrop-filter: blur(6px);
   animation: newsletter-panel-pulse 1.6s ease-out 1;
+  box-sizing: border-box;
+  display: grid;
+  gap: 10px;
+}
+
+.newsletter-element-controls.is-floating *,
+.newsletter-element-controls.is-floating *::before,
+.newsletter-element-controls.is-floating *::after {
+  box-sizing: border-box;
+}
+
+.newsletter-element-controls.is-floating > label {
+  display: grid;
+  gap: 4px;
+  width: 100%;
+  min-width: 0;
+  font-size: 0.78rem;
+  letter-spacing: 0.04em;
+  color: rgba(220, 235, 230, 0.95);
+}
+
+.newsletter-element-controls.is-floating > label > input[type="text"],
+.newsletter-element-controls.is-floating > label > input:not([type]),
+.newsletter-element-controls.is-floating > label > input[type="number"],
+.newsletter-element-controls.is-floating > label > input[type="datetime-local"],
+.newsletter-element-controls.is-floating > label > select,
+.newsletter-element-controls.is-floating > label > textarea {
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+}
+
+.newsletter-element-controls.is-floating > label > input[type="range"] {
+  width: 100%;
+  min-width: 0;
+}
+
+.newsletter-element-controls.is-floating .newsletter-radius-row {
+  flex-wrap: wrap;
+  width: 100%;
+  min-width: 0;
+}
+
+.newsletter-element-controls.is-floating .newsletter-radius-row > input[type="range"] {
+  flex: 1 1 60%;
+  min-width: 100px;
+}
+
+.newsletter-element-controls.is-floating .newsletter-radius-number {
+  width: 60px;
+  flex: 0 0 60px;
+}
+
+.newsletter-element-controls.is-floating .newsletter-floating-controls-actions {
+  flex-wrap: wrap;
 }
 
 @keyframes newsletter-panel-pulse {
@@ -5368,10 +5438,11 @@ img {
 @media (max-width: 720px) {
   .newsletter-element-controls.is-floating {
     top: auto;
-    bottom: 64px;
-    right: 8px;
+    bottom: 8px;
     left: 8px;
+    right: 8px;
     width: auto;
+    max-height: 60vh;
   }
 }
 

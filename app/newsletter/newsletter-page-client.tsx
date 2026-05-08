@@ -2253,7 +2253,7 @@ export default function NewsletterPageClient({ initialState, editMode }: Props) 
           {renderInlineControls("logoImage")}
         </div>
 
-        {topImageSrc || (canEdit && showGlobalControls) ? (
+        {topImageSrc || canEdit ? (
           <div className="newsletter-editable-row">
             <div className="newsletter-asset-row newsletter-top-image-row">
               <div
@@ -2295,7 +2295,7 @@ export default function NewsletterPageClient({ initialState, editMode }: Props) 
 
         <section className="newsletter-top-block" aria-label="Newsletter opening message">
           <div className="newsletter-top-grid">
-            {portraitSrc || (canEdit && showGlobalControls) ? (
+            {portraitSrc || canEdit ? (
             <div className="newsletter-editable-row">
               <div className="newsletter-asset-row newsletter-portrait-row">
               <div
@@ -2329,7 +2329,7 @@ export default function NewsletterPageClient({ initialState, editMode }: Props) 
             </div>
             ) : null}
 
-            {heroSrc || (canEdit && showGlobalControls) ? (
+            {heroSrc || canEdit ? (
             <div className="newsletter-editable-row">
               <div className="newsletter-asset-row newsletter-hero-row">
               <div
@@ -2449,7 +2449,7 @@ export default function NewsletterPageClient({ initialState, editMode }: Props) 
           </div>
           <hr className="newsletter-rule" />
 
-          {hasMission || (canEdit && showGlobalControls) ? (
+          {hasMission || canEdit ? (
           <div className={`newsletter-mission-block${hasMission || canEdit ? "" : " is-placeholder"}`}>
             <div className="newsletter-editable-row">
               {canEdit ? (
@@ -2490,9 +2490,9 @@ export default function NewsletterPageClient({ initialState, editMode }: Props) 
             </div>
           </div>
           ) : null}
-          {hasMission || (canEdit && showGlobalControls) ? <hr className="newsletter-rule" /> : null}
+          {hasMission || canEdit ? <hr className="newsletter-rule" /> : null}
 
-          {hasWelcome || (canEdit && showGlobalControls) ? (
+          {hasWelcome || canEdit ? (
           <div className={`newsletter-greeting-block${hasWelcome || canEdit ? "" : " is-placeholder"}`}>
             <div className="newsletter-editable-row">
               {canEdit ? (
@@ -2795,7 +2795,7 @@ export default function NewsletterPageClient({ initialState, editMode }: Props) 
         </div>
 
         {canEdit && showGlobalControls ? (
-          <div className="newsletter-inline-toolbar">
+          <div className="newsletter-inline-toolbar newsletter-bottom-toolbar">
             <button
               type="button"
               className="button secondary"
