@@ -448,6 +448,27 @@ const emptyDivider = (): StoryRecord => {
   };
 };
 
+const emptyTextBlock = (): StoryRecord => {
+  const now = new Date().toISOString();
+  const id = crypto.randomUUID();
+  return {
+    id,
+    kind: "text",
+    slug: `text-${id}`,
+    title: "",
+    excerpt: "",
+    body: "<p>Click to edit this text block. Bold, italic and links are preserved when you paste from Word, Google Docs or the web.</p>",
+    imageUrl: "",
+    sourceUrl: "",
+    source: "manual",
+    ctaLabel: "",
+    ctaUrl: "",
+    publishedAt: now,
+    updatedAt: now,
+    featured: false
+  };
+};
+
 const readFileAsDataUrl = async (file: File): Promise<string> => {
   const reader = new FileReader();
   return await new Promise((resolve, reject) => {
@@ -1221,6 +1242,7 @@ export default function NewsletterPageClient({ initialState, editMode }: Props) 
     if (!canEdit || !selectedStoryEdit) return null;
     const story = state.stories.find((s) => s.id === selectedStoryEdit.storyId);
     if (!story || story.kind === "divider") return null;
+    const isTextBlock = story.kind === "text";
     const { field } = selectedStoryEdit;
     const fieldLabels: Record<StoryEditField, string> = {
       title: "Title",
@@ -1239,7 +1261,7 @@ export default function NewsletterPageClient({ initialState, editMode }: Props) 
     const node = (
       <aside className="newsletter-element-controls is-floating">
         <div className="newsletter-floating-controls-head">
-          <strong>Edit story — {fieldLabels[field]}</strong>
+          <strong>{isTextBlock ? "Edit text block" : `Edit story — ${fieldLabels[field]}`}</strong>
           <div className="newsletter-floating-controls-actions">
             <button
               type="button"
@@ -1249,7 +1271,7 @@ export default function NewsletterPageClient({ initialState, editMode }: Props) 
             >
               {saveState === "saved" ? "Saved!" : saveState === "saving" ? "Saving..." : "Save"}
             </button>
-            <button type="button" className="button secondary" onClick={clearEditors} aria-label="Close story editor">
+            <button type="button" className="button secondary" onClick={clearEditors} aria-label="Close editor">
               Close
             </button>
             <button
@@ -1260,13 +1282,19 @@ export default function NewsletterPageClient({ initialState, editMode }: Props) 
                 clearEditors();
               }}
             >
-              Delete story
+              {isTextBlock ? "Delete text block" : "Delete story"}
             </button>
           </div>
         </div>
         <div className="newsletter-position-block">
-          <strong>Story layout</strong>
+          <strong>{isTextBlock ? "Block layout" : "Story layout"}</strong>
           <div className="newsletter-floating-controls-actions">
+            <button type="button" className="button secondary" onClick={() => insertTextBlockNearStory(story.id, "before")}>
+              + Text block above
+            </button>
+            <button type="button" className="button secondary" onClick={() => insertTextBlockNearStory(story.id, "after")}>
+              + Text block below
+            </button>
             <button type="button" className="button secondary" onClick={() => insertDividerNearStory(story.id, "before")}>
               + Divider above
             </button>
@@ -1281,25 +1309,49 @@ export default function NewsletterPageClient({ initialState, editMode }: Props) 
             </button>
           </div>
         </div>
-        {field === "title" ? (
+        {isTextBlock ? (
+          <>
+            <label>
+              Optional heading
+              <input
+                value={story.title}
+                onChange={(e) => updateStory(story.id, { title: e.target.value })}
+                placeholder="(leave blank for body-only)"
+              />
+            </label>
+            <label>
+              Body (rich HTML — paste from Word/Docs/web to keep formatting)
+              <textarea
+                rows={10}
+                value={story.body}
+                onChange={(e) => updateStory(story.id, { body: e.target.value })}
+                placeholder="<p>Your text here…</p>"
+              />
+            </label>
+            <p className="admin-rss-hint">
+              Tip: click directly on the text block in the preview to type inline. This textarea is for raw HTML (e.g. paste in <code>&lt;p&gt;&lt;strong&gt;…&lt;/strong&gt;&lt;/p&gt;</code>).
+            </p>
+          </>
+        ) : null}
+        {!isTextBlock && field === "title" ? (
           <label>
             Title
             <input value={story.title} onChange={(e) => updateStory(story.id, { title: e.target.value })} placeholder="Story title" />
           </label>
         ) : null}
-        {field === "excerpt" ? (
+        {!isTextBlock && field === "excerpt" ? (
           <label>
             Excerpt
             <textarea rows={4} value={story.excerpt} onChange={(e) => updateStory(story.id, { excerpt: e.target.value })} placeholder="Story excerpt" />
           </label>
         ) : null}
-        {field === "body" ? (
+        {!isTextBlock && field === "body" ? (
           <label>
-            Body (not shown in compact newsletter layout; kept for CMS / future use)
+            Body (rich HTML — paste from Word/Docs/web to keep formatting)
             <textarea rows={10} value={story.body} onChange={(e) => updateStory(story.id, { body: e.target.value })} placeholder="Story body" />
           </label>
         ) : null}
-        {field === "meta" ? (
+        {!isTextBlock && field === "meta" ? (
           <>
             <label>
               Published
@@ -1340,7 +1392,7 @@ export default function NewsletterPageClient({ initialState, editMode }: Props) 
             </label>
           </>
         ) : null}
-        {field === "cta" ? (
+        {!isTextBlock && field === "cta" ? (
           <>
             <label>
               CTA button text
@@ -1356,7 +1408,7 @@ export default function NewsletterPageClient({ initialState, editMode }: Props) 
             </label>
           </>
         ) : null}
-        {field === "image" ? (
+        {!isTextBlock && field === "image" ? (
           <>
             <label>
               Image URL (primary)
@@ -1782,6 +1834,27 @@ export default function NewsletterPageClient({ initialState, editMode }: Props) 
       return { ...prev, stories: next };
     });
     setStatus(`Divider inserted ${position} story.`);
+  };
+
+  const insertTextBlockNearStory = (storyId: string, position: "before" | "after") => {
+    const block = emptyTextBlock();
+    setState((prev) => {
+      const idx = prev.stories.findIndex((s) => s.id === storyId);
+      if (idx < 0) return prev;
+      const insertAt = position === "before" ? idx : idx + 1;
+      const next = [...prev.stories];
+      next.splice(insertAt, 0, block);
+      return { ...prev, stories: next };
+    });
+    setSelectedStoryEdit({ storyId: block.id, field: "body" });
+    setStatus(`Text block inserted ${position} story. Click to edit.`);
+  };
+
+  const insertTextBlockAtEnd = () => {
+    const block = emptyTextBlock();
+    setState((prev) => ({ ...prev, stories: [...prev.stories, block] }));
+    setSelectedStoryEdit({ storyId: block.id, field: "body" });
+    setStatus("Text block added. Click the body to edit.");
   };
 
   const moveStory = (storyId: string, direction: -1 | 1) => {
@@ -2568,6 +2641,23 @@ export default function NewsletterPageClient({ initialState, editMode }: Props) 
                     </div>
                   ) : null}
                 </div>
+              ) : story.kind === "text" ? (
+                <article
+                  key={story.id}
+                  className={`newsletter-text-block${
+                    canEdit ? (selectedStoryEdit?.storyId === story.id ? " newsletter-edit-selected" : " newsletter-text-block-editable") : ""
+                  }`}
+                  onClick={canEdit ? () => selectStoryField(story.id, "body") : undefined}
+                  role={canEdit ? "button" : undefined}
+                >
+                  {story.title.trim() ? (
+                    <h2 className="newsletter-text-block-heading">{story.title}</h2>
+                  ) : null}
+                  <div
+                    className="newsletter-rich-text newsletter-text-block-body"
+                    dangerouslySetInnerHTML={{ __html: sanitizeRichHtml(story.body || (canEdit ? "<p><em>Click to edit text block…</em></p>" : "")) }}
+                  />
+                </article>
               ) : (
               <article key={story.id} className="newsletter-story">
                 {(() => {
@@ -2710,6 +2800,13 @@ export default function NewsletterPageClient({ initialState, editMode }: Props) 
               onClick={() => setState((prev) => ({ ...prev, stories: [...prev.stories, emptyStory()] }))}
             >
               Add story
+            </button>
+            <button
+              type="button"
+              className="button secondary"
+              onClick={insertTextBlockAtEnd}
+            >
+              Add text block
             </button>
             <button
               type="button"

@@ -2,7 +2,7 @@ export type StorySource = "manual" | "instagram" | "facebook" | "web" | "rss";
 
 export type StoryRecord = {
   id: string;
-  kind?: "story" | "divider";
+  kind?: "story" | "divider" | "text";
   slug: string;
   title: string;
   excerpt: string;

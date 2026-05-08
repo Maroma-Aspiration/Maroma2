@@ -168,10 +168,11 @@ const toSlug = (value: string): string =>
 
 const normalizeStory = (story: Partial<StoryRecord>): StoryRecord => {
   const now = new Date().toISOString();
-  const kind = story.kind === "divider" ? "divider" : "story";
-  const title = (story.title ?? "").trim() || "Untitled story";
+  const kind: "story" | "divider" | "text" =
+    story.kind === "divider" ? "divider" : story.kind === "text" ? "text" : "story";
+  const title = (story.title ?? "").trim() || (kind === "text" ? "" : "Untitled story");
   const id = story.id ?? crypto.randomUUID();
-  const slugSeed = story.slug?.trim() ? story.slug.trim() : title;
+  const slugSeed = story.slug?.trim() ? story.slug.trim() : title || kind;
   if (kind === "divider") {
     return {
       id,
@@ -180,6 +181,24 @@ const normalizeStory = (story: Partial<StoryRecord>): StoryRecord => {
       title: "Divider",
       excerpt: "",
       body: "",
+      imageUrl: "",
+      sourceUrl: "",
+      source: "manual",
+      ctaLabel: "",
+      ctaUrl: "",
+      publishedAt: story.publishedAt ?? now,
+      updatedAt: now,
+      featured: Boolean(story.featured)
+    };
+  }
+  if (kind === "text") {
+    return {
+      id,
+      kind,
+      slug: story.slug?.trim() || `text-${id}`,
+      title,
+      excerpt: (story.excerpt ?? "").trim(),
+      body: (story.body ?? "").trim(),
       imageUrl: "",
       sourceUrl: "",
       source: "manual",

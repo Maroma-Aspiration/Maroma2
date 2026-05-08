@@ -5261,6 +5261,45 @@ img {
   margin-top: 6px;
 }
 
+.newsletter-text-block {
+  margin: 0 auto;
+  padding: 14px 18px;
+  max-width: var(--newsletter-content-width, 720px);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.02);
+  text-align: inherit;
+}
+
+.newsletter-text-block-editable:hover {
+  outline: 1px dashed rgba(112, 201, 217, 0.55);
+  outline-offset: 4px;
+  cursor: pointer;
+}
+
+.newsletter-text-block.newsletter-edit-selected {
+  outline: 2px solid rgba(112, 201, 217, 0.85);
+  outline-offset: 4px;
+}
+
+.newsletter-text-block-heading {
+  margin: 0 0 0.4em;
+  font-size: var(--newsletter-section-heading-size, 1rem);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  font-weight: 700;
+}
+
+.newsletter-text-block-body {
+  font-size: var(--newsletter-body-font-size, 1.04rem);
+  line-height: 1.55;
+}
+
+.newsletter-text-block-body p { margin: 0 0 0.7em; }
+.newsletter-text-block-body p:last-child { margin-bottom: 0; }
+.newsletter-text-block-body strong, .newsletter-text-block-body b { font-weight: 700; }
+.newsletter-text-block-body em, .newsletter-text-block-body i { font-style: italic; }
+.newsletter-text-block-body a { color: #2c8da0; text-decoration: underline; }
+
 .newsletter-element-controls.is-floating {
   position: fixed;
   right: 16px;
