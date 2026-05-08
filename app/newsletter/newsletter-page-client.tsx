@@ -144,6 +144,246 @@ function applyTextPourToState(text: string, prev: StoriesState): { next: Stories
   };
 }
 
+const RICH_POUR_ALLOWED_TAGS = new Set([
+  "P", "BR", "STRONG", "B", "EM", "I", "U", "A", "UL", "OL", "LI", "BLOCKQUOTE", "SPAN"
+]);
+
+function sanitizeRichInline(node: Node): string {
+  if (node.nodeType === Node.TEXT_NODE) {
+    return (node.textContent ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+  }
+  if (node.nodeType !== Node.ELEMENT_NODE) return "";
+  const el = node as Element;
+  const tag = el.tagName.toUpperCase();
+  if (tag === "BR") return "<br />";
+  const inner = Array.from(el.childNodes).map((child) => sanitizeRichInline(child)).join("");
+  if (!RICH_POUR_ALLOWED_TAGS.has(tag)) return inner;
+  if (tag === "A") {
+    const rawHref = (el.getAttribute("href") ?? "").trim();
+    const safe = /^(https?:|mailto:|tel:|\/)/i.test(rawHref) ? rawHref : "";
+    const escaped = safe.replace(/"/g, "&quot;");
+    return safe ? `<a href="${escaped}" target="_blank" rel="noopener noreferrer">${inner}</a>` : inner;
+  }
+  const remap: Record<string, string> = { B: "strong", I: "em" };
+  const out = remap[tag] ?? tag.toLowerCase();
+  return `<${out}>${inner}</${out}>`;
+}
+
+function blockNodeToHtml(node: Element): string {
+  const tag = node.tagName.toUpperCase();
+  if (tag === "P" || tag === "DIV") {
+    const inner = Array.from(node.childNodes).map(sanitizeRichInline).join("").trim();
+    return inner ? `<p>${inner}</p>` : "";
+  }
+  if (tag === "UL" || tag === "OL") {
+    const items = Array.from(node.children)
+      .filter((c) => c.tagName.toUpperCase() === "LI")
+      .map((li) => {
+        const inner = Array.from(li.childNodes).map(sanitizeRichInline).join("").trim();
+        return inner ? `<li>${inner}</li>` : "";
+      })
+      .filter(Boolean)
+      .join("");
+    return items ? `<${tag.toLowerCase()}>${items}</${tag.toLowerCase()}>` : "";
+  }
+  if (tag === "BLOCKQUOTE") {
+    const inner = Array.from(node.childNodes).map(sanitizeRichInline).join("").trim();
+    return inner ? `<blockquote><p>${inner}</p></blockquote>` : "";
+  }
+  const inner = Array.from(node.childNodes).map(sanitizeRichInline).join("").trim();
+  return inner ? `<p>${inner}</p>` : "";
+}
+
+const RICH_POUR_HEADING_ALIASES: Record<string, "title" | "mission" | "greeting" | "intro"> = {
+  title: "title",
+  newslettertitle: "title",
+  issuetitle: "title",
+  mission: "mission",
+  ourmission: "mission",
+  maromamission: "mission",
+  missionstatement: "mission",
+  greeting: "greeting",
+  greetingfromceo: "greeting",
+  welcomefromceo: "greeting",
+  welcomelaura: "greeting",
+  fromtheceo: "greeting",
+  fromourceo: "greeting",
+  letterfromtheceo: "greeting",
+  ceoletter: "greeting",
+  welcome: "greeting",
+  intro: "intro",
+  introduction: "intro"
+};
+
+function applyRichTextPour(
+  html: string,
+  prev: StoriesState,
+  options: { replaceStories: boolean }
+): { next: StoriesState; summary: string } {
+  const next: StoriesState = structuredClone(prev);
+  const template = document.createElement("template");
+  template.innerHTML = html;
+  template.content.querySelectorAll("script,style,iframe,object,embed,link,meta,head").forEach((n) => n.remove());
+
+  const root = template.content;
+  const blocks: { kind: "h" | "block" | "hr"; level?: number; text?: string; html?: string; node?: Element }[] = [];
+
+  const walk = (node: Node) => {
+    if (node.nodeType !== Node.ELEMENT_NODE) return;
+    const el = node as Element;
+    const tag = el.tagName.toUpperCase();
+    if (tag === "H1" || tag === "H2" || tag === "H3" || tag === "H4") {
+      blocks.push({ kind: "h", level: Number(tag.slice(1)), text: (el.textContent ?? "").trim(), node: el });
+      return;
+    }
+    if (tag === "HR") {
+      blocks.push({ kind: "hr" });
+      return;
+    }
+    if (tag === "P" || tag === "DIV" || tag === "UL" || tag === "OL" || tag === "BLOCKQUOTE") {
+      const out = blockNodeToHtml(el);
+      if (out) blocks.push({ kind: "block", html: out, text: (el.textContent ?? "").trim() });
+      return;
+    }
+    el.childNodes.forEach(walk);
+  };
+  root.childNodes.forEach(walk);
+
+  let topApplied = 0;
+  let storyApplied = 0;
+  let storiesAppendedOrReplaced: StoryRecord[] = [];
+  if (options.replaceStories) storiesAppendedOrReplaced = [];
+
+  let firstTitleSet = false;
+  let currentSection: { kind: "title" | "mission" | "greeting" | "intro" | "story"; story?: StoryRecord } | null = null;
+
+  const flushStory = () => {
+    if (currentSection?.kind === "story" && currentSection.story && (currentSection.story.title || currentSection.story.excerpt)) {
+      storiesAppendedOrReplaced.push(currentSection.story);
+    }
+  };
+
+  for (const block of blocks) {
+    if (block.kind === "hr") {
+      flushStory();
+      currentSection = null;
+      continue;
+    }
+    if (block.kind === "h") {
+      flushStory();
+      const aliasKey = normalizePourKey(block.text ?? "");
+      const role = RICH_POUR_HEADING_ALIASES[aliasKey];
+      if (block.level === 1 && !firstTitleSet && !role) {
+        next.newsletterTitle = block.text ?? next.newsletterTitle;
+        firstTitleSet = true;
+        topApplied += 1;
+        currentSection = { kind: "title" };
+        continue;
+      }
+      if (role === "title") {
+        next.newsletterTitle = block.text ?? next.newsletterTitle;
+        firstTitleSet = true;
+        topApplied += 1;
+        currentSection = { kind: "title" };
+        continue;
+      }
+      if (role === "mission") {
+        next.newsletterMission = "";
+        next.newsletterMissionHtml = "";
+        currentSection = { kind: "mission" };
+        continue;
+      }
+      if (role === "greeting") {
+        next.newsletterWelcomeLaura = "";
+        next.newsletterWelcomeLauraHtml = "";
+        currentSection = { kind: "greeting" };
+        continue;
+      }
+      if (role === "intro") {
+        next.newsletterIntro = "";
+        currentSection = { kind: "intro" };
+        continue;
+      }
+      const now = new Date().toISOString();
+      currentSection = {
+        kind: "story",
+        story: {
+          id: crypto.randomUUID(),
+          kind: "story",
+          slug: "",
+          title: block.text ?? "",
+          excerpt: "",
+          body: "",
+          imageUrl: "",
+          sourceUrl: "",
+          source: "manual",
+          ctaLabel: "Read more",
+          ctaUrl: "",
+          publishedAt: now,
+          updatedAt: now,
+          featured: false
+        }
+      };
+      continue;
+    }
+    if (block.kind === "block") {
+      const html = block.html ?? "";
+      const text = (block.text ?? "").trim();
+      if (!html || !text) continue;
+      if (!currentSection) {
+        if (!firstTitleSet) {
+          next.newsletterIntro = text;
+          topApplied += 1;
+          currentSection = { kind: "intro" };
+          continue;
+        }
+        currentSection = { kind: "intro" };
+      }
+      if (currentSection.kind === "title") {
+        currentSection = { kind: "intro" };
+      }
+      if (currentSection.kind === "mission") {
+        next.newsletterMissionHtml = next.newsletterMissionHtml ? `${next.newsletterMissionHtml}${html}` : html;
+        next.newsletterMission = next.newsletterMission ? `${next.newsletterMission}\n\n${text}` : text;
+        topApplied += 1;
+        continue;
+      }
+      if (currentSection.kind === "greeting") {
+        next.newsletterWelcomeLauraHtml = next.newsletterWelcomeLauraHtml ? `${next.newsletterWelcomeLauraHtml}${html}` : html;
+        next.newsletterWelcomeLaura = next.newsletterWelcomeLaura ? `${next.newsletterWelcomeLaura}\n\n${text}` : text;
+        topApplied += 1;
+        continue;
+      }
+      if (currentSection.kind === "intro") {
+        next.newsletterIntro = next.newsletterIntro ? `${next.newsletterIntro}\n\n${text}` : text;
+        topApplied += 1;
+        continue;
+      }
+      if (currentSection.kind === "story" && currentSection.story) {
+        const s = currentSection.story;
+        if (!s.excerpt) {
+          s.excerpt = text;
+        }
+        s.body = s.body ? `${s.body}${html}` : html;
+        storyApplied += 1;
+      }
+    }
+  }
+  flushStory();
+
+  if (options.replaceStories) {
+    next.stories = storiesAppendedOrReplaced;
+  } else {
+    next.stories = [...next.stories, ...storiesAppendedOrReplaced];
+  }
+
+  const newCount = storiesAppendedOrReplaced.length;
+  return {
+    next,
+    summary: `Rich text pour: ${topApplied} header field(s), ${newCount} story section(s) ${options.replaceStories ? "(replaced existing)" : "(appended)"}.`
+  };
+}
+
 type ToolDrawer = "settings" | "tools" | "delivery" | null;
 
 type Props = {
@@ -429,6 +669,9 @@ export default function NewsletterPageClient({ initialState, editMode }: Props) 
   const [webSearchQuery, setWebSearchQuery] = useState("Maroma Auroville");
   const [webSearchMax, setWebSearchMax] = useState(12);
   const [textPourStatus, setTextPourStatus] = useState("");
+  const [richPourStatus, setRichPourStatus] = useState("");
+  const [richPourReplace, setRichPourReplace] = useState(false);
+  const richPourRef = useRef<HTMLDivElement | null>(null);
   const [deliveryStatus, setDeliveryStatus] = useState("");
   const [campaignSubject, setCampaignSubject] = useState("Maroma newsletter");
   const [audienceInfo, setAudienceInfo] = useState<{
@@ -1254,6 +1497,47 @@ export default function NewsletterPageClient({ initialState, editMode }: Props) 
     event.target.value = "";
   };
 
+  const applyRichPourFromEditor = () => {
+    const editor = richPourRef.current;
+    if (!editor) return;
+    const html = editor.innerHTML.trim();
+    if (!html) {
+      setRichPourStatus("Paste some text first, then click Apply.");
+      return;
+    }
+    try {
+      const { next, summary } = applyRichTextPour(html, state, { replaceStories: richPourReplace });
+      setState(next);
+      setRichPourStatus(summary);
+      setStatus("Rich text pour applied. Review and click Save newsletter.");
+      editor.innerHTML = "";
+    } catch {
+      setRichPourStatus("Could not parse pasted content.");
+    }
+  };
+
+  const clearRichPourEditor = () => {
+    if (richPourRef.current) richPourRef.current.innerHTML = "";
+    setRichPourStatus("");
+  };
+
+  const handleRichPourPaste = (event: React.ClipboardEvent<HTMLDivElement>) => {
+    const html = event.clipboardData.getData("text/html");
+    if (html) {
+      event.preventDefault();
+      const sel = window.getSelection();
+      if (!sel || sel.rangeCount === 0) {
+        if (richPourRef.current) richPourRef.current.innerHTML += html;
+        return;
+      }
+      const range = sel.getRangeAt(0);
+      range.deleteContents();
+      const fragment = range.createContextualFragment(html);
+      range.insertNode(fragment);
+      range.collapse(false);
+    }
+  };
+
   const handleMailingListFile = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (!file) return;
@@ -1578,7 +1862,7 @@ export default function NewsletterPageClient({ initialState, editMode }: Props) 
                 </section>
 
                 <section>
-                  <h3>Text pour</h3>
+                  <h3>Text pour (labeled .txt)</h3>
                   <p className="admin-rss-hint">
                     Upload a <code>.txt</code> with labeled sections (<code>Newsletter Title:</code>, <code>Mission:</code>,
                     <code>Greeting from CEO:</code>, <code>Story1Title:</code>, etc.).
@@ -1594,6 +1878,43 @@ export default function NewsletterPageClient({ initialState, editMode }: Props) 
                     Upload text pour file
                   </button>
                   {textPourStatus ? <p className="admin-status">{textPourStatus}</p> : null}
+                </section>
+
+                <section>
+                  <h3>Rich text pour</h3>
+                  <p className="admin-rss-hint">
+                    Paste from Word, Google Docs, a webpage, or an email. <strong>Heading 1</strong> sets the
+                    newsletter title; headings named <code>Mission</code> or <code>Greeting from CEO</code>
+                    fill those slots. Other headings start new <strong>stories</strong>; the first paragraph
+                    under each heading becomes the excerpt. <em>Italics</em>, <strong>bold</strong>, links,
+                    bullet lists, and paragraph spacing are preserved. Use a horizontal rule (───) or
+                    blank lines to separate stories.
+                  </p>
+                  <div
+                    ref={richPourRef}
+                    className="newsletter-rich-pour-editor"
+                    contentEditable
+                    suppressContentEditableWarning
+                    data-placeholder="Paste your formatted newsletter content here…"
+                    onPaste={handleRichPourPaste}
+                  />
+                  <label className="newsletter-checkbox-row">
+                    <input
+                      type="checkbox"
+                      checked={richPourReplace}
+                      onChange={(e) => setRichPourReplace(e.target.checked)}
+                    />
+                    <span>Replace existing stories (otherwise append)</span>
+                  </label>
+                  <div style={{ display: "flex", flexWrap: "wrap", gap: "8px" }}>
+                    <button type="button" className="button primary" onClick={applyRichPourFromEditor}>
+                      Apply rich text pour
+                    </button>
+                    <button type="button" className="button secondary" onClick={clearRichPourEditor}>
+                      Clear
+                    </button>
+                  </div>
+                  {richPourStatus ? <p className="admin-status">{richPourStatus}</p> : null}
                 </section>
               </div>
             ) : null}
@@ -2136,6 +2457,14 @@ export default function NewsletterPageClient({ initialState, editMode }: Props) 
                 >
                   {story.excerpt.trim() || (canEdit ? "Click to edit excerpt" : "")}
                 </p>
+                {story.body && /[<>]/.test(story.body) ? (
+                  <div
+                    className={`newsletter-story-body newsletter-rich-text${canEdit ? (isStoryFieldSelected(story.id, "body") ? " newsletter-edit-selected" : "") : ""}`}
+                    onClick={canEdit ? () => selectStoryField(story.id, "body") : undefined}
+                    role={canEdit ? "button" : undefined}
+                    dangerouslySetInnerHTML={{ __html: sanitizeRichHtml(story.body) }}
+                  />
+                ) : null}
                 {canEdit ? (
                   <button type="button" className="button secondary newsletter-story-edit-body-btn" onClick={() => selectStoryField(story.id, "body")}>
                     Edit full body…
