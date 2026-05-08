@@ -4213,9 +4213,50 @@ img {
   border: 1px solid rgba(189, 208, 201, 0.2);
   color: #f3f7f6;
   text-align: center;
+  font-family: var(--newsletter-font, var(--font-serif), "Cormorant Garamond", Georgia, serif);
   display: grid;
   gap: 18px;
   position: relative;
+}
+
+.newsletter-shell.newsletter-font-serif {
+  --newsletter-font: var(--font-serif), "Cormorant Garamond", Georgia, serif;
+}
+
+.newsletter-shell.newsletter-font-sans {
+  --newsletter-font: var(--font-sans), "Montserrat", "Helvetica", sans-serif;
+}
+
+.newsletter-shell h1,
+.newsletter-shell h2,
+.newsletter-shell h3,
+.newsletter-shell p,
+.newsletter-shell li,
+.newsletter-shell blockquote,
+.newsletter-shell .newsletter-story-title,
+.newsletter-shell .newsletter-story-excerpt,
+.newsletter-shell .newsletter-story-meta,
+.newsletter-shell .newsletter-story-body,
+.newsletter-shell .newsletter-mission,
+.newsletter-shell .newsletter-intro,
+.newsletter-shell .newsletter-issue-heading,
+.newsletter-shell .newsletter-section-title,
+.newsletter-shell .newsletter-text-block,
+.newsletter-shell .newsletter-text-block-heading,
+.newsletter-shell .newsletter-text-block-body {
+  font-family: inherit;
+}
+
+.newsletter-shell .newsletter-top-tools,
+.newsletter-shell .newsletter-top-tools *,
+.newsletter-shell .newsletter-bottom-toolbar,
+.newsletter-shell .newsletter-bottom-toolbar *,
+.newsletter-shell .newsletter-element-controls,
+.newsletter-shell .newsletter-element-controls *,
+.newsletter-shell .newsletter-tool-drawer,
+.newsletter-shell .newsletter-tool-drawer *,
+.newsletter-shell .newsletter-edit-pill {
+  font-family: var(--font-sans), "Montserrat", "Helvetica", sans-serif;
 }
 
 .newsletter-bg-color-control {

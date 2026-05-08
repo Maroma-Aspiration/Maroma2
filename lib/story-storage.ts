@@ -35,6 +35,7 @@ const defaultState: StoriesState = {
   newsletterGreetingHeading: "Greeting from CEO",
   newsletterTextAlign: "center",
   newsletterBackgroundColor: "#10151c",
+  newsletterFontFamily: "serif",
   newsletterSectionHeadingSizeRem: 0.86,
   newsletterIssueHeadingSizeRem: 3,
   newsletterBodyFontSizeRem: 1.04,
@@ -305,6 +306,10 @@ const parseState = (value: unknown): StoriesState => {
       typeof raw.newsletterBackgroundColor === "string" && raw.newsletterBackgroundColor.trim()
         ? raw.newsletterBackgroundColor.trim()
         : defaultState.newsletterBackgroundColor,
+    newsletterFontFamily:
+      raw.newsletterFontFamily === "serif" || raw.newsletterFontFamily === "sans"
+        ? raw.newsletterFontFamily
+        : defaultState.newsletterFontFamily,
     newsletterSectionHeadingSizeRem:
       typeof raw.newsletterSectionHeadingSizeRem === "number"
         ? Math.min(2, Math.max(0.6, raw.newsletterSectionHeadingSizeRem))

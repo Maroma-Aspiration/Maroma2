@@ -1874,7 +1874,7 @@ export default function NewsletterPageClient({ initialState, editMode }: Props) 
     <main className="newsletter-page">
       {renderStoryEditPortal()}
       <section
-        className={`newsletter-shell ${state.newsletterTextAlign === "left" ? "is-align-left" : "is-align-center"}${canEdit ? " is-preview" : ""}`}
+        className={`newsletter-shell ${state.newsletterTextAlign === "left" ? "is-align-left" : "is-align-center"}${canEdit ? " is-preview" : ""} newsletter-font-${state.newsletterFontFamily ?? "serif"}`}
         style={
           {
             "--newsletter-section-heading-size": `${state.newsletterSectionHeadingSizeRem ?? 0.86}rem`,
@@ -1951,6 +1951,21 @@ export default function NewsletterPageClient({ initialState, editMode }: Props) 
 
             {openDrawer === "settings" ? (
               <div className="newsletter-tool-drawer-body">
+                <label>
+                  Body font
+                  <select
+                    value={state.newsletterFontFamily ?? "serif"}
+                    onChange={(e) =>
+                      setState((prev) => ({
+                        ...prev,
+                        newsletterFontFamily: e.target.value === "sans" ? "sans" : "serif"
+                      }))
+                    }
+                  >
+                    <option value="serif">Cormorant Garamond (serif)</option>
+                    <option value="sans">Montserrat (sans-serif)</option>
+                  </select>
+                </label>
                 <label>
                   Text alignment
                   <select
