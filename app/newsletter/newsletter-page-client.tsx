@@ -744,6 +744,16 @@ export default function NewsletterPageClient({ initialState, editMode }: Props) 
         ) : null}
         {transform ? (
           <>
+            <div className="newsletter-radius-presets">
+              <button
+                type="button"
+                className="button primary"
+                onClick={() => setTargetImageTransform(target, { x: 0, y: 0, zoom: 1 })}
+                title="Reset position and zoom so the full image is visible"
+              >
+                Fit image
+              </button>
+            </div>
             <label>
               Position X ({transform.x}%)
               <input
@@ -1607,7 +1617,7 @@ export default function NewsletterPageClient({ initialState, editMode }: Props) 
                 className={`newsletter-top-image-wrap${topImageSrc ? "" : " is-placeholder"}${canTransformImages && selectedEditorTarget === "topImage" ? " newsletter-edit-selected" : ""}`}
                 onClick={canTransformImages ? () => selectBlock("topImage") : undefined}
                 style={
-                  topImageSrc
+                  topImageSrc && state.newsletterImageTransforms.topImage.borderRadius > 0
                     ? {
                         borderRadius: `${state.newsletterImageTransforms.topImage.borderRadius}px`,
                         overflow: "hidden",
@@ -1657,7 +1667,7 @@ export default function NewsletterPageClient({ initialState, editMode }: Props) 
                 className={`newsletter-portrait-wrap${portraitSrc ? "" : " is-placeholder"}${canTransformImages && selectedEditorTarget === "portraitImage" ? " newsletter-edit-selected" : ""}`}
                 onClick={canTransformImages ? () => selectBlock("portraitImage") : undefined}
                 style={
-                  portraitSrc
+                  portraitSrc && state.newsletterImageTransforms.portrait.borderRadius > 0
                     ? {
                         borderRadius: `${state.newsletterImageTransforms.portrait.borderRadius}px`,
                         overflow: "hidden",
@@ -1700,7 +1710,7 @@ export default function NewsletterPageClient({ initialState, editMode }: Props) 
                 className={`newsletter-hero-wrap${heroSrc ? "" : " is-placeholder"}${canTransformImages && selectedEditorTarget === "heroImage" ? " newsletter-edit-selected" : ""}`}
                 onClick={canTransformImages ? () => selectBlock("heroImage") : undefined}
                 style={
-                  heroSrc
+                  heroSrc && state.newsletterImageTransforms.hero.borderRadius > 0
                     ? {
                         borderRadius: `${state.newsletterImageTransforms.hero.borderRadius}px`,
                         overflow: "hidden",

@@ -4343,8 +4343,6 @@ img {
   max-width: 720px;
   margin: 0 auto;
   position: relative;
-  border-radius: 14px;
-  overflow: hidden;
 }
 
 .newsletter-top-image-wrap.is-placeholder {
@@ -4458,9 +4456,6 @@ img {
   width: min(84px, 22vw);
   aspect-ratio: 1;
   position: relative;
-  border-radius: 50%;
-  overflow: hidden;
-  border: 3px solid rgba(167, 199, 188, 0.38);
   box-shadow: 0 10px 32px rgba(0, 0, 0, 0.42);
 }
 
@@ -4482,9 +4477,6 @@ img {
   width: 100%;
   max-width: 680px;
   position: relative;
-  border-radius: 14px;
-  overflow: hidden;
-  border: 1px solid rgba(167, 199, 188, 0.22);
 }
 
 .newsletter-hero-wrap.is-placeholder {
