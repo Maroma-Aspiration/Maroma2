@@ -8,6 +8,8 @@ export type StoryRecord = {
   excerpt: string;
   body: string;
   imageUrl: string;
+  /** Optional gallery — when 2+ entries are present, the story renders as a montage. images[0] mirrors imageUrl for backward compatibility. */
+  images?: string[];
   sourceUrl: string;
   source: StorySource;
   ctaLabel: string;

@@ -1231,6 +1231,11 @@ export default function NewsletterPageClient({ initialState, editMode }: Props) 
       image: "Image"
     };
     const storySources: StorySource[] = ["manual", "instagram", "facebook", "web", "rss"];
+    const galleryImages: string[] = Array.isArray(story.images) && story.images.length > 0
+      ? story.images
+      : story.imageUrl
+        ? [story.imageUrl]
+        : [];
     const node = (
       <aside className="newsletter-element-controls is-floating">
         <div className="newsletter-floating-controls-head">
@@ -1256,6 +1261,23 @@ export default function NewsletterPageClient({ initialState, editMode }: Props) 
               }}
             >
               Delete story
+            </button>
+          </div>
+        </div>
+        <div className="newsletter-position-block">
+          <strong>Story layout</strong>
+          <div className="newsletter-floating-controls-actions">
+            <button type="button" className="button secondary" onClick={() => insertDividerNearStory(story.id, "before")}>
+              + Divider above
+            </button>
+            <button type="button" className="button secondary" onClick={() => insertDividerNearStory(story.id, "after")}>
+              + Divider below
+            </button>
+            <button type="button" className="button secondary" onClick={() => moveStory(story.id, -1)}>
+              Move up
+            </button>
+            <button type="button" className="button secondary" onClick={() => moveStory(story.id, 1)}>
+              Move down
             </button>
           </div>
         </div>
@@ -1337,17 +1359,68 @@ export default function NewsletterPageClient({ initialState, editMode }: Props) 
         {field === "image" ? (
           <>
             <label>
-              Image URL
-              <input value={story.imageUrl} onChange={(e) => updateStory(story.id, { imageUrl: e.target.value })} placeholder="Story image URL" />
+              Image URL (primary)
+              <input
+                value={story.imageUrl}
+                onChange={(e) => updateStory(story.id, { imageUrl: e.target.value, images: [e.target.value, ...galleryImages.slice(1)].filter(Boolean) })}
+                placeholder="Story image URL"
+              />
             </label>
             <div className="newsletter-story-image-panel-actions">
-              <button type="button" className="button secondary" onClick={() => storyImageUploadRef.current?.click()}>
-                Upload image
+              <button type="button" className="button primary" onClick={() => storyImageUploadRef.current?.click()}>
+                Upload image(s) — pick multiple for a montage
               </button>
-              <button type="button" className="button secondary" onClick={() => updateStory(story.id, { imageUrl: "" })}>
-                Clear image
+              <button
+                type="button"
+                className="button secondary"
+                onClick={() => updateStory(story.id, { imageUrl: "", images: [] })}
+              >
+                Clear all images
               </button>
             </div>
+            {galleryImages.length > 0 ? (
+              <div className="newsletter-story-gallery-grid">
+                {galleryImages.map((src, idx) => (
+                  <div key={`${idx}-${src.slice(0, 24)}`} className="newsletter-story-gallery-item">
+                    <img src={src} alt={`Story image ${idx + 1}`} />
+                    <div className="newsletter-story-gallery-actions">
+                      <button
+                        type="button"
+                        className="button secondary"
+                        onClick={() => moveStoryImage(story.id, idx, -1)}
+                        disabled={idx === 0}
+                        title="Move left"
+                      >
+                        ←
+                      </button>
+                      <button
+                        type="button"
+                        className="button secondary"
+                        onClick={() => moveStoryImage(story.id, idx, 1)}
+                        disabled={idx === galleryImages.length - 1}
+                        title="Move right"
+                      >
+                        →
+                      </button>
+                      <button
+                        type="button"
+                        className="button secondary"
+                        onClick={() => removeStoryImageAt(story.id, idx)}
+                        title="Remove this image"
+                      >
+                        ✕
+                      </button>
+                    </div>
+                    {idx === 0 ? <span className="newsletter-story-gallery-tag">Primary</span> : null}
+                  </div>
+                ))}
+              </div>
+            ) : null}
+            <p className="admin-rss-hint">
+              {galleryImages.length > 1
+                ? `${galleryImages.length} images — montage layout will be applied automatically.`
+                : "Pick 2–9 photos at once to build a tidy montage."}
+            </p>
           </>
         ) : null}
       </aside>
@@ -1634,21 +1707,94 @@ export default function NewsletterPageClient({ initialState, editMode }: Props) 
   };
 
   const handleStoryImageUpload = (storyId: string) => async (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (!file) return;
+    const files = Array.from(event.target.files ?? []);
+    if (files.length === 0) return;
+    setStatus(files.length > 1 ? `Loading ${files.length} images…` : "Loading image…");
     try {
-      const dataUrl = await fileToDataUrl(file, {
-        maxWidth: 1200,
-        maxHeight: 1200,
-        quality: 0.78,
-        forceJpeg: true
-      });
-      updateStory(storyId, { imageUrl: dataUrl });
-      setStatus("Story image loaded. Click Save newsletter.");
+      const dataUrls: string[] = [];
+      for (const file of files) {
+        try {
+          const dataUrl = await fileToDataUrl(file, {
+            maxWidth: 1200,
+            maxHeight: 1200,
+            quality: 0.78,
+            forceJpeg: true
+          });
+          if (dataUrl) dataUrls.push(dataUrl);
+        } catch {
+          // skip invalid file
+        }
+      }
+      if (dataUrls.length === 0) {
+        setStatus("Could not load image(s). Try JPG or PNG.");
+        return;
+      }
+      const story = state.stories.find((s) => s.id === storyId);
+      const existing = Array.isArray(story?.images) ? (story?.images ?? []) : story?.imageUrl ? [story.imageUrl] : [];
+      const merged = [...existing, ...dataUrls].slice(0, 12);
+      updateStory(storyId, { images: merged, imageUrl: merged[0] ?? "" });
+      setStatus(
+        merged.length > 1
+          ? `${merged.length} images loaded — montage layout. Click Save newsletter.`
+          : "Story image loaded. Click Save newsletter."
+      );
     } catch {
-      setStatus("Could not load story image. Try JPG or PNG.");
+      setStatus("Could not load image(s). Try JPG or PNG.");
     }
     event.target.value = "";
+  };
+
+  const removeStoryImageAt = (storyId: string, index: number) => {
+    const story = state.stories.find((s) => s.id === storyId);
+    if (!story) return;
+    const list = Array.isArray(story.images) && story.images.length > 0
+      ? [...story.images]
+      : story.imageUrl
+        ? [story.imageUrl]
+        : [];
+    if (index < 0 || index >= list.length) return;
+    list.splice(index, 1);
+    updateStory(storyId, { images: list, imageUrl: list[0] ?? "" });
+  };
+
+  const moveStoryImage = (storyId: string, index: number, direction: -1 | 1) => {
+    const story = state.stories.find((s) => s.id === storyId);
+    if (!story) return;
+    const list = Array.isArray(story.images) && story.images.length > 0
+      ? [...story.images]
+      : story.imageUrl
+        ? [story.imageUrl]
+        : [];
+    const target = index + direction;
+    if (index < 0 || index >= list.length || target < 0 || target >= list.length) return;
+    const [item] = list.splice(index, 1);
+    list.splice(target, 0, item);
+    updateStory(storyId, { images: list, imageUrl: list[0] ?? "" });
+  };
+
+  const insertDividerNearStory = (storyId: string, position: "before" | "after") => {
+    setState((prev) => {
+      const idx = prev.stories.findIndex((s) => s.id === storyId);
+      if (idx < 0) return prev;
+      const insertAt = position === "before" ? idx : idx + 1;
+      const next = [...prev.stories];
+      next.splice(insertAt, 0, emptyDivider());
+      return { ...prev, stories: next };
+    });
+    setStatus(`Divider inserted ${position} story.`);
+  };
+
+  const moveStory = (storyId: string, direction: -1 | 1) => {
+    setState((prev) => {
+      const idx = prev.stories.findIndex((s) => s.id === storyId);
+      if (idx < 0) return prev;
+      const target = idx + direction;
+      if (target < 0 || target >= prev.stories.length) return prev;
+      const next = [...prev.stories];
+      const [item] = next.splice(idx, 1);
+      next.splice(target, 0, item);
+      return { ...prev, stories: next };
+    });
   };
 
   return (
@@ -2180,6 +2326,7 @@ export default function NewsletterPageClient({ initialState, editMode }: Props) 
               ref={storyImageUploadRef}
               type="file"
               accept="image/*"
+              multiple
               style={{ display: "none" }}
               onChange={(e) => {
                 const sid = selectedStoryEdit?.storyId;
@@ -2394,39 +2541,84 @@ export default function NewsletterPageClient({ initialState, editMode }: Props) 
                 <div key={story.id} className="newsletter-divider-item">
                   <hr className="newsletter-rule" />
                   {canEdit ? (
-                    <button
-                      type="button"
-                      className="button secondary"
-                      onClick={() =>
-                        setState((prev) => ({ ...prev, stories: prev.stories.filter((s) => s.id !== story.id) }))
-                      }
-                    >
-                      Delete divider
-                    </button>
+                    <div className="newsletter-divider-actions">
+                      <button
+                        type="button"
+                        className="button secondary"
+                        onClick={() => moveStory(story.id, -1)}
+                      >
+                        Move up
+                      </button>
+                      <button
+                        type="button"
+                        className="button secondary"
+                        onClick={() => moveStory(story.id, 1)}
+                      >
+                        Move down
+                      </button>
+                      <button
+                        type="button"
+                        className="button secondary"
+                        onClick={() =>
+                          setState((prev) => ({ ...prev, stories: prev.stories.filter((s) => s.id !== story.id) }))
+                        }
+                      >
+                        Delete divider
+                      </button>
+                    </div>
                   ) : null}
                 </div>
               ) : (
               <article key={story.id} className="newsletter-story">
-                {story.imageUrl ? (
-                  <img
-                    src={story.imageUrl}
-                    alt={story.title}
-                    className={
-                      canEdit
-                        ? `newsletter-story-img-editable${isStoryFieldSelected(story.id, "image") ? " newsletter-edit-selected" : ""}`
-                        : undefined
-                    }
-                    onClick={canEdit ? () => selectStoryField(story.id, "image") : undefined}
-                  />
-                ) : canEdit ? (
-                  <button
-                    type="button"
-                    className={`newsletter-story-image-placeholder${isStoryFieldSelected(story.id, "image") ? " newsletter-edit-selected" : ""}`}
-                    onClick={() => selectStoryField(story.id, "image")}
-                  >
-                    Add story image
-                  </button>
-                ) : null}
+                {(() => {
+                  const gallery = Array.isArray(story.images) && story.images.length > 0
+                    ? story.images
+                    : story.imageUrl
+                      ? [story.imageUrl]
+                      : [];
+                  if (gallery.length > 1) {
+                    const count = Math.min(gallery.length, 9);
+                    return (
+                      <div
+                        className={`newsletter-story-montage newsletter-story-montage-${count}${
+                          canEdit ? (isStoryFieldSelected(story.id, "image") ? " newsletter-edit-selected" : "") : ""
+                        }`}
+                        onClick={canEdit ? () => selectStoryField(story.id, "image") : undefined}
+                        role={canEdit ? "button" : undefined}
+                      >
+                        {gallery.slice(0, 9).map((src, idx) => (
+                          <img key={`${idx}-${src.slice(0, 24)}`} src={src} alt={`${story.title} ${idx + 1}`} loading="lazy" />
+                        ))}
+                      </div>
+                    );
+                  }
+                  if (gallery.length === 1) {
+                    return (
+                      <img
+                        src={gallery[0]}
+                        alt={story.title}
+                        className={
+                          canEdit
+                            ? `newsletter-story-img-editable${isStoryFieldSelected(story.id, "image") ? " newsletter-edit-selected" : ""}`
+                            : undefined
+                        }
+                        onClick={canEdit ? () => selectStoryField(story.id, "image") : undefined}
+                      />
+                    );
+                  }
+                  if (canEdit) {
+                    return (
+                      <button
+                        type="button"
+                        className={`newsletter-story-image-placeholder${isStoryFieldSelected(story.id, "image") ? " newsletter-edit-selected" : ""}`}
+                        onClick={() => selectStoryField(story.id, "image")}
+                      >
+                        Add story image(s)
+                      </button>
+                    );
+                  }
+                  return null;
+                })()}
 
                 <p
                   className={`newsletter-story-meta${canEdit ? " newsletter-story-text-editable" : ""}${canEdit && isStoryFieldSelected(story.id, "meta") ? " newsletter-edit-selected" : ""}`}

@@ -190,6 +190,19 @@ const normalizeStory = (story: Partial<StoryRecord>): StoryRecord => {
       featured: Boolean(story.featured)
     };
   }
+  const rawImages = Array.isArray(story.images) ? story.images : [];
+  const cleanedImages: string[] = [];
+  for (const item of rawImages) {
+    if (typeof item !== "string") continue;
+    const trimmed = item.trim();
+    if (!trimmed) continue;
+    cleanedImages.push(trimmed);
+    if (cleanedImages.length >= 12) break;
+  }
+  const primary = (story.imageUrl ?? "").trim();
+  if (primary && !cleanedImages.includes(primary)) cleanedImages.unshift(primary);
+  const images = cleanedImages;
+  const imageUrl = images[0] ?? primary;
   return {
     id,
     kind,
@@ -197,7 +210,8 @@ const normalizeStory = (story: Partial<StoryRecord>): StoryRecord => {
     title,
     excerpt: (story.excerpt ?? "").trim(),
     body: (story.body ?? "").trim(),
-    imageUrl: (story.imageUrl ?? "").trim(),
+    imageUrl,
+    images: images.length > 0 ? images : undefined,
     sourceUrl: (story.sourceUrl ?? "").trim(),
     source: story.source ?? "manual",
     ctaLabel: (story.ctaLabel ?? "Read more").trim() || "Read more",
