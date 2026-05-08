@@ -1886,6 +1886,7 @@ export default function NewsletterPageClient({ initialState, editMode }: Props) 
         }
       >
         {canEdit && showGlobalControls ? (
+          <div className="newsletter-top-tools">
           <div className="newsletter-inline-toolbar">
             <button
               type="button"
@@ -1934,9 +1935,8 @@ export default function NewsletterPageClient({ initialState, editMode }: Props) 
             </label>
             {status ? <p className="admin-status">{status}</p> : null}
           </div>
-        ) : null}
 
-        {canEdit && showGlobalControls && openDrawer ? (
+        {openDrawer ? (
           <div className="newsletter-tool-drawer">
             <div className="newsletter-tool-drawer-head">
               <strong>
@@ -2218,6 +2218,8 @@ export default function NewsletterPageClient({ initialState, editMode }: Props) 
                 </section>
               </div>
             ) : null}
+          </div>
+        ) : null}
           </div>
         ) : null}
 

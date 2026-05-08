@@ -4731,6 +4731,50 @@ img {
   border-radius: 8px;
 }
 
+.newsletter-top-tools {
+  position: fixed;
+  top: 80px;
+  right: 16px;
+  z-index: 90;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  width: min(320px, calc(100vw - 32px));
+  max-height: calc(100vh - 100px);
+  overflow-y: auto;
+  pointer-events: auto;
+}
+
+.newsletter-top-tools .newsletter-inline-toolbar {
+  flex-direction: column;
+  align-items: stretch;
+  width: 100%;
+}
+
+.newsletter-top-tools .newsletter-inline-toolbar .button {
+  text-align: center;
+}
+
+.newsletter-top-tools .newsletter-tool-drawer {
+  width: 100%;
+  max-height: calc(100vh - 280px);
+  overflow-y: auto;
+}
+
+@media (max-width: 720px) {
+  .newsletter-top-tools {
+    top: auto;
+    bottom: 0;
+    right: 0;
+    left: 0;
+    width: auto;
+    max-height: 70vh;
+    border-top: 1px solid rgba(140, 215, 230, 0.4);
+    background: rgba(6, 12, 18, 0.95);
+    padding: 8px;
+  }
+}
+
 .newsletter-inline-toolbar {
   display: flex;
   flex-wrap: wrap;
