@@ -541,7 +541,7 @@ export default function NewsletterPageClient({ initialState, editMode }: Props) 
 
   const setTargetImageTransform = (
     target: EditableTarget,
-    patch: Partial<{ x: number; y: number; zoom: number; borderRadius: number }>
+    patch: Partial<{ x: number; y: number; zoom: number; borderRadius: number; zIndex: number }>
   ) => {
     const current = getTransformForTarget(target);
     if (!current) return;
@@ -565,10 +565,27 @@ export default function NewsletterPageClient({ initialState, editMode }: Props) 
             : {}),
           ...(typeof patch.borderRadius === "number"
             ? { borderRadius: Math.min(9999, Math.max(0, patch.borderRadius)) }
+            : {}),
+          ...(typeof patch.zIndex === "number"
+            ? { zIndex: Math.min(999, Math.max(-999, Math.round(patch.zIndex))) }
             : {})
         }
       }
     }));
+  };
+
+  const bumpTargetZIndex = (target: EditableTarget, delta: number) => {
+    const current = getTransformForTarget(target);
+    if (!current) return;
+    setTargetImageTransform(target, { zIndex: (current.zIndex ?? 0) + delta });
+  };
+
+  const setTargetZIndexExtreme = (target: EditableTarget, mode: "front" | "back") => {
+    const transforms = state.newsletterImageTransforms;
+    const values = [transforms.topImage.zIndex, transforms.logo.zIndex, transforms.portrait.zIndex, transforms.hero.zIndex];
+    const max = values.reduce((acc, v) => (v > acc ? v : acc), -999);
+    const min = values.reduce((acc, v) => (v < acc ? v : acc), 999);
+    setTargetImageTransform(target, { zIndex: mode === "front" ? max + 1 : min - 1 });
   };
 
   const renderInlineControls = (target: EditableTarget) => {
@@ -754,6 +771,43 @@ export default function NewsletterPageClient({ initialState, editMode }: Props) 
                 Fit image
               </button>
             </div>
+            <label>
+              Layer (z: {transform.zIndex ?? 0})
+              <div className="newsletter-radius-presets">
+                <button
+                  type="button"
+                  className="button secondary"
+                  onClick={() => setTargetZIndexExtreme(target, "back")}
+                  title="Send to back of all images"
+                >
+                  To back
+                </button>
+                <button
+                  type="button"
+                  className="button secondary"
+                  onClick={() => bumpTargetZIndex(target, -1)}
+                  title="Send one layer back"
+                >
+                  Backward
+                </button>
+                <button
+                  type="button"
+                  className="button secondary"
+                  onClick={() => bumpTargetZIndex(target, 1)}
+                  title="Bring one layer forward"
+                >
+                  Forward
+                </button>
+                <button
+                  type="button"
+                  className="button secondary"
+                  onClick={() => setTargetZIndexExtreme(target, "front")}
+                  title="Bring to front of all images"
+                >
+                  To front
+                </button>
+              </div>
+            </label>
             <label>
               Position X ({transform.x}%)
               <input
@@ -1579,6 +1633,7 @@ export default function NewsletterPageClient({ initialState, editMode }: Props) 
           <div
             className={`newsletter-logo-wrap${canTransformImages && selectedEditorTarget === "logoImage" ? " newsletter-edit-selected" : ""}`}
             onClick={canTransformImages ? () => selectBlock("logoImage") : undefined}
+            style={{ position: "relative", zIndex: state.newsletterImageTransforms.logo.zIndex ?? 0 }}
           >
             <div
               className="newsletter-image-transform"
@@ -1609,6 +1664,7 @@ export default function NewsletterPageClient({ initialState, editMode }: Props) 
               <div
                 className={`newsletter-top-image-wrap${topImageSrc ? "" : " is-placeholder"}${canTransformImages && selectedEditorTarget === "topImage" ? " newsletter-edit-selected" : ""}`}
                 onClick={canTransformImages ? () => selectBlock("topImage") : undefined}
+                style={{ position: "relative", zIndex: state.newsletterImageTransforms.topImage.zIndex ?? 0 }}
               >
                 {topImageSrc ? (
                   <div
@@ -1654,9 +1710,10 @@ export default function NewsletterPageClient({ initialState, editMode }: Props) 
                   portraitSrc
                     ? {
                         transform: `translate(${state.newsletterImageTransforms.portrait.x}%, ${state.newsletterImageTransforms.portrait.y}%) scale(${state.newsletterImageTransforms.portrait.zoom})`,
-                        transformOrigin: "center center"
+                        transformOrigin: "center center",
+                        zIndex: state.newsletterImageTransforms.portrait.zIndex ?? 0
                       }
-                    : undefined
+                    : { zIndex: state.newsletterImageTransforms.portrait.zIndex ?? 0 }
                 }
               >
                 {portraitSrc ? (
@@ -1683,6 +1740,7 @@ export default function NewsletterPageClient({ initialState, editMode }: Props) 
               <div
                 className={`newsletter-hero-wrap${heroSrc ? "" : " is-placeholder"}${canTransformImages && selectedEditorTarget === "heroImage" ? " newsletter-edit-selected" : ""}`}
                 onClick={canTransformImages ? () => selectBlock("heroImage") : undefined}
+                style={{ position: "relative", zIndex: state.newsletterImageTransforms.hero.zIndex ?? 0 }}
               >
                 {heroSrc ? (
                   <div

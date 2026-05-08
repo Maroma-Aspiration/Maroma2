@@ -86,10 +86,10 @@ const defaultState: StoriesState = {
     }
   },
   newsletterImageTransforms: {
-    topImage: { x: 0, y: 0, zoom: 1, borderRadius: 14 },
-    logo: { x: 0, y: 0, zoom: 1, borderRadius: 0 },
-    portrait: { x: 0, y: 0, zoom: 1, borderRadius: 9999 },
-    hero: { x: 0, y: 0, zoom: 1, borderRadius: 14 }
+    topImage: { x: 0, y: 0, zoom: 1, borderRadius: 14, zIndex: 0 },
+    logo: { x: 0, y: 0, zoom: 1, borderRadius: 0, zIndex: 0 },
+    portrait: { x: 0, y: 0, zoom: 1, borderRadius: 9999, zIndex: 2 },
+    hero: { x: 0, y: 0, zoom: 1, borderRadius: 14, zIndex: 1 }
   }
 };
 
@@ -126,7 +126,11 @@ function parseImageTransforms(input: unknown, fallback: NewsletterImageTransform
       borderRadius:
         typeof item.borderRadius === "number" && Number.isFinite(item.borderRadius)
           ? Math.min(9999, Math.max(0, item.borderRadius))
-          : fallback[key].borderRadius
+          : fallback[key].borderRadius,
+      zIndex:
+        typeof item.zIndex === "number" && Number.isFinite(item.zIndex)
+          ? Math.min(999, Math.max(-999, Math.round(item.zIndex)))
+          : fallback[key].zIndex
     };
   };
   return {

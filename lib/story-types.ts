@@ -84,6 +84,8 @@ export type NewsletterImageTransform = {
   zoom: number;
   /** Corner radius in pixels (>=0). Defaults vary per image type. */
   borderRadius: number;
+  /** Stacking order. Higher values render on top. Defaults to 0. */
+  zIndex: number;
 };
 
 export type NewsletterImageTransforms = {
