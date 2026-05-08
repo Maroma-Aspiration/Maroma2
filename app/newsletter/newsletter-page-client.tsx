@@ -667,6 +667,59 @@ export default function NewsletterPageClient({ initialState, editMode }: Props) 
         ) : null}
         {style ? (
           <>
+            <div className="newsletter-position-block">
+              <strong>Position</strong>
+              <label>
+                Nudge X ({Math.round(style.offsetX ?? 0)}px)
+                <div className="newsletter-radius-row">
+                  <input
+                    type="range"
+                    min={-400}
+                    max={400}
+                    step={1}
+                    value={style.offsetX ?? 0}
+                    onChange={(e) => setTargetStyle(target, { offsetX: Number(e.target.value) })}
+                    aria-label="Horizontal nudge"
+                  />
+                  <input
+                    type="number"
+                    min={-2000}
+                    max={2000}
+                    step={1}
+                    value={Math.round(style.offsetX ?? 0)}
+                    onChange={(e) => {
+                      const raw = e.target.value;
+                      if (!raw.trim()) return;
+                      const next = Number.parseFloat(raw);
+                      if (!Number.isFinite(next)) return;
+                      setTargetStyle(target, { offsetX: next });
+                    }}
+                    className="newsletter-radius-number"
+                    aria-label="Horizontal nudge value (px)"
+                  />
+                  <button
+                    type="button"
+                    className="button secondary"
+                    onClick={() => setTargetStyle(target, { offsetX: 0, offsetY: 0 })}
+                    title="Reset both nudges"
+                  >
+                    Reset
+                  </button>
+                </div>
+              </label>
+              <label>
+                Nudge Y ({Math.round(style.offsetY ?? 0)}px)
+                <input
+                  type="range"
+                  min={-400}
+                  max={400}
+                  step={1}
+                  value={style.offsetY ?? 0}
+                  onChange={(e) => setTargetStyle(target, { offsetY: Number(e.target.value) })}
+                  aria-label="Vertical nudge"
+                />
+              </label>
+            </div>
             <label>
               Font
               <input
@@ -738,56 +791,6 @@ export default function NewsletterPageClient({ initialState, editMode }: Props) 
                   Default all
                 </button>
               </span>
-            </label>
-            <label>
-              Nudge X ({Math.round(style.offsetX ?? 0)}px)
-              <div className="newsletter-radius-row">
-                <input
-                  type="range"
-                  min={-400}
-                  max={400}
-                  step={1}
-                  value={style.offsetX ?? 0}
-                  onChange={(e) => setTargetStyle(target, { offsetX: Number(e.target.value) })}
-                  aria-label="Horizontal nudge"
-                />
-                <input
-                  type="number"
-                  min={-2000}
-                  max={2000}
-                  step={1}
-                  value={Math.round(style.offsetX ?? 0)}
-                  onChange={(e) => {
-                    const raw = e.target.value;
-                    if (!raw.trim()) return;
-                    const next = Number.parseFloat(raw);
-                    if (!Number.isFinite(next)) return;
-                    setTargetStyle(target, { offsetX: next });
-                  }}
-                  className="newsletter-radius-number"
-                  aria-label="Horizontal nudge value (px)"
-                />
-                <button
-                  type="button"
-                  className="button secondary"
-                  onClick={() => setTargetStyle(target, { offsetX: 0, offsetY: 0 })}
-                  title="Reset both nudges"
-                >
-                  Reset
-                </button>
-              </div>
-            </label>
-            <label>
-              Nudge Y ({Math.round(style.offsetY ?? 0)}px)
-              <input
-                type="range"
-                min={-400}
-                max={400}
-                step={1}
-                value={style.offsetY ?? 0}
-                onChange={(e) => setTargetStyle(target, { offsetY: Number(e.target.value) })}
-                aria-label="Vertical nudge"
-              />
             </label>
             <label>
               Quote breakout box
