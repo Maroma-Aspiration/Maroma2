@@ -307,7 +307,11 @@ const parseState = (value: unknown): StoriesState => {
         ? raw.newsletterBackgroundColor.trim()
         : defaultState.newsletterBackgroundColor,
     newsletterFontFamily:
-      raw.newsletterFontFamily === "serif" || raw.newsletterFontFamily === "sans"
+      raw.newsletterFontFamily === "serif" ||
+      raw.newsletterFontFamily === "sans" ||
+      raw.newsletterFontFamily === "montserrat-light" ||
+      raw.newsletterFontFamily === "raleway-light" ||
+      raw.newsletterFontFamily === "josefin-light"
         ? raw.newsletterFontFamily
         : defaultState.newsletterFontFamily,
     newsletterSectionHeadingSizeRem:

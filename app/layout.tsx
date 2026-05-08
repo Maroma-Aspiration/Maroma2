@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
 import { Montserrat } from "next/font/google";
 import { Cormorant_Garamond } from "next/font/google";
+import { Raleway } from "next/font/google";
+import { Josefin_Sans } from "next/font/google";
 import { readSiteContentFromDisk } from "../lib/read-site-content";
 import { SiteFooter } from "./components/SiteFooter";
 import { SiteHeader } from "./components/SiteHeader";
@@ -11,6 +13,7 @@ export const dynamic = "force-dynamic";
 const sans = Montserrat({
   subsets: ["latin"],
   weight: ["300", "400", "500", "600", "700", "800"],
+  style: ["normal", "italic"],
   variable: "--font-sans",
   adjustFontFallback: true
 });
@@ -18,7 +21,24 @@ const sans = Montserrat({
 const serif = Cormorant_Garamond({
   subsets: ["latin"],
   weight: ["400", "500", "600", "700"],
+  style: ["normal", "italic"],
   variable: "--font-serif",
+  adjustFontFallback: true
+});
+
+const raleway = Raleway({
+  subsets: ["latin"],
+  weight: ["200", "300", "400", "600", "700"],
+  style: ["normal", "italic"],
+  variable: "--font-raleway",
+  adjustFontFallback: true
+});
+
+const josefin = Josefin_Sans({
+  subsets: ["latin"],
+  weight: ["300", "400", "600", "700"],
+  style: ["normal", "italic"],
+  variable: "--font-josefin",
   adjustFontFallback: true
 });
 
@@ -41,7 +61,7 @@ export default async function RootLayout({
   const initialNav = { brand: initialSiteContent.brand, nav: initialSiteContent.nav };
 
   return (
-    <html lang="en" className={`${sans.variable} ${serif.variable}`}>
+    <html lang="en" className={`${sans.variable} ${serif.variable} ${raleway.variable} ${josefin.variable}`}>
       <body className="antialiased">
         <Script src="https://elfsightcdn.com/platform.js" strategy="afterInteractive" />
         <CartProvider>

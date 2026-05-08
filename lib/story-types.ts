@@ -55,8 +55,20 @@ export type StoriesState = {
   newsletterTextAlign: "left" | "center";
   /** Newsletter shell background color (CSS color string, e.g. "#10151c"). */
   newsletterBackgroundColor: string;
-  /** Newsletter body font preference. "serif" = Cormorant Garamond, "sans" = Montserrat. */
-  newsletterFontFamily: "serif" | "sans";
+  /**
+   * Newsletter body font preference.
+   *  - "serif"            = Cormorant Garamond
+   *  - "sans"             = Montserrat (regular)
+   *  - "montserrat-light" = Montserrat 300
+   *  - "raleway-light"    = Raleway 200 (ExtraLight)
+   *  - "josefin-light"    = Josefin Sans 300 (Light)
+   */
+  newsletterFontFamily:
+    | "serif"
+    | "sans"
+    | "montserrat-light"
+    | "raleway-light"
+    | "josefin-light";
   /** Section heading size in rem. */
   newsletterSectionHeadingSizeRem: number;
   /** Issue heading size in rem. */

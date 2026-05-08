@@ -1955,15 +1955,18 @@ export default function NewsletterPageClient({ initialState, editMode }: Props) 
                   Body font
                   <select
                     value={state.newsletterFontFamily ?? "serif"}
-                    onChange={(e) =>
-                      setState((prev) => ({
-                        ...prev,
-                        newsletterFontFamily: e.target.value === "sans" ? "sans" : "serif"
-                      }))
-                    }
+                    onChange={(e) => {
+                      const v = e.target.value;
+                      const allowed = ["serif", "sans", "montserrat-light", "raleway-light", "josefin-light"] as const;
+                      const next = (allowed as readonly string[]).includes(v) ? (v as (typeof allowed)[number]) : "serif";
+                      setState((prev) => ({ ...prev, newsletterFontFamily: next }));
+                    }}
                   >
                     <option value="serif">Cormorant Garamond (serif)</option>
-                    <option value="sans">Montserrat (sans-serif)</option>
+                    <option value="sans">Montserrat (regular)</option>
+                    <option value="montserrat-light">Montserrat Light</option>
+                    <option value="raleway-light">Raleway ExtraLight</option>
+                    <option value="josefin-light">Josefin Sans Light</option>
                   </select>
                 </label>
                 <label>

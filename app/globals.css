@@ -4221,10 +4221,44 @@ img {
 
 .newsletter-shell.newsletter-font-serif {
   --newsletter-font: var(--font-serif), "Cormorant Garamond", Georgia, serif;
+  --newsletter-font-weight: 400;
 }
 
 .newsletter-shell.newsletter-font-sans {
   --newsletter-font: var(--font-sans), "Montserrat", "Helvetica", sans-serif;
+  --newsletter-font-weight: 400;
+}
+
+.newsletter-shell.newsletter-font-montserrat-light {
+  --newsletter-font: var(--font-sans), "Montserrat", "Helvetica", sans-serif;
+  --newsletter-font-weight: 300;
+}
+
+.newsletter-shell.newsletter-font-raleway-light {
+  --newsletter-font: var(--font-raleway), "Raleway", "Helvetica", sans-serif;
+  --newsletter-font-weight: 200;
+}
+
+.newsletter-shell.newsletter-font-josefin-light {
+  --newsletter-font: var(--font-josefin), "Josefin Sans", "Helvetica", sans-serif;
+  --newsletter-font-weight: 300;
+}
+
+.newsletter-shell {
+  font-weight: var(--newsletter-font-weight, 400);
+}
+
+.newsletter-shell strong,
+.newsletter-shell b,
+.newsletter-shell h1,
+.newsletter-shell h2,
+.newsletter-shell h3 {
+  font-weight: 700;
+}
+
+.newsletter-shell em,
+.newsletter-shell i {
+  font-style: italic;
 }
 
 .newsletter-shell h1,
