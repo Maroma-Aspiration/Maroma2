@@ -1579,13 +1579,6 @@ export default function NewsletterPageClient({ initialState, editMode }: Props) 
           <div
             className={`newsletter-logo-wrap${canTransformImages && selectedEditorTarget === "logoImage" ? " newsletter-edit-selected" : ""}`}
             onClick={canTransformImages ? () => selectBlock("logoImage") : undefined}
-            style={{
-              borderRadius: state.newsletterImageTransforms.logo.borderRadius
-                ? `${state.newsletterImageTransforms.logo.borderRadius}px`
-                : undefined,
-              overflow: state.newsletterImageTransforms.logo.borderRadius ? "hidden" : undefined,
-              isolation: state.newsletterImageTransforms.logo.borderRadius ? "isolate" : undefined
-            }}
           >
             <div
               className="newsletter-image-transform"
@@ -1616,15 +1609,6 @@ export default function NewsletterPageClient({ initialState, editMode }: Props) 
               <div
                 className={`newsletter-top-image-wrap${topImageSrc ? "" : " is-placeholder"}${canTransformImages && selectedEditorTarget === "topImage" ? " newsletter-edit-selected" : ""}`}
                 onClick={canTransformImages ? () => selectBlock("topImage") : undefined}
-                style={
-                  topImageSrc && state.newsletterImageTransforms.topImage.borderRadius > 0
-                    ? {
-                        borderRadius: `${state.newsletterImageTransforms.topImage.borderRadius}px`,
-                        overflow: "hidden",
-                        isolation: "isolate"
-                      }
-                    : undefined
-                }
               >
                 {topImageSrc ? (
                   <div
@@ -1666,15 +1650,6 @@ export default function NewsletterPageClient({ initialState, editMode }: Props) 
               <div
                 className={`newsletter-portrait-wrap${portraitSrc ? "" : " is-placeholder"}${canTransformImages && selectedEditorTarget === "portraitImage" ? " newsletter-edit-selected" : ""}`}
                 onClick={canTransformImages ? () => selectBlock("portraitImage") : undefined}
-                style={
-                  portraitSrc && state.newsletterImageTransforms.portrait.borderRadius > 0
-                    ? {
-                        borderRadius: `${state.newsletterImageTransforms.portrait.borderRadius}px`,
-                        overflow: "hidden",
-                        isolation: "isolate"
-                      }
-                    : undefined
-                }
               >
                 {portraitSrc ? (
                   <div
@@ -1709,15 +1684,6 @@ export default function NewsletterPageClient({ initialState, editMode }: Props) 
               <div
                 className={`newsletter-hero-wrap${heroSrc ? "" : " is-placeholder"}${canTransformImages && selectedEditorTarget === "heroImage" ? " newsletter-edit-selected" : ""}`}
                 onClick={canTransformImages ? () => selectBlock("heroImage") : undefined}
-                style={
-                  heroSrc && state.newsletterImageTransforms.hero.borderRadius > 0
-                    ? {
-                        borderRadius: `${state.newsletterImageTransforms.hero.borderRadius}px`,
-                        overflow: "hidden",
-                        isolation: "isolate"
-                      }
-                    : undefined
-                }
               >
                 {heroSrc ? (
                   <div
