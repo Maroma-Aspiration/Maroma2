@@ -79,9 +79,44 @@ export type StoriesState = {
   newsletterElementStyles: Record<string, NewsletterElementStyle>;
   /** Per-image crop/position controls for newsletter assets. */
   newsletterImageTransforms: NewsletterImageTransforms;
+  /** Decorative lines placed before/after sections in the header / body shell. */
+  newsletterLayoutDividers: NewsletterLayoutDivider[];
 };
 
 export const STORIES_STORAGE_KEY = "maroma-stories-state";
+
+/** Logical newsletter regions that can have a decorative line above/below them. */
+export type NewsletterLayoutSectionId =
+  | "logo"
+  | "topImage"
+  | "portraitHero"
+  | "issueHeading"
+  | "mission"
+  | "greeting"
+  | "stories";
+
+/** A user-placed decorative horizontal rule attached to a section. */
+export type NewsletterLayoutDivider = {
+  id: string;
+  sectionId: NewsletterLayoutSectionId;
+  placement: "before" | "after";
+  /** Horizontal nudge in px. */
+  offsetX: number;
+  /** Vertical nudge in px. */
+  offsetY: number;
+  /** Space above the line in px. */
+  marginTop: number;
+  /** Space below the line in px. */
+  marginBottom: number;
+  /** Stroke thickness in px. */
+  thickness: number;
+  /** CSS color string. */
+  color: string;
+  /** Width of the line as a percent of the available column (10-100). */
+  widthPercent: number;
+  /** Border style. */
+  lineStyle: "solid" | "dashed" | "double";
+};
 
 export type NewsletterElementStyle = {
   fontFamily: string;

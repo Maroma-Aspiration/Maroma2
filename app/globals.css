@@ -4741,10 +4741,43 @@ img {
 }
 
 .newsletter-edit-selected {
-  outline: 2px dashed rgba(112, 201, 217, 0.8);
+  outline: 3px solid rgba(112, 201, 217, 0.95);
   outline-offset: 4px;
+  box-shadow: 0 0 0 6px rgba(112, 201, 217, 0.18);
   border-radius: 8px;
   cursor: pointer;
+  position: relative;
+  z-index: 4;
+}
+
+.newsletter-layout-divider {
+  width: 100%;
+  cursor: default;
+}
+
+.newsletter-layout-divider.is-editable {
+  cursor: pointer;
+  padding: 4px 0;
+  border-radius: 6px;
+  transition: background-color 120ms ease, outline-color 120ms ease;
+}
+
+.newsletter-layout-divider.is-editable:hover {
+  background-color: rgba(112, 201, 217, 0.08);
+  outline: 1px dashed rgba(112, 201, 217, 0.45);
+  outline-offset: 2px;
+}
+
+.newsletter-layout-divider.newsletter-edit-selected {
+  outline: 3px solid rgba(112, 201, 217, 0.95);
+  outline-offset: 2px;
+  box-shadow: 0 0 0 6px rgba(112, 201, 217, 0.18);
+  background-color: rgba(112, 201, 217, 0.06);
+  border-radius: 6px;
+}
+
+.newsletter-layout-divider-line {
+  pointer-events: none;
 }
 
 /* Portrait: circular hit target + selection ring (must follow .newsletter-edit-selected) */

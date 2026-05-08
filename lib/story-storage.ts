@@ -6,7 +6,9 @@ import {
   type StoriesState,
   type StoryRecord,
   type NewsletterElementStyle,
-  type NewsletterImageTransforms
+  type NewsletterImageTransforms,
+  type NewsletterLayoutDivider,
+  type NewsletterLayoutSectionId
 } from "./story-types";
 
 const storageDir = path.join(process.cwd(), "data");
@@ -101,8 +103,58 @@ const defaultState: StoriesState = {
     logo: { x: 0, y: 0, zoom: 1, borderRadius: 0, zIndex: 0 },
     portrait: { x: 0, y: 0, zoom: 1, borderRadius: 9999, zIndex: 2 },
     hero: { x: 0, y: 0, zoom: 1, borderRadius: 14, zIndex: 1 }
-  }
+  },
+  newsletterLayoutDividers: []
 };
+
+const ALLOWED_LAYOUT_SECTIONS: ReadonlyArray<NewsletterLayoutSectionId> = [
+  "logo",
+  "topImage",
+  "portraitHero",
+  "issueHeading",
+  "mission",
+  "greeting",
+  "stories"
+];
+
+const clampNumber = (value: unknown, min: number, max: number, fallback: number): number => {
+  const n = typeof value === "number" ? value : Number.parseFloat(String(value));
+  if (!Number.isFinite(n)) return fallback;
+  return Math.min(max, Math.max(min, n));
+};
+
+function parseLayoutDivider(input: unknown): NewsletterLayoutDivider | null {
+  if (!input || typeof input !== "object") return null;
+  const raw = input as Record<string, unknown>;
+  const sectionId = ALLOWED_LAYOUT_SECTIONS.includes(raw.sectionId as NewsletterLayoutSectionId)
+    ? (raw.sectionId as NewsletterLayoutSectionId)
+    : null;
+  if (!sectionId) return null;
+  const placement = raw.placement === "before" ? "before" : "after";
+  const lineStyle =
+    raw.lineStyle === "dashed" || raw.lineStyle === "double" ? raw.lineStyle : "solid";
+  const color =
+    typeof raw.color === "string" && raw.color.trim() ? raw.color.trim() : "rgba(230, 245, 239, 0.55)";
+  const id =
+    typeof raw.id === "string" && raw.id.trim()
+      ? raw.id.trim()
+      : (typeof crypto !== "undefined" && "randomUUID" in crypto
+          ? crypto.randomUUID()
+          : `divider-${Math.random().toString(36).slice(2)}-${Date.now().toString(36)}`);
+  return {
+    id,
+    sectionId,
+    placement,
+    offsetX: clampNumber(raw.offsetX, -2000, 2000, 0),
+    offsetY: clampNumber(raw.offsetY, -2000, 2000, 0),
+    marginTop: clampNumber(raw.marginTop, 0, 200, 12),
+    marginBottom: clampNumber(raw.marginBottom, 0, 200, 12),
+    thickness: clampNumber(raw.thickness, 1, 12, 1),
+    color,
+    widthPercent: clampNumber(raw.widthPercent, 10, 100, 72),
+    lineStyle
+  };
+}
 
 function parseElementStyle(input: unknown, fallback: NewsletterElementStyle): NewsletterElementStyle {
   const raw = input && typeof input === "object" ? (input as Record<string, unknown>) : {};
@@ -348,7 +400,12 @@ const parseState = (value: unknown): StoriesState => {
         defaultState.newsletterElementStyles.greetingBody
       )
     },
-    newsletterImageTransforms: parseImageTransforms(raw.newsletterImageTransforms, defaultState.newsletterImageTransforms)
+    newsletterImageTransforms: parseImageTransforms(raw.newsletterImageTransforms, defaultState.newsletterImageTransforms),
+    newsletterLayoutDividers: Array.isArray(raw.newsletterLayoutDividers)
+      ? (raw.newsletterLayoutDividers
+          .map((d) => parseLayoutDivider(d))
+          .filter((d): d is NewsletterLayoutDivider => d !== null))
+      : defaultState.newsletterLayoutDividers
   };
 };
 

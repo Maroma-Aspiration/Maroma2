@@ -3,7 +3,13 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { formatStoryDate } from "../../lib/story-format";
-import type { StoriesState, StoryRecord, StorySource } from "../../lib/story-types";
+import type {
+  StoriesState,
+  StoryRecord,
+  StorySource,
+  NewsletterLayoutDivider,
+  NewsletterLayoutSectionId
+} from "../../lib/story-types";
 import type { NewsletterCampaignSummary } from "../../lib/newsletter-audience-types";
 
 type StoryFieldKey = "title" | "excerpt" | "body" | "ctaLabel" | "ctaUrl" | "sourceUrl" | "imageUrl";
@@ -684,6 +690,8 @@ export default function NewsletterPageClient({ initialState, editMode }: Props) 
   const [saveState, setSaveState] = useState<"idle" | "saving" | "saved">("idle");
   const [selectedEditorTarget, setSelectedEditorTarget] = useState<EditableTarget | null>(null);
   const [selectedStoryEdit, setSelectedStoryEdit] = useState<{ storyId: string; field: StoryEditField } | null>(null);
+  const [selectedLayoutDividerId, setSelectedLayoutDividerId] = useState<string | null>(null);
+  const [activeLayoutSection, setActiveLayoutSection] = useState<NewsletterLayoutSectionId>("portraitHero");
   const [openDrawer, setOpenDrawer] = useState<ToolDrawer>(null);
   const [showGlobalControls, setShowGlobalControls] = useState(false);
   const [importUrls, setImportUrls] = useState("");
@@ -720,22 +728,102 @@ export default function NewsletterPageClient({ initialState, editMode }: Props) 
   const clearEditors = () => {
     setSelectedEditorTarget(null);
     setSelectedStoryEdit(null);
+    setSelectedLayoutDividerId(null);
+  };
+
+  const targetToLayoutSection = (target: EditableTarget): NewsletterLayoutSectionId | null => {
+    switch (target) {
+      case "logoImage":
+        return "logo";
+      case "topImage":
+        return "topImage";
+      case "portraitImage":
+      case "heroImage":
+        return "portraitHero";
+      case "issueHeading":
+        return "issueHeading";
+      case "missionHeading":
+      case "missionBody":
+        return "mission";
+      case "greetingHeading":
+      case "greetingBody":
+        return "greeting";
+    }
   };
 
   const selectBlock = (target: EditableTarget) => {
     setSelectedStoryEdit(null);
+    setSelectedLayoutDividerId(null);
     setSelectedEditorTarget(target);
+    const sec = targetToLayoutSection(target);
+    if (sec) setActiveLayoutSection(sec);
   };
 
   const selectStoryField = (storyId: string, field: StoryEditField) => {
     setSelectedEditorTarget(null);
+    setSelectedLayoutDividerId(null);
     setSelectedStoryEdit({ storyId, field });
+    setActiveLayoutSection("stories");
+  };
+
+  const layoutSectionLabels: Record<NewsletterLayoutSectionId, string> = {
+    logo: "Logo",
+    topImage: "Top banner",
+    portraitHero: "Portrait & hero",
+    issueHeading: "Issue title",
+    mission: "Mission",
+    greeting: "Greeting",
+    stories: "Stories"
+  };
+
+  const insertLayoutDivider = (sectionId: NewsletterLayoutSectionId, placement: "before" | "after") => {
+    const newDivider: NewsletterLayoutDivider = {
+      id:
+        typeof crypto !== "undefined" && "randomUUID" in crypto
+          ? crypto.randomUUID()
+          : `divider-${Math.random().toString(36).slice(2)}-${Date.now().toString(36)}`,
+      sectionId,
+      placement,
+      offsetX: 0,
+      offsetY: 0,
+      marginTop: 14,
+      marginBottom: 14,
+      thickness: 1,
+      color: "rgba(230, 245, 239, 0.55)",
+      widthPercent: 72,
+      lineStyle: "solid"
+    };
+    setState((prev) => ({
+      ...prev,
+      newsletterLayoutDividers: [...(prev.newsletterLayoutDividers ?? []), newDivider]
+    }));
+    setSelectedEditorTarget(null);
+    setSelectedStoryEdit(null);
+    setSelectedLayoutDividerId(newDivider.id);
+    setStatus(`Decorative line added ${placement} ${layoutSectionLabels[sectionId]}.`);
+  };
+
+  const updateLayoutDivider = (id: string, patch: Partial<NewsletterLayoutDivider>) => {
+    setState((prev) => ({
+      ...prev,
+      newsletterLayoutDividers: (prev.newsletterLayoutDividers ?? []).map((d) =>
+        d.id === id ? { ...d, ...patch } : d
+      )
+    }));
+  };
+
+  const deleteLayoutDivider = (id: string) => {
+    setState((prev) => ({
+      ...prev,
+      newsletterLayoutDividers: (prev.newsletterLayoutDividers ?? []).filter((d) => d.id !== id)
+    }));
+    setSelectedLayoutDividerId(null);
   };
 
   const isStoryFieldSelected = (storyId: string, field: StoryEditField) =>
     selectedStoryEdit?.storyId === storyId && selectedStoryEdit.field === field;
 
-  const featured = state.stories.slice(0, 6);
+  const featured = canEdit ? state.stories : state.stories.slice(0, 6);
   const issueDate = useMemo(
     () => new Intl.DateTimeFormat("en-US", { month: "long", year: "numeric" }).format(new Date()),
     []
@@ -928,6 +1016,40 @@ export default function NewsletterPageClient({ initialState, editMode }: Props) 
         ) : null}
         {target === "missionBody" || target === "greetingBody" ? (
           <p className="newsletter-inline-edit-hint">Click the text on the page to edit it directly. Use this panel to change font, size, and color.</p>
+        ) : null}
+        {canEdit ? (
+          <div className="newsletter-position-block">
+            <strong>Decorative line</strong>
+            <label>
+              Section
+              <select
+                value={activeLayoutSection}
+                onChange={(e) => setActiveLayoutSection(e.target.value as NewsletterLayoutSectionId)}
+              >
+                {(Object.keys(layoutSectionLabels) as NewsletterLayoutSectionId[]).map((id) => (
+                  <option key={id} value={id}>
+                    {layoutSectionLabels[id]}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <div className="newsletter-floating-controls-actions">
+              <button
+                type="button"
+                className="button secondary"
+                onClick={() => insertLayoutDivider(activeLayoutSection, "before")}
+              >
+                + Line above
+              </button>
+              <button
+                type="button"
+                className="button secondary"
+                onClick={() => insertLayoutDivider(activeLayoutSection, "after")}
+              >
+                + Line below
+              </button>
+            </div>
+          </div>
         ) : null}
         {style ? (
           <>
@@ -1238,6 +1360,240 @@ export default function NewsletterPageClient({ initialState, editMode }: Props) 
     return inlineNode;
   };
 
+  const renderLayoutDividers = (sectionId: NewsletterLayoutSectionId, placement: "before" | "after") => {
+    const dividers = (state.newsletterLayoutDividers ?? []).filter(
+      (d) => d.sectionId === sectionId && d.placement === placement
+    );
+    if (dividers.length === 0) return null;
+    return (
+      <>
+        {dividers.map((d) => {
+          const isSelected = selectedLayoutDividerId === d.id;
+          const lineWidth =
+            d.lineStyle === "double"
+              ? Math.max(3, d.thickness * 3)
+              : d.thickness;
+          const borderTop =
+            d.lineStyle === "double"
+              ? `${lineWidth}px double ${d.color}`
+              : `${lineWidth}px ${d.lineStyle} ${d.color}`;
+          return (
+            <div
+              key={d.id}
+              className={`newsletter-layout-divider${isSelected ? " newsletter-edit-selected" : ""}${canEdit ? " is-editable" : ""}`}
+              role={canEdit ? "button" : undefined}
+              onClick={
+                canEdit
+                  ? (e) => {
+                      e.stopPropagation();
+                      setSelectedEditorTarget(null);
+                      setSelectedStoryEdit(null);
+                      setSelectedLayoutDividerId(d.id);
+                    }
+                  : undefined
+              }
+              style={{
+                marginTop: `${d.marginTop}px`,
+                marginBottom: `${d.marginBottom}px`,
+                transform: `translate(${d.offsetX}px, ${d.offsetY}px)`,
+                display: "flex",
+                justifyContent: "center"
+              }}
+            >
+              <span
+                className="newsletter-layout-divider-line"
+                style={{
+                  width: `${d.widthPercent}%`,
+                  borderTop,
+                  display: "block"
+                }}
+              />
+            </div>
+          );
+        })}
+      </>
+    );
+  };
+
+  const renderLayoutDividerPortal = () => {
+    if (!canEdit || !selectedLayoutDividerId) return null;
+    const divider = (state.newsletterLayoutDividers ?? []).find((d) => d.id === selectedLayoutDividerId);
+    if (!divider) return null;
+    const node = (
+      <aside className="newsletter-element-controls is-floating">
+        <div className="newsletter-floating-controls-head">
+          <strong>Decorative line — {layoutSectionLabels[divider.sectionId]} ({divider.placement})</strong>
+          <div className="newsletter-floating-controls-actions">
+            <button
+              type="button"
+              className={`button primary newsletter-save-button${saveState === "saved" ? " is-saved" : ""}`}
+              onClick={saveStories}
+              disabled={saveState === "saving"}
+            >
+              {saveState === "saved" ? "Saved!" : saveState === "saving" ? "Saving..." : "Save"}
+            </button>
+            <button type="button" className="button secondary" onClick={clearEditors} aria-label="Close line editor">
+              Close
+            </button>
+            <button type="button" className="button secondary" onClick={() => deleteLayoutDivider(divider.id)}>
+              Delete line
+            </button>
+          </div>
+        </div>
+        <div className="newsletter-position-block">
+          <strong>Move</strong>
+          <label>
+            Section
+            <select
+              value={divider.sectionId}
+              onChange={(e) =>
+                updateLayoutDivider(divider.id, {
+                  sectionId: e.target.value as NewsletterLayoutSectionId
+                })
+              }
+            >
+              {(Object.keys(layoutSectionLabels) as NewsletterLayoutSectionId[]).map((id) => (
+                <option key={id} value={id}>
+                  {layoutSectionLabels[id]}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label>
+            Placement
+            <select
+              value={divider.placement}
+              onChange={(e) =>
+                updateLayoutDivider(divider.id, {
+                  placement: e.target.value === "before" ? "before" : "after"
+                })
+              }
+            >
+              <option value="before">Above section</option>
+              <option value="after">Below section</option>
+            </select>
+          </label>
+          <label>
+            Nudge X ({Math.round(divider.offsetX)}px)
+            <input
+              type="range"
+              min={-400}
+              max={400}
+              step={1}
+              value={divider.offsetX}
+              onChange={(e) => updateLayoutDivider(divider.id, { offsetX: Number(e.target.value) })}
+            />
+          </label>
+          <label>
+            Nudge Y ({Math.round(divider.offsetY)}px)
+            <input
+              type="range"
+              min={-400}
+              max={400}
+              step={1}
+              value={divider.offsetY}
+              onChange={(e) => updateLayoutDivider(divider.id, { offsetY: Number(e.target.value) })}
+            />
+          </label>
+          <div className="newsletter-floating-controls-actions">
+            <button
+              type="button"
+              className="button secondary"
+              onClick={() => updateLayoutDivider(divider.id, { offsetX: 0, offsetY: 0 })}
+            >
+              Reset nudge
+            </button>
+          </div>
+        </div>
+        <label>
+          Margin top ({Math.round(divider.marginTop)}px)
+          <input
+            type="range"
+            min={0}
+            max={120}
+            step={1}
+            value={divider.marginTop}
+            onChange={(e) => updateLayoutDivider(divider.id, { marginTop: Number(e.target.value) })}
+          />
+        </label>
+        <label>
+          Margin bottom ({Math.round(divider.marginBottom)}px)
+          <input
+            type="range"
+            min={0}
+            max={120}
+            step={1}
+            value={divider.marginBottom}
+            onChange={(e) => updateLayoutDivider(divider.id, { marginBottom: Number(e.target.value) })}
+          />
+        </label>
+        <label>
+          Width ({Math.round(divider.widthPercent)}%)
+          <input
+            type="range"
+            min={10}
+            max={100}
+            step={1}
+            value={divider.widthPercent}
+            onChange={(e) => updateLayoutDivider(divider.id, { widthPercent: Number(e.target.value) })}
+          />
+        </label>
+        <label>
+          Thickness ({divider.thickness}px)
+          <input
+            type="range"
+            min={1}
+            max={12}
+            step={1}
+            value={divider.thickness}
+            onChange={(e) => updateLayoutDivider(divider.id, { thickness: Number(e.target.value) })}
+          />
+        </label>
+        <label>
+          Style
+          <select
+            value={divider.lineStyle}
+            onChange={(e) => {
+              const v = e.target.value;
+              const next: NewsletterLayoutDivider["lineStyle"] =
+                v === "dashed" ? "dashed" : v === "double" ? "double" : "solid";
+              updateLayoutDivider(divider.id, { lineStyle: next });
+            }}
+          >
+            <option value="solid">Solid</option>
+            <option value="dashed">Dashed</option>
+            <option value="double">Double</option>
+          </select>
+        </label>
+        <label>
+          Color
+          <span className="newsletter-text-color-row">
+            <input
+              type="color"
+              value={(() => {
+                const c = divider.color.trim();
+                if (/^#[0-9a-f]{6}$/i.test(c)) return c;
+                if (/^#[0-9a-f]{3}$/i.test(c)) return c;
+                return "#e6f5ef";
+              })()}
+              onChange={(e) => updateLayoutDivider(divider.id, { color: e.target.value })}
+              aria-label="Line color"
+            />
+            <button
+              type="button"
+              className="button secondary"
+              onClick={() => updateLayoutDivider(divider.id, { color: "rgba(230, 245, 239, 0.55)" })}
+            >
+              Default
+            </button>
+          </span>
+        </label>
+      </aside>
+    );
+    if (typeof document === "undefined") return null;
+    return createPortal(node, document.body);
+  };
+
   const renderStoryEditPortal = () => {
     if (!canEdit || !selectedStoryEdit) return null;
     const story = state.stories.find((s) => s.id === selectedStoryEdit.storyId);
@@ -1306,6 +1662,38 @@ export default function NewsletterPageClient({ initialState, editMode }: Props) 
             </button>
             <button type="button" className="button secondary" onClick={() => moveStory(story.id, 1)}>
               Move down
+            </button>
+          </div>
+        </div>
+        <div className="newsletter-position-block">
+          <strong>Decorative line (anywhere in newsletter)</strong>
+          <label>
+            Section
+            <select
+              value={activeLayoutSection}
+              onChange={(e) => setActiveLayoutSection(e.target.value as NewsletterLayoutSectionId)}
+            >
+              {(Object.keys(layoutSectionLabels) as NewsletterLayoutSectionId[]).map((id) => (
+                <option key={id} value={id}>
+                  {layoutSectionLabels[id]}
+                </option>
+              ))}
+            </select>
+          </label>
+          <div className="newsletter-floating-controls-actions">
+            <button
+              type="button"
+              className="button secondary"
+              onClick={() => insertLayoutDivider(activeLayoutSection, "before")}
+            >
+              + Line above section
+            </button>
+            <button
+              type="button"
+              className="button secondary"
+              onClick={() => insertLayoutDivider(activeLayoutSection, "after")}
+            >
+              + Line below section
             </button>
           </div>
         </div>
@@ -1873,6 +2261,7 @@ export default function NewsletterPageClient({ initialState, editMode }: Props) 
   return (
     <main className="newsletter-page">
       {renderStoryEditPortal()}
+      {renderLayoutDividerPortal()}
       <section
         className={`newsletter-shell ${state.newsletterTextAlign === "left" ? "is-align-left" : "is-align-center"}${canEdit ? " is-preview" : ""} newsletter-font-${state.newsletterFontFamily ?? "serif"}`}
         style={
@@ -2241,6 +2630,7 @@ export default function NewsletterPageClient({ initialState, editMode }: Props) 
           </div>
         ) : null}
 
+        {renderLayoutDividers("logo", "before")}
         <div className="newsletter-editable-row">
           <div className="newsletter-asset-row newsletter-logo-row">
           <div
@@ -2270,7 +2660,9 @@ export default function NewsletterPageClient({ initialState, editMode }: Props) 
           </div>
           {renderInlineControls("logoImage")}
         </div>
+        {renderLayoutDividers("logo", "after")}
 
+        {renderLayoutDividers("topImage", "before")}
         {topImageSrc || canEdit ? (
           <div className="newsletter-editable-row">
             <div className="newsletter-asset-row newsletter-top-image-row">
@@ -2309,9 +2701,11 @@ export default function NewsletterPageClient({ initialState, editMode }: Props) 
             {renderInlineControls("topImage")}
           </div>
         ) : null}
+        {renderLayoutDividers("topImage", "after")}
         <hr className="newsletter-rule" />
 
         <section className="newsletter-top-block" aria-label="Newsletter opening message">
+          {renderLayoutDividers("portraitHero", "before")}
           <div className="newsletter-top-grid">
             {portraitSrc || canEdit ? (
             <div className="newsletter-editable-row">
@@ -2381,6 +2775,7 @@ export default function NewsletterPageClient({ initialState, editMode }: Props) 
             </div>
             ) : null}
           </div>
+          {renderLayoutDividers("portraitHero", "after")}
 
           {canTransformImages ? (
             <>
@@ -2429,6 +2824,7 @@ export default function NewsletterPageClient({ initialState, editMode }: Props) 
             />
           ) : null}
 
+          {renderLayoutDividers("issueHeading", "before")}
           <div className="newsletter-editable-row">
             {canEdit ? (
               <SingleLineEditable
@@ -2465,8 +2861,10 @@ export default function NewsletterPageClient({ initialState, editMode }: Props) 
             {canEdit ? <p className="newsletter-issue-date-hint">| {issueDate}</p> : null}
             {renderInlineControls("issueHeading")}
           </div>
+          {renderLayoutDividers("issueHeading", "after")}
           <hr className="newsletter-rule" />
 
+          {renderLayoutDividers("mission", "before")}
           {hasMission || canEdit ? (
           <div className={`newsletter-mission-block${hasMission || canEdit ? "" : " is-placeholder"}`}>
             <div className="newsletter-editable-row">
@@ -2508,8 +2906,10 @@ export default function NewsletterPageClient({ initialState, editMode }: Props) 
             </div>
           </div>
           ) : null}
+          {renderLayoutDividers("mission", "after")}
           {hasMission || canEdit ? <hr className="newsletter-rule" /> : null}
 
+          {renderLayoutDividers("greeting", "before")}
           {hasWelcome || canEdit ? (
           <div className={`newsletter-greeting-block${hasWelcome || canEdit ? "" : " is-placeholder"}`}>
             <div className="newsletter-editable-row">
@@ -2619,9 +3019,11 @@ export default function NewsletterPageClient({ initialState, editMode }: Props) 
             </div>
           </div>
           ) : null}
+          {renderLayoutDividers("greeting", "after")}
           <hr className="newsletter-rule" />
         </section>
 
+        {renderLayoutDividers("stories", "before")}
         <div className="newsletter-list">
           {featured.length === 0 ? (
             <article className="newsletter-story">
@@ -2811,6 +3213,7 @@ export default function NewsletterPageClient({ initialState, editMode }: Props) 
             ))
           )}
         </div>
+        {renderLayoutDividers("stories", "after")}
 
         {canEdit && showGlobalControls ? (
           <div className="newsletter-inline-toolbar newsletter-bottom-toolbar">
@@ -2834,6 +3237,14 @@ export default function NewsletterPageClient({ initialState, editMode }: Props) 
               onClick={() => setState((prev) => ({ ...prev, stories: [...prev.stories, emptyDivider()] }))}
             >
               Add divider
+            </button>
+            <button
+              type="button"
+              className="button secondary"
+              onClick={() => insertLayoutDivider(activeLayoutSection, "after")}
+              title={`Insert decorative line below ${layoutSectionLabels[activeLayoutSection]}`}
+            >
+              Add line ({layoutSectionLabels[activeLayoutSection]})
             </button>
             <button
               type="button"
