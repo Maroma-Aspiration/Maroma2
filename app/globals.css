@@ -5035,8 +5035,8 @@ img {
 
 @keyframes newsletter-panel-pulse {
   0% { box-shadow: 0 0 0 0 rgba(112, 201, 217, 0.55), 0 18px 40px rgba(0, 0, 0, 0.5); }
-  60% { box-shadow: 0 0 0 12px rgba(112, 201, 217, 0); 0 18px 40px rgba(0, 0, 0, 0.5); }
-  100% { box-shadow: 0 0 0 0 rgba(112, 201, 217, 0); 0 18px 40px rgba(0, 0, 0, 0.5); }
+  60% { box-shadow: 0 0 0 12px rgba(112, 201, 217, 0), 0 18px 40px rgba(0, 0, 0, 0.5); }
+  100% { box-shadow: 0 0 0 0 rgba(112, 201, 217, 0), 0 18px 40px rgba(0, 0, 0, 0.5); }
 }
 
 @media (max-width: 720px) {
