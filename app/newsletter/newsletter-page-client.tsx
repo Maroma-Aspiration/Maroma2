@@ -740,6 +740,56 @@ export default function NewsletterPageClient({ initialState, editMode }: Props) 
               </span>
             </label>
             <label>
+              Nudge X ({Math.round(style.offsetX ?? 0)}px)
+              <div className="newsletter-radius-row">
+                <input
+                  type="range"
+                  min={-400}
+                  max={400}
+                  step={1}
+                  value={style.offsetX ?? 0}
+                  onChange={(e) => setTargetStyle(target, { offsetX: Number(e.target.value) })}
+                  aria-label="Horizontal nudge"
+                />
+                <input
+                  type="number"
+                  min={-2000}
+                  max={2000}
+                  step={1}
+                  value={Math.round(style.offsetX ?? 0)}
+                  onChange={(e) => {
+                    const raw = e.target.value;
+                    if (!raw.trim()) return;
+                    const next = Number.parseFloat(raw);
+                    if (!Number.isFinite(next)) return;
+                    setTargetStyle(target, { offsetX: next });
+                  }}
+                  className="newsletter-radius-number"
+                  aria-label="Horizontal nudge value (px)"
+                />
+                <button
+                  type="button"
+                  className="button secondary"
+                  onClick={() => setTargetStyle(target, { offsetX: 0, offsetY: 0 })}
+                  title="Reset both nudges"
+                >
+                  Reset
+                </button>
+              </div>
+            </label>
+            <label>
+              Nudge Y ({Math.round(style.offsetY ?? 0)}px)
+              <input
+                type="range"
+                min={-400}
+                max={400}
+                step={1}
+                value={style.offsetY ?? 0}
+                onChange={(e) => setTargetStyle(target, { offsetY: Number(e.target.value) })}
+                aria-label="Vertical nudge"
+              />
+            </label>
+            <label>
               Quote breakout box
               <input
                 type="checkbox"
@@ -1829,7 +1879,8 @@ export default function NewsletterPageClient({ initialState, editMode }: Props) 
                   fontSize: `${state.newsletterElementStyles.issueHeading.fontSizeRem}rem`,
                   textAlign: state.newsletterElementStyles.issueHeading.textAlign,
                   fontWeight: state.newsletterElementStyles.issueHeading.fontWeight,
-                  color: state.newsletterElementStyles.issueHeading.color || undefined
+                  color: state.newsletterElementStyles.issueHeading.color || undefined,
+                  transform: `translate(${state.newsletterElementStyles.issueHeading.offsetX ?? 0}px, ${state.newsletterElementStyles.issueHeading.offsetY ?? 0}px)`
                 }}
               />
             ) : (
@@ -1840,7 +1891,8 @@ export default function NewsletterPageClient({ initialState, editMode }: Props) 
                   fontSize: `${state.newsletterElementStyles.issueHeading.fontSizeRem}rem`,
                   textAlign: state.newsletterElementStyles.issueHeading.textAlign,
                   fontWeight: state.newsletterElementStyles.issueHeading.fontWeight,
-                  color: state.newsletterElementStyles.issueHeading.color || undefined
+                  color: state.newsletterElementStyles.issueHeading.color || undefined,
+                  transform: `translate(${state.newsletterElementStyles.issueHeading.offsetX ?? 0}px, ${state.newsletterElementStyles.issueHeading.offsetY ?? 0}px)`
                 }}
               >
                 {state.newsletterTitle} | {issueDate}
@@ -1869,6 +1921,7 @@ export default function NewsletterPageClient({ initialState, editMode }: Props) 
                     textAlign: state.newsletterElementStyles.missionBody.textAlign,
                     fontWeight: state.newsletterElementStyles.missionBody.fontWeight,
                     color: state.newsletterElementStyles.missionBody.color || undefined,
+                    transform: `translate(${state.newsletterElementStyles.missionBody.offsetX ?? 0}px, ${state.newsletterElementStyles.missionBody.offsetY ?? 0}px)`,
                     ["--quote-box-color" as string]: state.newsletterElementStyles.missionBody.quoteBoxColor
                   }}
                 />
@@ -1881,6 +1934,7 @@ export default function NewsletterPageClient({ initialState, editMode }: Props) 
                     textAlign: state.newsletterElementStyles.missionBody.textAlign,
                     fontWeight: state.newsletterElementStyles.missionBody.fontWeight,
                     color: state.newsletterElementStyles.missionBody.color || undefined,
+                    transform: `translate(${state.newsletterElementStyles.missionBody.offsetX ?? 0}px, ${state.newsletterElementStyles.missionBody.offsetY ?? 0}px)`,
                     ["--quote-box-color" as string]: state.newsletterElementStyles.missionBody.quoteBoxColor
                   }}
                   dangerouslySetInnerHTML={{ __html: missionHtml || textToHtml(mission) }}
@@ -1907,7 +1961,8 @@ export default function NewsletterPageClient({ initialState, editMode }: Props) 
                     fontSize: `${state.newsletterElementStyles.missionHeading.fontSizeRem}rem`,
                     textAlign: state.newsletterElementStyles.missionHeading.textAlign,
                     fontWeight: state.newsletterElementStyles.missionHeading.fontWeight,
-                    color: state.newsletterElementStyles.missionHeading.color || undefined
+                    color: state.newsletterElementStyles.missionHeading.color || undefined,
+                    transform: `translate(${state.newsletterElementStyles.missionHeading.offsetX ?? 0}px, ${state.newsletterElementStyles.missionHeading.offsetY ?? 0}px)`
                   }}
                 />
               ) : (
@@ -1918,7 +1973,8 @@ export default function NewsletterPageClient({ initialState, editMode }: Props) 
                     fontSize: `${state.newsletterElementStyles.missionHeading.fontSizeRem}rem`,
                     textAlign: state.newsletterElementStyles.missionHeading.textAlign,
                     fontWeight: state.newsletterElementStyles.missionHeading.fontWeight,
-                    color: state.newsletterElementStyles.missionHeading.color || undefined
+                    color: state.newsletterElementStyles.missionHeading.color || undefined,
+                    transform: `translate(${state.newsletterElementStyles.missionHeading.offsetX ?? 0}px, ${state.newsletterElementStyles.missionHeading.offsetY ?? 0}px)`
                   }}
                 >
                   {state.newsletterMissionHeading?.trim() || "Maroma mission"}
@@ -1939,7 +1995,8 @@ export default function NewsletterPageClient({ initialState, editMode }: Props) 
                     fontSize: `${state.newsletterElementStyles.greetingHeading.fontSizeRem}rem`,
                     textAlign: state.newsletterElementStyles.greetingHeading.textAlign,
                     fontWeight: state.newsletterElementStyles.greetingHeading.fontWeight,
-                    color: state.newsletterElementStyles.greetingHeading.color || undefined
+                    color: state.newsletterElementStyles.greetingHeading.color || undefined,
+                    transform: `translate(${state.newsletterElementStyles.greetingHeading.offsetX ?? 0}px, ${state.newsletterElementStyles.greetingHeading.offsetY ?? 0}px)`
                   }}
                 />
               ) : (
@@ -1950,7 +2007,8 @@ export default function NewsletterPageClient({ initialState, editMode }: Props) 
                     fontSize: `${state.newsletterElementStyles.greetingHeading.fontSizeRem}rem`,
                     textAlign: state.newsletterElementStyles.greetingHeading.textAlign,
                     fontWeight: state.newsletterElementStyles.greetingHeading.fontWeight,
-                    color: state.newsletterElementStyles.greetingHeading.color || undefined
+                    color: state.newsletterElementStyles.greetingHeading.color || undefined,
+                    transform: `translate(${state.newsletterElementStyles.greetingHeading.offsetX ?? 0}px, ${state.newsletterElementStyles.greetingHeading.offsetY ?? 0}px)`
                   }}
                 >
                   {state.newsletterGreetingHeading?.trim() || "Greeting"}
@@ -1974,6 +2032,7 @@ export default function NewsletterPageClient({ initialState, editMode }: Props) 
                     textAlign: state.newsletterElementStyles.greetingBody.textAlign,
                     fontWeight: state.newsletterElementStyles.greetingBody.fontWeight,
                     color: state.newsletterElementStyles.greetingBody.color || undefined,
+                    transform: `translate(${state.newsletterElementStyles.greetingBody.offsetX ?? 0}px, ${state.newsletterElementStyles.greetingBody.offsetY ?? 0}px)`,
                     ["--quote-box-color" as string]: state.newsletterElementStyles.greetingBody.quoteBoxColor
                   }}
                 />
@@ -1986,6 +2045,7 @@ export default function NewsletterPageClient({ initialState, editMode }: Props) 
                     textAlign: state.newsletterElementStyles.greetingBody.textAlign,
                     fontWeight: state.newsletterElementStyles.greetingBody.fontWeight,
                     color: state.newsletterElementStyles.greetingBody.color || undefined,
+                    transform: `translate(${state.newsletterElementStyles.greetingBody.offsetX ?? 0}px, ${state.newsletterElementStyles.greetingBody.offsetY ?? 0}px)`,
                     ["--quote-box-color" as string]: state.newsletterElementStyles.greetingBody.quoteBoxColor
                   }}
                   dangerouslySetInnerHTML={{ __html: welcomeHtml || textToHtml(welcomeLine) }}

@@ -46,7 +46,9 @@ const defaultState: StoriesState = {
       fontWeight: 700,
       isQuoteBox: false,
       quoteBoxColor: "#1f3d4a",
-      color: ""
+      color: "",
+      offsetX: 0,
+      offsetY: 0
     },
     missionHeading: {
       fontFamily: "inherit",
@@ -55,7 +57,9 @@ const defaultState: StoriesState = {
       fontWeight: 600,
       isQuoteBox: false,
       quoteBoxColor: "#1f3d4a",
-      color: ""
+      color: "",
+      offsetX: 0,
+      offsetY: 0
     },
     missionBody: {
       fontFamily: "inherit",
@@ -64,7 +68,9 @@ const defaultState: StoriesState = {
       fontWeight: 400,
       isQuoteBox: false,
       quoteBoxColor: "#1f3d4a",
-      color: ""
+      color: "",
+      offsetX: 0,
+      offsetY: 0
     },
     greetingHeading: {
       fontFamily: "inherit",
@@ -73,7 +79,9 @@ const defaultState: StoriesState = {
       fontWeight: 600,
       isQuoteBox: false,
       quoteBoxColor: "#1f3d4a",
-      color: ""
+      color: "",
+      offsetX: 0,
+      offsetY: 0
     },
     greetingBody: {
       fontFamily: "inherit",
@@ -82,7 +90,9 @@ const defaultState: StoriesState = {
       fontWeight: 400,
       isQuoteBox: false,
       quoteBoxColor: "#1f3d4a",
-      color: ""
+      color: "",
+      offsetX: 0,
+      offsetY: 0
     }
   },
   newsletterImageTransforms: {
@@ -107,7 +117,15 @@ function parseElementStyle(input: unknown, fallback: NewsletterElementStyle): Ne
       typeof raw.quoteBoxColor === "string" && raw.quoteBoxColor.trim()
         ? raw.quoteBoxColor
         : fallback.quoteBoxColor,
-    color: typeof raw.color === "string" ? raw.color.trim() : fallback.color
+    color: typeof raw.color === "string" ? raw.color.trim() : fallback.color,
+    offsetX:
+      typeof raw.offsetX === "number" && Number.isFinite(raw.offsetX)
+        ? Math.min(2000, Math.max(-2000, raw.offsetX))
+        : fallback.offsetX,
+    offsetY:
+      typeof raw.offsetY === "number" && Number.isFinite(raw.offsetY)
+        ? Math.min(2000, Math.max(-2000, raw.offsetY))
+        : fallback.offsetY
   };
 }
 

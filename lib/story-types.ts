@@ -76,6 +76,10 @@ export type NewsletterElementStyle = {
   quoteBoxColor: string;
   /** Optional text color (CSS color string). Empty falls back to inherited theme color. */
   color: string;
+  /** Horizontal nudge in px (positive = right). */
+  offsetX: number;
+  /** Vertical nudge in px (positive = down). */
+  offsetY: number;
 };
 
 export type NewsletterImageTransform = {
