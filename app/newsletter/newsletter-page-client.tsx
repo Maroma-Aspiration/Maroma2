@@ -1650,18 +1650,17 @@ export default function NewsletterPageClient({ initialState, editMode }: Props) 
               <div
                 className={`newsletter-portrait-wrap${portraitSrc ? "" : " is-placeholder"}${canTransformImages && selectedEditorTarget === "portraitImage" ? " newsletter-edit-selected" : ""}`}
                 onClick={canTransformImages ? () => selectBlock("portraitImage") : undefined}
+                style={
+                  portraitSrc
+                    ? {
+                        transform: `translate(${state.newsletterImageTransforms.portrait.x}%, ${state.newsletterImageTransforms.portrait.y}%) scale(${state.newsletterImageTransforms.portrait.zoom})`,
+                        transformOrigin: "center center"
+                      }
+                    : undefined
+                }
               >
                 {portraitSrc ? (
-                  <div
-                    className="newsletter-image-transform"
-                    style={{
-                      transform: `translate(${state.newsletterImageTransforms.portrait.x}%, ${state.newsletterImageTransforms.portrait.y}%) scale(${state.newsletterImageTransforms.portrait.zoom})`,
-                      transformOrigin: "center center",
-                      width: "100%",
-                      height: "100%",
-                      lineHeight: 0
-                    }}
-                  >
+                  <div className="newsletter-image-transform" style={{ width: "100%", height: "100%", lineHeight: 0 }}>
                     <img
                       src={portraitSrc}
                       alt="CEO portrait"
