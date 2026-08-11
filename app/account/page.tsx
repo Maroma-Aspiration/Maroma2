@@ -2,16 +2,19 @@ import Link from "next/link";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { SignOutButton } from "../components/SignOutButton";
+import { ChangePasswordForm } from "../components/ChangePasswordForm";
 import { getSessionSecret, SESSION_COOKIE, verifySessionPayload } from "../../lib/auth-session";
+import { listOrdersForEmail } from "../../lib/commerce-orders";
+import { formatInrPrice } from "../../lib/format-price";
 
 export const dynamic = "force-dynamic";
 
 export const metadata = {
-  title: "Your account — Maroma"
+  title: "Your account | Maroma",
 };
 
 export default async function AccountPage({
-  searchParams
+  searchParams,
 }: {
   searchParams: { reason?: string };
 }) {
@@ -25,14 +28,16 @@ export default async function AccountPage({
     redirect("/login?next=/account&reason=sign_in_required");
   }
 
+  const orders = await listOrdersForEmail(session.email, 20);
+
   const notice =
     searchParams.reason === "admin_only"
-      ? "Admin tools live under /admin — your account uses the standard user role."
+      ? "Admin tools live under /admin. Your account uses the standard user role."
       : null;
 
   return (
     <main className="login-page">
-      <section className="login-card">
+      <section className="login-card" style={{ maxWidth: 720, width: "100%" }}>
         <p className="login-eyebrow">Signed in</p>
         <h1 className="login-title">Account</h1>
         <p className="login-reason">
@@ -41,11 +46,37 @@ export default async function AccountPage({
           Role: <strong>{session.role}</strong>
         </p>
         {notice ? <p className="login-reason">{notice}</p> : null}
-        <div className="login-actions-row">
+
+        <ChangePasswordForm />
+
+        <h2 style={{ fontSize: "1.1rem", marginTop: 24, marginBottom: 12 }}>Your orders</h2>
+        {orders.length === 0 ? (
+          <p className="login-reason">No orders yet for this email.</p>
+        ) : (
+          <ul style={{ listStyle: "none", padding: 0, margin: 0 }}>
+            {orders.map((order) => (
+              <li key={order.id} style={{ borderTop: "1px solid #ddd", padding: "12px 0" }}>
+                <strong>{order.orderNumber}</strong> · {order.status.replace("_", " ")}
+                <br />
+                <small>
+                  {new Date(order.createdAt).toLocaleDateString("en-IN")} ·{" "}
+                  {formatInrPrice(String(order.total)) ?? `₹${order.total}`} · {order.lines.length} items
+                </small>
+              </li>
+            ))}
+          </ul>
+        )}
+
+        <div className="login-actions-row" style={{ marginTop: 24 }}>
           {session.role === "admin" ? (
-            <Link href="/admin" className="button primary button-sage">
-              Open admin
-            </Link>
+            <>
+              <Link href="/admin" className="button primary button-sage">
+                Site admin
+              </Link>
+              <Link href="/admin/orders" className="button secondary">
+                Orders
+              </Link>
+            </>
           ) : null}
           <Link href="/" className="button secondary">
             Home

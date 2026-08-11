@@ -18,8 +18,8 @@ export const catalogCategories: CatalogCategory[] = [
     slug: "face-care",
     label: "Face Care",
     description: "Botanical cleansers, serums, and skincare rituals for daily glow.",
-    keywords: ["face", "facial", "skin care", "serum", "cleanser"],
-    bannerImage: "/staging-media/wp-content/uploads/2025/07/facecare-hero.png",
+    keywords: ["face", "facial", "skin care", "serum", "cleanser", "face care"],
+    bannerImage: "/staging-media/admin-category-banners/face-care-1776928521609.png",
     bannerLayout: "wide-cover",
     heroTitle: "Love Your Skin",
     heroTagline:
@@ -30,7 +30,7 @@ export const catalogCategories: CatalogCategory[] = [
     label: "Body Care",
     description: "Body washes, soaps, oils, and nourishing care essentials.",
     keywords: ["body care", "bath", "soap", "body", "lotion"],
-    bannerImage: "/staging-media/wp-content/uploads/2025/07/facecare-hero.png",
+    bannerImage: "/staging-media/admin-category-banners/body-care-1776932025032.png",
     bannerLayout: "wide-cover"
   },
   {
@@ -38,15 +38,35 @@ export const catalogCategories: CatalogCategory[] = [
     label: "Hair Care",
     description: "Shampoos, conditioners, and hair rituals made with natural ingredients.",
     keywords: ["hair", "shampoo", "conditioner", "scalp"],
-    bannerImage: "/staging-media/wp-content/uploads/2025/07/facecare-hero.png",
+    bannerImage: "/staging-media/admin-category-banners/hair-care-1776932050901.png",
     bannerLayout: "wide-cover"
+  },
+  {
+    slug: "baby",
+    label: "Baby",
+    description: "Gentle, natural care formulated for delicate baby skin.",
+    keywords: ["baby"],
+    bannerImage: "/staging-media/wp-content/uploads/2023/09/Baby-Shampoo-01.jpeg",
+    bannerLayout: "wide-cover",
+    heroTitle: "Baby",
+    heroTagline: "Gentle, natural care for your little one."
+  },
+  {
+    slug: "man",
+    label: "Man",
+    description: "Grooming, beard care, and fragrances made for men.",
+    keywords: ["men", "man", "beard", "shave", "grooming"],
+    bannerImage: "/staging-media/wp-content/uploads/2023/08/EA29-A33_Man-Travel-Kit-001-copy.jpg",
+    bannerLayout: "wide-cover",
+    heroTitle: "Man",
+    heroTagline: "Natural grooming and fragrance for him."
   },
   {
     slug: "perfumes",
     label: "Perfumes",
     description: "Fine fragrances and aromatics designed around mood and memory.",
     keywords: ["perfume", "fragrance", "aroma", "eau", "attar"],
-    bannerImage: "/staging-media/wp-content/uploads/2025/07/facecare-hero.png",
+    bannerImage: "/staging-media/admin-category-banners/perfumes-1776932080574.png",
     bannerLayout: "wide-cover"
   },
   {
@@ -54,15 +74,25 @@ export const catalogCategories: CatalogCategory[] = [
     label: "Home Essentials",
     description: "Incense, candles, and ambient rituals for your space.",
     keywords: ["home", "incense", "candle", "ambient", "room", "diffuser"],
-    bannerImage: "/staging-media/wp-content/uploads/2025/07/facecare-hero.png",
+    bannerImage: "/staging-media/admin-category-banners/home-essentials-1776932101259.png",
     bannerLayout: "wide-cover"
+  },
+  {
+    slug: "colibri",
+    label: "Colibri",
+    description: "Natural outdoor incense leaves and garden fragrances.",
+    keywords: ["colibri"],
+    bannerImage: "/staging-media/wp-content/uploads/2023/12/Colibri-Cedarwood1-min.jpg",
+    bannerLayout: "wide-cover",
+    heroTitle: "Colibri",
+    heroTagline: "Botanical incense leaves for home and garden."
   },
   {
     slug: "gifting",
     label: "Gifting",
     description: "Gift-ready selections and curated wellbeing sets.",
     keywords: ["gift", "gifting", "set", "hamper", "collection"],
-    bannerImage: "/staging-media/wp-content/uploads/2025/07/facecare-hero.png",
+    bannerImage: "/staging-media/admin-category-banners/gifting-1776932133753.png",
     bannerLayout: "wide-cover"
   }
 ];

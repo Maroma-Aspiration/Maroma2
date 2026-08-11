@@ -5,6 +5,8 @@ import type {
   NewsletterAudienceState,
   NewsletterCampaignMetrics,
   NewsletterCampaignSummary,
+  NewsletterMailingList,
+  NewsletterMailingListSummary,
   NewsletterSubscriber
 } from "./newsletter-audience-types";
 import { verifyTrackingToken } from "./newsletter-tracking";
@@ -15,10 +17,48 @@ const audienceKvKey = "maroma:newsletter-audience";
 const hasKvConfig = Boolean(process.env.KV_REST_API_URL && process.env.KV_REST_API_TOKEN);
 const MAX_CAMPAIGNS = 60;
 
+const DEFAULT_LIST_NAME = "Main list";
+
 const defaultState: NewsletterAudienceState = {
   subscribers: [],
+  mailingLists: [],
+  selectedListId: null,
   campaigns: []
 };
+
+const normalizeMailingList = (raw: Partial<NewsletterMailingList>): NewsletterMailingList | null => {
+  const id = typeof raw.id === "string" && raw.id.trim() ? raw.id.trim() : "";
+  const name = typeof raw.name === "string" ? raw.name.trim() : "";
+  if (!id || !name) {
+    return null;
+  }
+  const now = new Date().toISOString();
+  const subscriberIds = Array.isArray(raw.subscriberIds)
+    ? [
+        ...new Set(
+          raw.subscriberIds.filter(
+            (x): x is string => typeof x === "string" && x.trim().length > 0
+          )
+        ),
+      ]
+    : [];
+  return {
+    id,
+    name,
+    createdAt: typeof raw.createdAt === "string" && raw.createdAt ? raw.createdAt : now,
+    updatedAt: typeof raw.updatedAt === "string" && raw.updatedAt ? raw.updatedAt : now,
+    subscriberIds,
+  };
+};
+
+function normalizeListName(name: string): string {
+  return name.trim().replace(/\s+/g, " ");
+}
+
+function findListByName(lists: NewsletterMailingList[], name: string): NewsletterMailingList | undefined {
+  const key = normalizeListName(name).toLowerCase();
+  return lists.find((list) => normalizeListName(list.name).toLowerCase() === key);
+}
 
 const normalizeSubscriber = (raw: Partial<NewsletterSubscriber>): NewsletterSubscriber | null => {
   const email = (raw.email ?? "").trim().toLowerCase();
@@ -83,7 +123,49 @@ const parseAudienceState = (value: unknown): NewsletterAudienceState => {
     .map((c) => normalizeCampaign(c as Partial<NewsletterCampaignMetrics>))
     .filter(Boolean) as NewsletterCampaignMetrics[];
 
-  return { subscribers, campaigns: campaigns.slice(-MAX_CAMPAIGNS) };
+  let mailingLists = Array.isArray(raw.mailingLists)
+    ? (raw.mailingLists
+        .map((list) => normalizeMailingList(list as Partial<NewsletterMailingList>))
+        .filter(Boolean) as NewsletterMailingList[])
+    : [];
+
+  let selectedListId =
+    typeof raw.selectedListId === "string" && raw.selectedListId.trim() ? raw.selectedListId.trim() : null;
+
+  const subscriberIds = new Set(subscribers.map((s) => s.id));
+  mailingLists = mailingLists.map((list) => ({
+    ...list,
+    subscriberIds: list.subscriberIds.filter((id) => subscriberIds.has(id)),
+  }));
+
+  if (mailingLists.length === 0 && subscribers.length > 0) {
+    const now = new Date().toISOString();
+    const defaultId = crypto.randomUUID();
+    mailingLists = [
+      {
+        id: defaultId,
+        name: DEFAULT_LIST_NAME,
+        createdAt: now,
+        updatedAt: now,
+        subscriberIds: subscribers.map((s) => s.id),
+      },
+    ];
+    selectedListId = defaultId;
+  }
+
+  if (selectedListId && !mailingLists.some((list) => list.id === selectedListId)) {
+    selectedListId = mailingLists[0]?.id ?? null;
+  }
+  if (!selectedListId && mailingLists.length > 0) {
+    selectedListId = mailingLists[0].id;
+  }
+
+  return {
+    subscribers,
+    mailingLists,
+    selectedListId,
+    campaigns: campaigns.slice(-MAX_CAMPAIGNS),
+  };
 };
 
 export async function readNewsletterAudience(): Promise<NewsletterAudienceState> {
@@ -167,12 +249,138 @@ export async function mergeNewsletterSubscribers(
       updated += 1;
     }
   }
+  const nextSubscribers = Array.from(byEmail.values());
   const next: NewsletterAudienceState = {
-    subscribers: Array.from(byEmail.values()),
-    campaigns: state.campaigns
+    subscribers: nextSubscribers,
+    mailingLists: state.mailingLists,
+    selectedListId: state.selectedListId,
+    campaigns: state.campaigns,
   };
   await writeNewsletterAudience(next);
   return { state: next, added, updated };
+}
+
+export function summarizeMailingLists(state: NewsletterAudienceState): NewsletterMailingListSummary[] {
+  const byId = new Map(state.subscribers.map((s) => [s.id, s]));
+  return [...state.mailingLists]
+    .sort((a, b) => a.name.localeCompare(b.name))
+    .map((list) => {
+      const members = list.subscriberIds
+        .map((id) => byId.get(id))
+        .filter((s): s is NewsletterSubscriber => Boolean(s));
+      return {
+        id: list.id,
+        name: list.name,
+        activeCount: countActiveSubscribers(members),
+        totalCount: members.length,
+        updatedAt: list.updatedAt,
+      };
+    });
+}
+
+export function getMailingListRecipients(
+  state: NewsletterAudienceState,
+  listId: string | null | undefined
+): NewsletterSubscriber[] {
+  const id = listId ?? state.selectedListId;
+  if (!id) {
+    return [];
+  }
+  const list = state.mailingLists.find((entry) => entry.id === id);
+  if (!list) {
+    return [];
+  }
+  const byId = new Map(state.subscribers.map((s) => [s.id, s]));
+  return list.subscriberIds
+    .map((subscriberId) => byId.get(subscriberId))
+    .filter((s): s is NewsletterSubscriber => Boolean(s && !s.unsubscribedAt));
+}
+
+export async function setSelectedMailingList(listId: string): Promise<NewsletterAudienceState> {
+  const state = await readNewsletterAudience();
+  if (!state.mailingLists.some((list) => list.id === listId)) {
+    throw new Error("Mailing list not found.");
+  }
+  return writeNewsletterAudience({ ...state, selectedListId: listId });
+}
+
+export async function importToMailingList(
+  listName: string,
+  incoming: { email: string; name?: string }[]
+): Promise<{
+  state: NewsletterAudienceState;
+  listId: string;
+  listName: string;
+  added: number;
+  updated: number;
+  importedRows: number;
+  listActiveCount: number;
+}> {
+  const normalizedName = normalizeListName(listName);
+  if (!normalizedName) {
+    throw new Error("Enter a name for the mailing list.");
+  }
+
+  const { state: mergedState, added, updated } = await mergeNewsletterSubscribers(incoming);
+  const byEmail = new Map(mergedState.subscribers.map((s) => [s.email, s]));
+  const importedIds: string[] = [];
+  for (const row of incoming) {
+    const norm = normalizeSubscriber({ email: row.email, name: row.name ?? "" });
+    if (!norm) {
+      continue;
+    }
+    const sub = byEmail.get(norm.email);
+    if (sub) {
+      importedIds.push(sub.id);
+    }
+  }
+
+  const now = new Date().toISOString();
+  let lists = [...mergedState.mailingLists];
+  let list = findListByName(lists, normalizedName);
+  if (!list) {
+    list = {
+      id: crypto.randomUUID(),
+      name: normalizedName,
+      createdAt: now,
+      updatedAt: now,
+      subscriberIds: [],
+    };
+    lists.push(list);
+  }
+
+  const memberSet = new Set(list.subscriberIds);
+  for (const id of importedIds) {
+    memberSet.add(id);
+  }
+  lists = lists.map((entry) =>
+    entry.id === list!.id
+      ? {
+          ...entry,
+          name: entry.name || normalizedName,
+          subscriberIds: Array.from(memberSet),
+          updatedAt: now,
+        }
+      : entry
+  );
+
+  const selectedListId = mergedState.selectedListId ?? list.id;
+  const next: NewsletterAudienceState = {
+    ...mergedState,
+    mailingLists: lists,
+    selectedListId,
+  };
+  const saved = await writeNewsletterAudience(next);
+  const savedList = saved.mailingLists.find((entry) => entry.id === list!.id);
+  return {
+    state: saved,
+    listId: list.id,
+    listName: savedList?.name ?? normalizedName,
+    added,
+    updated,
+    importedRows: incoming.length,
+    listActiveCount: getMailingListRecipients(saved, list.id).length,
+  };
 }
 
 export async function appendCampaign(campaign: NewsletterCampaignMetrics): Promise<NewsletterAudienceState> {

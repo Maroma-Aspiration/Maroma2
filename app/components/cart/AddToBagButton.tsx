@@ -14,9 +14,10 @@ export function AddToBagButton({ product, variant, disabled = false }: AddToBagB
   const { addToCart } = useCart();
   const [status, setStatus] = useState<'idle' | 'added'>('idle');
 
-  const handleAdd = () => {
+  const handleAdd = async () => {
     if (disabled) return;
-    addToCart(product, variant);
+    const ok = await addToCart(product, variant);
+    if (!ok) return;
     setStatus('added');
     setTimeout(() => setStatus('idle'), 2000);
   };
@@ -28,7 +29,7 @@ export function AddToBagButton({ product, variant, disabled = false }: AddToBagB
       disabled={disabled}
     >
       <span className="btn-text">
-        {status === 'added' ? 'Added ✓' : 'Add to Bag'}
+        {status === 'added' ? 'Added ✓' : 'Add to Basket'}
       </span>
       
       <style jsx>{`
@@ -41,8 +42,8 @@ export function AddToBagButton({ product, variant, disabled = false }: AddToBagB
           border-radius: 100px;
           font-weight: 700;
           font-size: 0.9rem;
-          text-transform: uppercase;
-          letter-spacing: 0.15em;
+          text-transform: none;
+          letter-spacing: 0.04em;
           cursor: pointer;
           transition: all 0.3s cubic-bezier(0.19, 1, 0.22, 1);
           position: relative;

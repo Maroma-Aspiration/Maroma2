@@ -1,5 +1,7 @@
 export type HeroVideo = {
   src: string;
+  /** Optional mobile hero (maroma.com uses a YouTube Short on phones). */
+  mobileSrc?: string;
   poster: string;
   caption: string;
 };
@@ -46,26 +48,30 @@ export const siteContent: SiteContent = {
     "Face Care",
     "Body Care",
     "Hair Care",
+    "Baby",
+    "Man",
     "Perfumes",
     "Home Essentials",
+    "Colibri",
     "Gifting"
   ],
   hero: {
     eyebrow: "Conscious luxury",
     headline: "Auroville-crafted ritual care",
     subhead: "",
-    ctaPrimary: "Shop Luxury",
+    ctaPrimary: "Shop by Care",
     ctaSecondary: "Discover Rituals",
     video: {
-      src: "",
-      poster: "",
-      caption: "Add hero video in Admin content"
+      src: "https://www.youtube.com/watch?v=S_uYmuKyMRg",
+      mobileSrc: "https://www.youtube.com/watch?v=tF9-sa_s-q0",
+      poster: "https://img.youtube.com/vi/S_uYmuKyMRg/maxresdefault.jpg",
+      caption: "Maroma hero (from maroma.com)"
     },
     phrases: []
   },
   carousel: {
     title: "Loved for a reason",
-    subtitle: "Our bestsellers bring balance and well-being.",
+    subtitle: "See what people\nAre loving right now",
     slides: [
       {
         label: "Face Serum",

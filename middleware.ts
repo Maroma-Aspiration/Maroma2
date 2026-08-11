@@ -38,6 +38,9 @@ function requiresAdmin(pathname: string, method: string): boolean {
   if (pathname === "/api/hero-media-layout" && method !== "GET") {
     return true;
   }
+  if (pathname.startsWith("/api/admin/")) {
+    return true;
+  }
   return false;
 }
 
@@ -114,19 +117,20 @@ export async function middleware(request: NextRequest) {
     return NextResponse.next();
   }
 
-  if (pathname === "/login" || pathname === "/signup") {
+  if (pathname === "/login" || pathname === "/signup" || pathname === "/forgot-password") {
     if (session) {
       const nextParam = request.nextUrl.searchParams.get("next");
       const safeNext =
         nextParam && nextParam.startsWith("/") && !nextParam.startsWith("//") ? nextParam : null;
       if (session.role === "admin") {
         const url = request.nextUrl.clone();
-        url.pathname = safeNext ?? "/admin";
+        // Homepage Login links use next=/ — send admins to the editor instead of bouncing home.
+        url.pathname = safeNext && safeNext !== "/" ? safeNext : "/admin";
         url.search = "";
         return NextResponse.redirect(url);
       }
       const url = request.nextUrl.clone();
-      url.pathname = "/account";
+      url.pathname = safeNext && safeNext !== "/" ? safeNext : "/account";
       url.search = "";
       return NextResponse.redirect(url);
     }
@@ -170,6 +174,7 @@ export const config = {
     "/account",
     "/login",
     "/signup",
+    "/forgot-password",
     "/api/stories",
     "/api/stories/:path*",
     "/api/newsletter/:path*",
@@ -178,6 +183,7 @@ export const config = {
     "/api/category-banners",
     "/api/category-banners/upload",
     "/api/products/upload",
-    "/api/auth/:path*"
+    "/api/auth/:path*",
+    "/api/admin/:path*"
   ]
 };

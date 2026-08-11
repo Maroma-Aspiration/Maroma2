@@ -2,12 +2,12 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
-import { SiteHeader } from "../components/SiteHeader";
 import { getDisplayImageUrl } from "../../lib/product-image";
 import { decodeBasicHtmlEntities } from "../../lib/decode-html-entities";
 import { formatInrPrice } from "../../lib/format-price";
 import type { ProductRecord } from "../../lib/product-types";
 import type { SiteContent } from "../content";
+import { useAdminSession } from "../../lib/use-admin-session";
 
 type Props = {
   query: string;
@@ -18,16 +18,10 @@ type Props = {
 
 export default function SearchPageClient({ query, ritualName, products, initialSiteContent }: Props) {
   const [isVisible, setIsVisible] = useState(false);
-  const [isAdmin, setIsAdmin] = useState(false);
+  const { adminModeEnabled: isAdmin } = useAdminSession();
 
   useEffect(() => {
     setIsVisible(true);
-    const check = () => {
-      setIsAdmin(window.localStorage.getItem("maroma-admin-drag") === "true");
-    };
-    check();
-    window.addEventListener("maroma-admin-changed", check);
-    return () => window.removeEventListener("maroma-admin-changed", check);
   }, []);
 
   const handleSlotUpload = async (productId: string, slot: string, file: File) => {
@@ -68,8 +62,6 @@ export default function SearchPageClient({ query, ritualName, products, initialS
 
   return (
     <div className={`page-container ${isCurated ? "is-curated" : ""}`}>
-      <SiteHeader initialNav={{ brand: initialSiteContent.brand, nav: initialSiteContent.nav }} />
-      
       <main className={`content-wrap ${isVisible ? "is-visible" : ""}`}>
         <header className="page-header">
           {isCurated && (
@@ -280,7 +272,7 @@ export default function SearchPageClient({ query, ritualName, products, initialS
         .product-visual {
           position: relative;
           aspect-ratio: 4 / 5.75;
-          background: #fbfbfb;
+          background: var(--maroma-site-bg);
           border-radius: 8px;
           overflow: hidden;
           margin-bottom: 24px;
@@ -291,6 +283,7 @@ export default function SearchPageClient({ query, ritualName, products, initialS
           width: 100%;
           height: 100%;
           object-fit: cover;
+          object-position: center;
           transition: transform 0.8s cubic-bezier(0.19, 1, 0.22, 1);
         }
 

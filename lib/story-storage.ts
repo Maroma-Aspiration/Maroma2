@@ -1,14 +1,39 @@
 import { promises as fs } from "fs";
 import path from "path";
 import { kv } from "@vercel/kv";
+import { syncAllBlocksToLegacy } from "./newsletter-block-legacy-sync";
+import { buildMigratedNewsletterBlocks } from "./newsletter-migrate-legacy-blocks";
+import { parseStoryImageFrame } from "./story-image-frame";
+import { parseStorySpacingGaps } from "./story-spacing-gaps";
 import {
+  DEFAULT_BLOCK_IMAGE_TRANSFORM,
+  DEFAULT_BLOCK_TEXT_STYLE,
+  DEFAULT_TEXT_BOX_STYLE,
+  DEFAULT_NEWSLETTER_LAYOUT_DIVIDER_PRESET,
   STORIES_STORAGE_KEY,
+  type NewsletterBlock,
+  type NewsletterBlockImageTransform,
+  type NewsletterBlockTextStyle,
+  type NewsletterCtaBlock,
+  type NewsletterDecorativeLineBlock,
+  type NewsletterDividerBlock,
+  type NewsletterHeadingBlock,
+  type NewsletterImageBlock,
+  type NewsletterSpacerBlock,
+  type NewsletterStoryBlock,
+  type NewsletterTextBlock,
+  type NewsletterTextBoxBlock,
+  type NewsletterTextBoxStyle,
   type StoriesState,
   type StoryRecord,
+  type StorySource,
   type NewsletterElementStyle,
+  type NewsletterImageTransform,
   type NewsletterImageTransforms,
   type NewsletterLayoutDivider,
-  type NewsletterLayoutSectionId
+  type NewsletterLayoutDividerPreset,
+  type NewsletterLayoutSectionId,
+  type NewsletterBlockSync
 } from "./story-types";
 
 const storageDir = path.join(process.cwd(), "data");
@@ -96,6 +121,105 @@ const defaultState: StoriesState = {
       color: "",
       offsetX: 0,
       offsetY: 0
+    },
+    executiveBriefTitle: {
+      fontFamily: "inherit",
+      fontSizeRem: 0.95,
+      textAlign: "center",
+      fontWeight: 600,
+      isQuoteBox: false,
+      quoteBoxColor: "#1f3d4a",
+      color: "",
+      offsetX: 0,
+      offsetY: 0
+    },
+    executiveBriefBody: {
+      fontFamily: "inherit",
+      fontSizeRem: 0.92,
+      textAlign: "left",
+      fontWeight: 400,
+      isQuoteBox: false,
+      quoteBoxColor: "#1f3d4a",
+      color: "",
+      offsetX: 0,
+      offsetY: 0
+    },
+    executiveBriefLink: {
+      fontFamily: "inherit",
+      fontSizeRem: 0.82,
+      textAlign: "left",
+      fontWeight: 600,
+      isQuoteBox: false,
+      quoteBoxColor: "#1f3d4a",
+      color: "",
+      offsetX: 0,
+      offsetY: 0
+    },
+    executiveBriefSection: {
+      fontFamily: "inherit",
+      fontSizeRem: 1,
+      textAlign: "left",
+      fontWeight: 400,
+      isQuoteBox: false,
+      quoteBoxColor: "#1f3d4a",
+      color: "",
+      offsetX: 0,
+      offsetY: 0
+    },
+    storyTitle: {
+      fontFamily: "inherit",
+      fontSizeRem: 1.6,
+      textAlign: "center",
+      fontWeight: 600,
+      isQuoteBox: false,
+      quoteBoxColor: "#1f3d4a",
+      color: "",
+      offsetX: 0,
+      offsetY: 0
+    },
+    storyExcerpt: {
+      fontFamily: "inherit",
+      fontSizeRem: 1,
+      textAlign: "center",
+      fontWeight: 400,
+      isQuoteBox: false,
+      quoteBoxColor: "#1f3d4a",
+      color: "",
+      offsetX: 0,
+      offsetY: 0
+    },
+    storyBody: {
+      fontFamily: "inherit",
+      fontSizeRem: 1,
+      textAlign: "left",
+      fontWeight: 400,
+      isQuoteBox: false,
+      quoteBoxColor: "#1f3d4a",
+      color: "",
+      offsetX: 0,
+      offsetY: 0
+    },
+    storyMeta: {
+      fontFamily: "inherit",
+      fontSizeRem: 0.82,
+      textAlign: "center",
+      fontWeight: 400,
+      isQuoteBox: false,
+      quoteBoxColor: "#1f3d4a",
+      color: "",
+      offsetX: 0,
+      offsetY: 0
+    },
+    storyCta: {
+      fontFamily: "inherit",
+      fontSizeRem: 0.85,
+      textAlign: "center",
+      fontWeight: 600,
+      isQuoteBox: false,
+      quoteBoxColor: "#1f3d4a",
+      color: "",
+      offsetX: 0,
+      offsetY: 0
     }
   },
   newsletterImageTransforms: {
@@ -104,7 +228,22 @@ const defaultState: StoriesState = {
     portrait: { x: 0, y: 0, zoom: 1, borderRadius: 9999, zIndex: 2 },
     hero: { x: 0, y: 0, zoom: 1, borderRadius: 14, zIndex: 1 }
   },
-  newsletterLayoutDividers: []
+  newsletterLayoutDividers: [],
+  newsletterLayoutDividerPreset: { ...DEFAULT_NEWSLETTER_LAYOUT_DIVIDER_PRESET },
+  newsletterStoryTextColor: "",
+  newsletterBlocks: [],
+  newsletterBlocksMigrationVersion: 0,
+  executiveBriefTitle: "Top Stories This Month",
+  executiveBriefStoryIds: ["", "", ""],
+  executiveBriefImageOverrides: ["", "", ""],
+  executiveBriefImageTransforms: [
+    { x: 0, y: 0, zoom: 1, borderRadius: 12, zIndex: 0 },
+    { x: 0, y: 0, zoom: 1, borderRadius: 12, zIndex: 0 },
+    { x: 0, y: 0, zoom: 1, borderRadius: 12, zIndex: 0 }
+  ],
+  newsletterShowDate: true,
+  newsletterCanvas: { enabled: false, elements: [] },
+  newsletterIssueTemplate: null
 };
 
 const ALLOWED_LAYOUT_SECTIONS: ReadonlyArray<NewsletterLayoutSectionId> = [
@@ -122,6 +261,289 @@ const clampNumber = (value: unknown, min: number, max: number, fallback: number)
   if (!Number.isFinite(n)) return fallback;
   return Math.min(max, Math.max(min, n));
 };
+
+const STORY_SOURCES: ReadonlyArray<StorySource> = ["manual", "instagram", "facebook", "web", "rss"];
+
+const newRandomId = (prefix: string): string =>
+  typeof crypto !== "undefined" && "randomUUID" in crypto
+    ? crypto.randomUUID()
+    : `${prefix}-${Math.random().toString(36).slice(2)}-${Date.now().toString(36)}`;
+
+function parseBlockTextStyle(input: unknown, fallback: NewsletterBlockTextStyle = DEFAULT_BLOCK_TEXT_STYLE): NewsletterBlockTextStyle {
+  if (!input || typeof input !== "object") return { ...fallback };
+  const raw = input as Record<string, unknown>;
+  return {
+    fontFamily: typeof raw.fontFamily === "string" && raw.fontFamily.trim() ? raw.fontFamily : fallback.fontFamily,
+    fontSizeRem: clampNumber(raw.fontSizeRem, 0.5, 6, fallback.fontSizeRem),
+    fontWeight: clampNumber(raw.fontWeight, 100, 900, fallback.fontWeight),
+    color: typeof raw.color === "string" ? raw.color.trim() : fallback.color,
+    textAlign:
+      raw.textAlign === "left" || raw.textAlign === "center" || raw.textAlign === "right"
+        ? raw.textAlign
+        : fallback.textAlign,
+    italic: Boolean(raw.italic),
+    underline: Boolean(raw.underline),
+    lineHeight: clampNumber(raw.lineHeight, 0.7, 4, fallback.lineHeight),
+    letterSpacingEm: clampNumber(raw.letterSpacingEm, -0.2, 1, fallback.letterSpacingEm),
+    marginTopRem: clampNumber(raw.marginTopRem, 0, 12, fallback.marginTopRem),
+    marginBottomRem: clampNumber(raw.marginBottomRem, 0, 12, fallback.marginBottomRem),
+    maxWidthRem: clampNumber(raw.maxWidthRem, 0, 200, fallback.maxWidthRem)
+  };
+}
+
+function parseBlockImageTransform(
+  input: unknown,
+  fallback: NewsletterBlockImageTransform = DEFAULT_BLOCK_IMAGE_TRANSFORM
+): NewsletterBlockImageTransform {
+  if (!input || typeof input !== "object") return { ...fallback };
+  const raw = input as Record<string, unknown>;
+  return {
+    x: clampNumber(raw.x, -500, 500, fallback.x),
+    y: clampNumber(raw.y, -500, 500, fallback.y),
+    zoom: clampNumber(raw.zoom, 0.01, 3, fallback.zoom),
+    borderRadius: clampNumber(raw.borderRadius, 0, 9999, fallback.borderRadius),
+    zIndex:
+      typeof raw.zIndex === "number" && Number.isFinite(raw.zIndex)
+        ? Math.min(999, Math.max(-999, Math.round(raw.zIndex)))
+        : fallback.zIndex,
+    widthPercent: clampNumber(raw.widthPercent, 10, 100, fallback.widthPercent),
+    aspectRatio: typeof raw.aspectRatio === "string" ? raw.aspectRatio.trim() : fallback.aspectRatio,
+    objectFit: raw.objectFit === "contain" ? "contain" : "cover",
+    maxFrameHeightPx: clampNumber(raw.maxFrameHeightPx, 0, 2000, fallback.maxFrameHeightPx),
+    marginTopRem: clampNumber(raw.marginTopRem, 0, 12, fallback.marginTopRem),
+    marginBottomRem: clampNumber(raw.marginBottomRem, 0, 12, fallback.marginBottomRem)
+  };
+}
+
+function parseTextBoxStyle(
+  input: unknown,
+  fallback: NewsletterTextBoxStyle = DEFAULT_TEXT_BOX_STYLE
+): NewsletterTextBoxStyle {
+  if (!input || typeof input !== "object") return { ...fallback };
+  const raw = input as Record<string, unknown>;
+  return {
+    offsetX: clampNumber(raw.offsetX, -2000, 2000, fallback.offsetX),
+    offsetY: clampNumber(raw.offsetY, -2000, 2000, fallback.offsetY),
+    widthPercent: clampNumber(raw.widthPercent, 10, 100, fallback.widthPercent),
+    paddingRem: clampNumber(raw.paddingRem, 0, 8, fallback.paddingRem),
+    backgroundColor:
+      typeof raw.backgroundColor === "string" ? raw.backgroundColor.trim() : fallback.backgroundColor,
+    outlineColor:
+      typeof raw.outlineColor === "string" ? raw.outlineColor.trim() : fallback.outlineColor,
+    outlineWidthPx: clampNumber(raw.outlineWidthPx, 0, 24, fallback.outlineWidthPx),
+    borderRadiusPx: clampNumber(raw.borderRadiusPx, 0, 200, fallback.borderRadiusPx),
+    shadowColor:
+      typeof raw.shadowColor === "string" ? raw.shadowColor.trim() : fallback.shadowColor,
+    shadowBlurPx: clampNumber(raw.shadowBlurPx, 0, 120, fallback.shadowBlurPx),
+    shadowOffsetX: clampNumber(raw.shadowOffsetX, -120, 120, fallback.shadowOffsetX),
+    shadowOffsetY: clampNumber(raw.shadowOffsetY, -120, 120, fallback.shadowOffsetY),
+    marginTopRem: clampNumber(raw.marginTopRem, 0, 12, fallback.marginTopRem),
+    marginBottomRem: clampNumber(raw.marginBottomRem, 0, 12, fallback.marginBottomRem)
+  };
+}
+
+function parseBlockSync(raw: Record<string, unknown>): NewsletterBlockSync | undefined {
+  const s = raw.sync;
+  if (!s || typeof s !== "object") return undefined;
+  const o = s as Record<string, unknown>;
+  const kind = o.kind;
+  if (kind === "issueTitle" || kind === "missionHeading" || kind === "greetingHeading") {
+    return { kind } as NewsletterBlockSync;
+  }
+  if (kind === "missionBody" || kind === "greetingBody") {
+    return { kind } as NewsletterBlockSync;
+  }
+  if (kind === "asset") {
+    const slot = o.slot;
+    if (slot === "topImage" || slot === "logo" || slot === "portrait" || slot === "hero") {
+      return { kind: "asset", slot };
+    }
+  }
+  return undefined;
+}
+
+function parseBlock(input: unknown): NewsletterBlock | null {
+  if (!input || typeof input !== "object") return null;
+  const raw = input as Record<string, unknown>;
+  const kind = raw.kind;
+  const id = typeof raw.id === "string" && raw.id.trim() ? raw.id.trim() : newRandomId("blk");
+  if (kind === "heading") {
+    const level = raw.level === 1 || raw.level === 2 || raw.level === 3 || raw.level === 4 ? raw.level : 2;
+    const headingDefaults: NewsletterBlockTextStyle = {
+      ...DEFAULT_BLOCK_TEXT_STYLE,
+      fontWeight: 700,
+      fontSizeRem: level === 1 ? 2.6 : level === 2 ? 1.6 : level === 3 ? 1.2 : 1
+    };
+    const block: NewsletterHeadingBlock = {
+      id,
+      kind: "heading",
+      level,
+      text: typeof raw.text === "string" ? raw.text : "",
+      style: parseBlockTextStyle(raw.style, headingDefaults)
+    };
+    const sync = parseBlockSync(raw);
+    if (
+      sync &&
+      (sync.kind === "issueTitle" || sync.kind === "missionHeading" || sync.kind === "greetingHeading")
+    ) {
+      block.sync = sync;
+    }
+    return block;
+  }
+  if (kind === "text") {
+    const block: NewsletterTextBlock = {
+      id,
+      kind: "text",
+      html: typeof raw.html === "string" ? raw.html : "",
+      style: parseBlockTextStyle(raw.style)
+    };
+    const sync = parseBlockSync(raw);
+    if (sync && (sync.kind === "missionBody" || sync.kind === "greetingBody")) {
+      block.sync = sync;
+    }
+    return block;
+  }
+  if (kind === "text-box") {
+    const block: NewsletterTextBoxBlock = {
+      id,
+      kind: "text-box",
+      html:
+        typeof raw.html === "string"
+          ? raw.html
+          : "<p>Click inside this box to edit text. Paste from Word, Docs, or the web to keep formatting.</p>",
+      textStyle: parseBlockTextStyle(raw.textStyle, {
+        ...DEFAULT_BLOCK_TEXT_STYLE,
+        textAlign: "left",
+        maxWidthRem: 0,
+        marginTopRem: 0,
+        marginBottomRem: 0
+      }),
+      boxStyle: parseTextBoxStyle(raw.boxStyle)
+    };
+    return block;
+  }
+  if (kind === "image") {
+    const images = Array.isArray(raw.images)
+      ? raw.images.filter((s): s is string => typeof s === "string" && s.trim().length > 0).slice(0, 12)
+      : [];
+    const block: NewsletterImageBlock = {
+      id,
+      kind: "image",
+      images,
+      alt: typeof raw.alt === "string" ? raw.alt : "",
+      caption: typeof raw.caption === "string" ? raw.caption : "",
+      transform: parseBlockImageTransform(raw.transform),
+      captionStyle: parseBlockTextStyle(raw.captionStyle, {
+        ...DEFAULT_BLOCK_TEXT_STYLE,
+        fontSizeRem: 0.84,
+        marginTopRem: 0.4,
+        marginBottomRem: 0.4
+      })
+    };
+    const sync = parseBlockSync(raw);
+    if (sync && sync.kind === "asset") {
+      block.sync = sync;
+    }
+    if (raw.pairRole === "portraitHeroLeft" || raw.pairRole === "portraitHeroRight") {
+      block.pairRole = raw.pairRole;
+    }
+    return block;
+  }
+  if (kind === "cta") {
+    const block: NewsletterCtaBlock = {
+      id,
+      kind: "cta",
+      label: typeof raw.label === "string" ? raw.label : "Read more",
+      url: typeof raw.url === "string" ? raw.url : "",
+      variant:
+        raw.variant === "primary" || raw.variant === "secondary" || raw.variant === "ghost"
+          ? raw.variant
+          : "primary",
+      textAlign:
+        raw.textAlign === "left" || raw.textAlign === "center" || raw.textAlign === "right"
+          ? raw.textAlign
+          : "center",
+      marginTopRem: clampNumber(raw.marginTopRem, 0, 12, 0.6),
+      marginBottomRem: clampNumber(raw.marginBottomRem, 0, 12, 0.6)
+    };
+    return block;
+  }
+  if (kind === "divider") {
+    const block: NewsletterDividerBlock = {
+      id,
+      kind: "divider",
+      marginTopRem: clampNumber(raw.marginTopRem, 0, 12, 1.2),
+      marginBottomRem: clampNumber(raw.marginBottomRem, 0, 12, 1.2)
+    };
+    return block;
+  }
+  if (kind === "decorative-line") {
+    const block: NewsletterDecorativeLineBlock = {
+      id,
+      kind: "decorative-line",
+      preset: parseLayoutDividerPreset(raw.preset)
+    };
+    return block;
+  }
+  if (kind === "spacer") {
+    const block: NewsletterSpacerBlock = {
+      id,
+      kind: "spacer",
+      heightRem: clampNumber(raw.heightRem, 0, 24, 1.5)
+    };
+    return block;
+  }
+  if (kind === "story") {
+    const snapRaw = raw.snapshot && typeof raw.snapshot === "object" ? (raw.snapshot as Record<string, unknown>) : {};
+    const block: NewsletterStoryBlock = {
+      id,
+      kind: "story",
+      storyId: typeof raw.storyId === "string" ? raw.storyId : "",
+      snapshot: {
+        title: typeof snapRaw.title === "string" ? snapRaw.title : "",
+        excerpt: typeof snapRaw.excerpt === "string" ? snapRaw.excerpt : "",
+        body: typeof snapRaw.body === "string" ? snapRaw.body : "",
+        images: Array.isArray(snapRaw.images)
+          ? snapRaw.images.filter((s): s is string => typeof s === "string" && s.trim().length > 0).slice(0, 12)
+          : [],
+        alt: typeof snapRaw.alt === "string" ? snapRaw.alt : "",
+        publishedAt: typeof snapRaw.publishedAt === "string" ? snapRaw.publishedAt : new Date().toISOString(),
+        source: STORY_SOURCES.includes(snapRaw.source as StorySource) ? (snapRaw.source as StorySource) : "manual",
+        sourceUrl: typeof snapRaw.sourceUrl === "string" ? snapRaw.sourceUrl : "",
+        ctaLabel: typeof snapRaw.ctaLabel === "string" ? snapRaw.ctaLabel : "Read more",
+        ctaUrl: typeof snapRaw.ctaUrl === "string" ? snapRaw.ctaUrl : "",
+        slug: typeof snapRaw.slug === "string" ? snapRaw.slug : ""
+      }
+    };
+    if (snapRaw.imageTransform && typeof snapRaw.imageTransform === "object") {
+      block.snapshot.imageTransform = parseBlockImageTransform(snapRaw.imageTransform);
+    }
+    const imageFrame = parseStoryImageFrame(snapRaw.imageFrame);
+    if (imageFrame) block.snapshot.imageFrame = imageFrame;
+    return block;
+  }
+  return null;
+}
+
+function parseLayoutDividerPreset(input: unknown): NewsletterLayoutDividerPreset {
+  const fallback = DEFAULT_NEWSLETTER_LAYOUT_DIVIDER_PRESET;
+  if (!input || typeof input !== "object") return { ...fallback };
+  const raw = input as Record<string, unknown>;
+  const lineStyle =
+    raw.lineStyle === "dashed" || raw.lineStyle === "double" ? raw.lineStyle : fallback.lineStyle;
+  const color =
+    typeof raw.color === "string" && raw.color.trim() ? raw.color.trim() : fallback.color;
+  return {
+    offsetX: clampNumber(raw.offsetX, -2000, 2000, fallback.offsetX),
+    offsetY: clampNumber(raw.offsetY, -2000, 2000, fallback.offsetY),
+    marginTop: clampNumber(raw.marginTop, 0, 200, fallback.marginTop),
+    marginBottom: clampNumber(raw.marginBottom, 0, 200, fallback.marginBottom),
+    thickness: clampNumber(raw.thickness, 1, 12, fallback.thickness),
+    color,
+    widthPercent: clampNumber(raw.widthPercent, 10, 100, fallback.widthPercent),
+    lineStyle
+  };
+}
 
 function parseLayoutDivider(input: unknown): NewsletterLayoutDivider | null {
   if (!input || typeof input !== "object") return null;
@@ -275,7 +697,8 @@ const normalizeStory = (story: Partial<StoryRecord>): StoryRecord => {
   if (primary && !cleanedImages.includes(primary)) cleanedImages.unshift(primary);
   const images = cleanedImages;
   const imageUrl = images[0] ?? primary;
-  return {
+  const imageFrame = parseStoryImageFrame((story as Record<string, unknown>).imageFrame);
+  const out: StoryRecord = {
     id,
     kind,
     slug: toSlug(slugSeed),
@@ -292,6 +715,32 @@ const normalizeStory = (story: Partial<StoryRecord>): StoryRecord => {
     updatedAt: now,
     featured: Boolean(story.featured)
   };
+  if (imageFrame) out.imageFrame = imageFrame;
+  if (typeof story.articleOffsetX === "number" && Number.isFinite(story.articleOffsetX)) {
+    out.articleOffsetX = story.articleOffsetX;
+  }
+  if (typeof story.articleOffsetY === "number" && Number.isFinite(story.articleOffsetY)) {
+    out.articleOffsetY = story.articleOffsetY;
+  }
+  const passNum = (key: keyof StoryRecord) => {
+    const v = (story as Record<string, unknown>)[key];
+    if (typeof v === "number" && Number.isFinite(v)) {
+      (out as Record<string, unknown>)[key] = v;
+    }
+  };
+  passNum("titleOffsetX");
+  passNum("titleOffsetY");
+  passNum("excerptOffsetX");
+  passNum("excerptOffsetY");
+  passNum("imageOffsetX");
+  passNum("imageOffsetY");
+  passNum("bodyOffsetX");
+  passNum("bodyOffsetY");
+  passNum("metaOffsetX");
+  passNum("metaOffsetY");
+  passNum("ctaOffsetX");
+  passNum("ctaOffsetY");
+  return out;
 };
 
 const parseState = (value: unknown): StoriesState => {
@@ -311,7 +760,18 @@ const parseState = (value: unknown): StoriesState => {
         .filter(Boolean)
     : defaultState.rssFeedUrls;
 
-  return {
+  const newsletterLayoutDividersParsed = Array.isArray(raw.newsletterLayoutDividers)
+    ? raw.newsletterLayoutDividers
+        .map((d) => parseLayoutDivider(d))
+        .filter((d): d is NewsletterLayoutDivider => d !== null)
+    : defaultState.newsletterLayoutDividers;
+  const newsletterBlocksParsed = Array.isArray(raw.newsletterBlocks)
+    ? raw.newsletterBlocks
+        .map((b) => parseBlock(b))
+        .filter((b): b is NewsletterBlock => b !== null)
+    : defaultState.newsletterBlocks;
+
+  const base: StoriesState = {
     stories,
     socialSources: {
       instagram: socialSources.instagram ?? defaultState.socialSources.instagram,
@@ -398,16 +858,135 @@ const parseState = (value: unknown): StoriesState => {
       greetingBody: parseElementStyle(
         (raw.newsletterElementStyles as Record<string, unknown> | undefined)?.greetingBody,
         defaultState.newsletterElementStyles.greetingBody
+      ),
+      executiveBriefTitle: parseElementStyle(
+        (raw.newsletterElementStyles as Record<string, unknown> | undefined)?.executiveBriefTitle,
+        defaultState.newsletterElementStyles.executiveBriefTitle
+      ),
+      executiveBriefBody: parseElementStyle(
+        (raw.newsletterElementStyles as Record<string, unknown> | undefined)?.executiveBriefBody,
+        defaultState.newsletterElementStyles.executiveBriefBody
+      ),
+      executiveBriefLink: parseElementStyle(
+        (raw.newsletterElementStyles as Record<string, unknown> | undefined)?.executiveBriefLink,
+        defaultState.newsletterElementStyles.executiveBriefLink
+      ),
+      executiveBriefSection: parseElementStyle(
+        (raw.newsletterElementStyles as Record<string, unknown> | undefined)?.executiveBriefSection,
+        defaultState.newsletterElementStyles.executiveBriefSection
+      ),
+      storyTitle: parseElementStyle(
+        (raw.newsletterElementStyles as Record<string, unknown> | undefined)?.storyTitle,
+        defaultState.newsletterElementStyles.storyTitle
+      ),
+      storyExcerpt: parseElementStyle(
+        (raw.newsletterElementStyles as Record<string, unknown> | undefined)?.storyExcerpt,
+        defaultState.newsletterElementStyles.storyExcerpt
+      ),
+      storyBody: parseElementStyle(
+        (raw.newsletterElementStyles as Record<string, unknown> | undefined)?.storyBody,
+        defaultState.newsletterElementStyles.storyBody
+      ),
+      storyMeta: parseElementStyle(
+        (raw.newsletterElementStyles as Record<string, unknown> | undefined)?.storyMeta,
+        defaultState.newsletterElementStyles.storyMeta
+      ),
+      storyCta: parseElementStyle(
+        (raw.newsletterElementStyles as Record<string, unknown> | undefined)?.storyCta,
+        defaultState.newsletterElementStyles.storyCta
       )
     },
     newsletterImageTransforms: parseImageTransforms(raw.newsletterImageTransforms, defaultState.newsletterImageTransforms),
-    newsletterLayoutDividers: Array.isArray(raw.newsletterLayoutDividers)
-      ? (raw.newsletterLayoutDividers
-          .map((d) => parseLayoutDivider(d))
-          .filter((d): d is NewsletterLayoutDivider => d !== null))
-      : defaultState.newsletterLayoutDividers
+    newsletterLayoutDividers: newsletterLayoutDividersParsed,
+    newsletterLayoutDividerPreset: parseLayoutDividerPreset(raw.newsletterLayoutDividerPreset),
+    newsletterStoryTextColor:
+      typeof raw.newsletterStoryTextColor === "string" ? raw.newsletterStoryTextColor.trim() : "",
+    newsletterBlocks: newsletterBlocksParsed,
+    newsletterBlocksMigrationVersion:
+      typeof raw.newsletterBlocksMigrationVersion === "number" && raw.newsletterBlocksMigrationVersion >= 1 ? 1 : 0,
+    executiveBriefTitle:
+      typeof raw.executiveBriefTitle === "string"
+        ? raw.executiveBriefTitle
+        : defaultState.executiveBriefTitle,
+    executiveBriefStoryIds: (() => {
+      const arr = Array.isArray(raw.executiveBriefStoryIds) ? raw.executiveBriefStoryIds : [];
+      const out = ["", "", ""];
+      for (let i = 0; i < 3; i++) out[i] = typeof arr[i] === "string" ? (arr[i] as string) : "";
+      return out;
+    })(),
+    executiveBriefImageOverrides: (() => {
+      const arr = Array.isArray(raw.executiveBriefImageOverrides) ? raw.executiveBriefImageOverrides : [];
+      const out = ["", "", ""];
+      for (let i = 0; i < 3; i++) out[i] = typeof arr[i] === "string" ? (arr[i] as string) : "";
+      return out;
+    })(),
+    executiveBriefImageTransforms: (() => {
+      const arr = Array.isArray(raw.executiveBriefImageTransforms) ? raw.executiveBriefImageTransforms : [];
+      const fallback = defaultState.executiveBriefImageTransforms;
+      const parseOne = (item: unknown, fb: NewsletterImageTransform): NewsletterImageTransform => {
+        const it = item && typeof item === "object" ? (item as Record<string, unknown>) : {};
+        return {
+          x: typeof it.x === "number" ? Math.min(500, Math.max(-500, it.x)) : fb.x,
+          y: typeof it.y === "number" ? Math.min(500, Math.max(-500, it.y)) : fb.y,
+          zoom:
+            typeof it.zoom === "number" && Number.isFinite(it.zoom)
+              ? Math.min(3, Math.max(0.01, it.zoom))
+              : fb.zoom,
+          borderRadius:
+            typeof it.borderRadius === "number" && Number.isFinite(it.borderRadius)
+              ? Math.min(9999, Math.max(0, it.borderRadius))
+              : fb.borderRadius,
+          zIndex:
+            typeof it.zIndex === "number" && Number.isFinite(it.zIndex)
+              ? Math.min(999, Math.max(-999, Math.round(it.zIndex)))
+              : fb.zIndex
+        };
+      };
+      return [0, 1, 2].map((i) => parseOne(arr[i], fallback[i] ?? fallback[0]));
+    })(),
+    newsletterShowDate: typeof raw.newsletterShowDate === "boolean" ? raw.newsletterShowDate : true,
+    newsletterIssueTemplate: null,
+    newsletterCanvas: (() => {
+      const c = raw.newsletterCanvas as Record<string, unknown> | null | undefined;
+      if (!c || typeof c !== "object") return defaultState.newsletterCanvas;
+      const dd = c.dividerDefaults as Record<string, unknown> | null | undefined;
+      return {
+        enabled: typeof c.enabled === "boolean" ? c.enabled : false,
+        elements: Array.isArray(c.elements) ? c.elements : [],
+        dividerDefaults: dd && typeof dd === "object" ? {
+          color: typeof dd.color === "string" ? dd.color : "rgba(120,170,160,0.85)",
+          thickness: typeof dd.thickness === "number" ? dd.thickness : 1,
+          lineStyle: (dd.lineStyle === "solid" || dd.lineStyle === "dashed" || dd.lineStyle === "dotted")
+            ? dd.lineStyle : "solid",
+        } : undefined,
+        measuredHeights:
+          c.measuredHeights && typeof c.measuredHeights === "object" && !Array.isArray(c.measuredHeights)
+            ? (c.measuredHeights as Record<string, number>)
+            : undefined,
+        storySpacingGaps: parseStorySpacingGaps(c.storySpacingGaps),
+      };
+    })()
   };
+
+  if (raw.newsletterIssueTemplate && typeof raw.newsletterIssueTemplate === "object") {
+    base.newsletterIssueTemplate = parseState({
+      ...(raw.newsletterIssueTemplate as Record<string, unknown>),
+      newsletterIssueTemplate: null,
+    });
+  }
+
+  return base;
 };
+
+export function migrateLegacyToModular(state: StoriesState): StoriesState {
+  if ((state.newsletterBlocksMigrationVersion ?? 0) >= 1) return state;
+  return {
+    ...state,
+    newsletterBlocks: buildMigratedNewsletterBlocks({ ...state, newsletterBlocks: [] }),
+    newsletterLayoutDividers: [],
+    newsletterBlocksMigrationVersion: 1
+  };
+}
 
 export async function readStoriesState(): Promise<StoriesState> {
   if (hasKvConfig) {
@@ -424,12 +1003,13 @@ export async function readStoriesState(): Promise<StoriesState> {
     const raw = await fs.readFile(storagePath, "utf8");
     return parseState(JSON.parse(raw));
   } catch {
-    return defaultState;
+    return parseState({ ...defaultState });
   }
 }
 
 export async function writeStoriesState(state: StoriesState): Promise<StoriesState> {
-  const parsed = parseState(state);
+  const merged = syncAllBlocksToLegacy({ ...state, newsletterBlocks: state.newsletterBlocks ?? [] });
+  const parsed = parseState(merged);
   if (hasKvConfig) {
     try {
       await kv.set(storiesKvKey, parsed);

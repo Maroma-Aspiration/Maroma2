@@ -2,11 +2,10 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { defaultWideBannerLayout } from "../../lib/category-banner-defaults";
 import type { ResolvedCategoryBanner } from "../../lib/category-banner-types";
-
-const ADMIN_STORAGE_KEY = "maroma-admin-drag";
+import { ADMIN_DRAG_STORAGE_KEY, useAdminSession } from "../../lib/use-admin-session";
 
 function clamp(n: number, min: number, max: number): number {
   return Math.min(max, Math.max(min, n));
@@ -22,6 +21,25 @@ function parseObjectPosition(value: string): { x: number; y: number } {
     };
   }
   return { x: 82, y: 38 };
+}
+
+function faceCareMobileObjectPosition(value: string): string {
+  const { x, y } = parseObjectPosition(value);
+  return `calc(${x}% - 2cm) ${y}%`;
+}
+
+function useMobileCategoryHero(): boolean {
+  const [isMobile, setIsMobile] = useState(false);
+
+  useEffect(() => {
+    const mq = window.matchMedia("(max-width: 900px)");
+    const sync = () => setIsMobile(mq.matches);
+    sync();
+    mq.addEventListener("change", sync);
+    return () => mq.removeEventListener("change", sync);
+  }, []);
+
+  return isMobile;
 }
 
 const minHeightPresets: { label: string; value: string }[] = [
@@ -57,7 +75,8 @@ export function CategoryHeroWithAdmin({
   italicTagline = false
 }: CategoryHeroWithAdminProps) {
   const router = useRouter();
-  const [admin, setAdmin] = useState(false);
+  const { adminModeEnabled: admin } = useAdminSession();
+  const isMobileCategoryHero = useMobileCategoryHero();
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [imageUrl, setImageUrl] = useState(resolved.imageUrl);
   const [heroTitle, setHeroTitle] = useState(resolved.heroTitle);
@@ -70,25 +89,6 @@ export function CategoryHeroWithAdmin({
   const [posY, setPosY] = useState(() => parseObjectPosition(resolved.objectPosition).y);
   const [status, setStatus] = useState("");
   const [busy, setBusy] = useState(false);
-
-  const readAdmin = useCallback(() => {
-    if (typeof window === "undefined") {
-      return;
-    }
-    setAdmin(window.localStorage.getItem(ADMIN_STORAGE_KEY) === "true");
-  }, []);
-
-  useEffect(() => {
-    readAdmin();
-    window.addEventListener("storage", readAdmin);
-    window.addEventListener("focus", readAdmin);
-    window.addEventListener("maroma-admin-changed", readAdmin);
-    return () => {
-      window.removeEventListener("storage", readAdmin);
-      window.removeEventListener("focus", readAdmin);
-      window.removeEventListener("maroma-admin-changed", readAdmin);
-    };
-  }, [readAdmin]);
 
   useEffect(() => {
     setImageUrl(resolved.imageUrl);
@@ -122,20 +122,50 @@ export function CategoryHeroWithAdmin({
 
   const showEditor = admin && Boolean(imageUrl);
   const heroMods = `${wideCover ? "category-hero--wide" : ""} ${splitThumb ? "category-hero--split" : ""}`.trim();
+  const bannerObjectPosition =
+    wideCover && slug === "face-care" && isMobileCategoryHero
+      ? faceCareMobileObjectPosition(objectPosition)
+      : objectPosition;
 
-  const heroCopy = useMemo(
-    () => (
-      <>
-        <Link href="/" className={`category-back ${wideCover ? "category-back--on-photo" : ""}`}>
-          Back to Home
-        </Link>
-        <span className={`eyebrow ${wideCover ? "eyebrow--on-photo" : ""}`}>Maroma Collection</span>
-        <h1>{heroTitle}</h1>
-        <p className={wideCover || italicTagline ? "category-hero-tagline" : undefined}>{heroTagline}</p>
-      </>
-    ),
-    [heroTagline, heroTitle, italicTagline, wideCover]
+  const backLink = (
+    <Link href="/" className="category-back">
+      Back to Home
+    </Link>
   );
+
+  const wideCoverTextPill = (
+    <div className="category-hero-text-pill">
+      <Link href="/" className="category-hero-pill-home" aria-label="Home">
+        <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+          <path
+            d="M5.5 10.5 12 5l6.5 5.5V18a1.5 1.5 0 0 1-1.5 1.5H7A1.5 1.5 0 0 1 5.5 18v-7.5Z"
+            stroke="currentColor"
+            strokeWidth="1.5"
+            strokeLinejoin="round"
+          />
+          <path
+            d="M10 19.5V13a2 2 0 0 1 2-2h0a2 2 0 0 1 2 2v6.5"
+            stroke="currentColor"
+            strokeWidth="1.5"
+            strokeLinecap="round"
+          />
+        </svg>
+      </Link>
+      <span className="category-hero-pill-eyebrow eyebrow">Maroma Collection</span>
+      <h1 className="category-hero-pill-title">{heroTitle}</h1>
+      <p className={`category-hero-pill-tagline${italicTagline ? " category-hero-tagline" : ""}`}>{heroTagline}</p>
+    </div>
+  );
+
+  const defaultHeroCopy = (
+    <>
+      <span className="eyebrow">Maroma Collection</span>
+      <h1>{heroTitle}</h1>
+      <p className={italicTagline ? "category-hero-tagline" : undefined}>{heroTagline}</p>
+    </>
+  );
+
+  const heroCopy = wideCover ? wideCoverTextPill : defaultHeroCopy;
 
   const savePatch = async (patch: Record<string, string | number>) => {
     setBusy(true);
@@ -219,8 +249,7 @@ export function CategoryHeroWithAdmin({
   };
 
   const openDrawer = () => {
-    readAdmin();
-    if (window.localStorage.getItem(ADMIN_STORAGE_KEY) !== "true") {
+    if (!admin || window.localStorage.getItem(ADMIN_DRAG_STORAGE_KEY) !== "true") {
       window.alert(
         'Turn on admin mode from the homepage using the floating "Admin" control, then return here.'
       );
@@ -231,15 +260,22 @@ export function CategoryHeroWithAdmin({
 
   if (!imageUrl) {
     return (
-      <header className={`category-hero ${heroMods}`}>
-        <div className="category-hero-copy">{heroCopy}</div>
+      <header className={`category-hero ${heroMods}`} data-category-slug={slug}>
+        <div className="category-hero-copy">
+          {wideCover ? heroCopy : (
+            <>
+              {backLink}
+              {heroCopy}
+            </>
+          )}
+        </div>
       </header>
     );
   }
 
   return (
     <>
-      <header className={`category-hero ${heroMods}`}>
+      <header className={`category-hero ${heroMods}`} data-category-slug={slug}>
         {wideCover ? (
           <div
             className="category-hero-wide-media category-banner-admin-target"
@@ -259,14 +295,16 @@ export function CategoryHeroWithAdmin({
               className="category-hero-wide-img"
               src={imageUrl}
               alt="Category hero photograph"
-              style={{ objectPosition }}
+              style={{ objectPosition: bannerObjectPosition }}
             />
-            <div className="category-hero-wide-scrim" aria-hidden />
             <div className="category-hero-copy category-hero-copy--overlay">{heroCopy}</div>
           </div>
         ) : (
           <>
-            <div className="category-hero-copy">{heroCopy}</div>
+            <div className="category-hero-copy">
+              {backLink}
+              {heroCopy}
+            </div>
             <div className={`category-hero-banner ${showEditor ? "category-banner-admin-target" : ""}`}>
               {showEditor ? (
                 <button
@@ -280,7 +318,7 @@ export function CategoryHeroWithAdmin({
               ) : null}
               <img
                 src={imageUrl}
-                alt={`${categoryLabel} — Maroma Collection`}
+                alt={`${categoryLabel} | Maroma Collection`}
                 style={splitThumb ? { maxWidth: thumbMaxWidth } : undefined}
               />
             </div>
@@ -462,8 +500,8 @@ export function CategoryHeroWithAdmin({
                 </button>
               </div>
               <p className="category-banner-hint">
-                Admin mode uses the same toggle as the homepage (`{ADMIN_STORAGE_KEY}` in local storage). API routes
-                are open on this staging build—do not expose publicly without authentication.
+                Admin mode uses the same toggle as the homepage (`{ADMIN_DRAG_STORAGE_KEY}` in local storage). API routes
+                are open on this staging build. Do not expose publicly without authentication.
               </p>
             </div>
           </aside>

@@ -1,0 +1,1031 @@
+import type {
+  CanvasCtaEl,
+  CanvasEl,
+  CanvasImageEl,
+  CanvasStoryGridEl,
+  CanvasTextEl,
+} from "./story-types";
+import {
+  DEFAULT_STORY_SPACING_GAPS,
+  gapBetweenStoryElements,
+  type StorySpacingGaps,
+} from "./story-spacing-gaps";
+
+/** Newsletter canvas coordinate width (matches editor + email scale source). */
+export const NEWSLETTER_CANVAS_WIDTH = 716;
+
+const isImage = (e: CanvasEl): e is CanvasImageEl => e.kind === "image";
+const isDivider = (e: CanvasEl): e is import("./story-types").CanvasDividerEl =>
+  e.kind === "divider";
+const isStoryGrid = (e: CanvasEl): e is CanvasStoryGridEl => e.kind === "story-grid";
+const isCta = (e: CanvasEl): e is import("./story-types").CanvasCtaEl => e.kind === "cta";
+
+export function isSpacingLocked(e: CanvasEl): boolean {
+  return !!(e as { spacingLocked?: boolean }).spacingLocked;
+}
+
+/** Clear manual spacing locks — run before ⇕ Apply spacing. */
+export function clearSpacingLocks(elements: CanvasEl[]): CanvasEl[] {
+  return elements.map((e) => {
+    if (!(e as { spacingLocked?: boolean }).spacingLocked) return e;
+    const next = { ...e } as CanvasEl & { spacingLocked?: boolean };
+    delete next.spacingLocked;
+    return next;
+  });
+}
+const isText = (e: CanvasEl): e is CanvasTextEl => e.kind === "text";
+
+function estimateTextHeight(el: CanvasTextEl): number {
+  const plain = el.html.replace(/<[^>]+>/g, " ").trim();
+  const charsPerLine = Math.max(1, Math.floor(el.w / (el.fontSize * 0.55)));
+  const contentLines = Math.ceil(plain.length / charsPerLine);
+  const paraBreaks = el.html.split(/<\/p>|<br/gi).length - 1;
+  const blockTags = el.html.match(/<p[\s>]/gi)?.length ?? 0;
+  const lineCount = Math.max(contentLines, blockTags, 1) + Math.max(0, paraBreaks);
+  return Math.max(40, lineCount * el.fontSize * el.lineHeight + 20);
+}
+
+/** Strip HTML to plain text for story body height. */
+function storyBodyParagraphs(html: string): string[] {
+  const parts = html
+    .split(/<\/p>/i)
+    .map((p) =>
+      p
+        .replace(/<br\s*\/?>/gi, " ")
+        .replace(/<[^>]+>/g, "")
+        .replace(/&nbsp;|&#160;/gi, " ")
+        .replace(/\s+/g, " ")
+        .trim(),
+    )
+    .filter(Boolean);
+  if (parts.length > 0) return parts;
+  const plain = html
+    .replace(/<br\s*\/?>/gi, " ")
+    .replace(/<[^>]+>/g, "")
+    .replace(/&nbsp;|&#160;/gi, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+  return plain ? [plain] : [];
+}
+
+/** Story body block height at explicit render width + font size. */
+export function storyBodyInkHeightAt(
+  el: CanvasTextEl,
+  widthPx: number,
+  fontSizePx: number,
+): number {
+  const paragraphs = storyBodyParagraphs(el.html);
+  if (paragraphs.length === 0) return 0;
+  const charsPerLine = Math.max(1, Math.floor(widthPx / (fontSizePx * 0.55)));
+  const lineH = fontSizePx * el.lineHeight;
+  let totalLines = 0;
+  for (const para of paragraphs) {
+    totalLines += Math.max(1, Math.ceil(para.length / charsPerLine));
+  }
+  const paraGap = Math.max(0, paragraphs.length - 1) * fontSizePx * 0.65;
+  return Math.ceil(totalLines * lineH + paraGap);
+}
+
+/** Story body block height — paragraph-aware ink; never use stale saved measurements. */
+export function storyBodyInkHeight(el: CanvasTextEl): number {
+  return storyBodyInkHeightAt(el, el.w, el.fontSize);
+}
+
+const EMAIL_RENDER_W = 600;
+
+/** Story body height as rendered in 600px-wide email (scaled font + width). */
+export function emailRenderStoryBodyInkHeight(el: CanvasTextEl): number {
+  const fontSize = Math.max(11, Math.round((el.fontSize / NEWSLETTER_CANVAS_WIDTH) * EMAIL_RENDER_W));
+  const width = (el.w / NEWSLETTER_CANVAS_WIDTH) * EMAIL_RENDER_W;
+  return storyBodyInkHeightAt(el, width, fontSize);
+}
+
+const GRID_H_PAD = 56;
+const GRID_CARD_GAP = 12;
+const GRID_HEADING_H = 54;
+
+/** Gap between TOP STORIES block and first story section (divider / headline). */
+export const STORY_GRID_TO_SECTION_GAP = 48;
+
+function storyGridCardWidth(columns: number, canvasW = NEWSLETTER_CANVAS_WIDTH): number {
+  return (canvasW - GRID_H_PAD - (columns - 1) * GRID_CARD_GAP) / columns;
+}
+
+function estimateStoryGridCardHeight(
+  card: { title: string; excerpt?: string },
+  columns: number,
+  canvasW = NEWSLETTER_CANVAS_WIDTH,
+): number {
+  const cardW = storyGridCardWidth(columns, canvasW);
+  const imgH = Math.round(cardW * 0.75);
+  const titleLines = Math.max(
+    1,
+    Math.ceil(card.title.length / Math.max(1, Math.floor(cardW / 7))),
+  );
+  const excerptLen = card.excerpt?.length ?? 0;
+  const excerptLines =
+    excerptLen > 0
+      ? Math.max(1, Math.ceil(excerptLen / Math.max(1, Math.floor(cardW / 6))))
+      : 0;
+  const bodyH = 36 + titleLines * 19 + excerptLines * 18 + 16;
+  return imgH + bodyH;
+}
+
+/** Match `.nl-story-grid-el` card rows (heading + 4:3 image + title/excerpt). */
+export function estimateStoryGridHeight(el: CanvasStoryGridEl): number {
+  const cols = el.columns;
+  const stories = el.stories;
+  if (stories.length === 0) return GRID_HEADING_H + 200;
+  const rowCount = Math.ceil(stories.length / cols);
+  let cardsH = 0;
+  for (let r = 0; r < rowCount; r++) {
+    const rowCards = stories.slice(r * cols, r * cols + cols);
+    cardsH += Math.max(...rowCards.map((c) => estimateStoryGridCardHeight(c, cols)), 200);
+  }
+  const heading = el.headingText ? GRID_HEADING_H : 0;
+  return heading + cardsH + Math.max(0, rowCount - 1) * GRID_CARD_GAP + 16;
+}
+
+/** Never under-estimate TOP STORIES — measured DOM can lag one frame behind paint. */
+export function effectiveStoryGridHeight(
+  grid: CanvasStoryGridEl,
+  heightOf: (el: CanvasEl) => number,
+): number {
+  return Math.max(heightOf(grid), estimateStoryGridHeight(grid)) + 8;
+}
+
+/** Minimum Y for the first story divider / headline — bottom of TOP STORIES + gap. */
+export function storyGridLayoutFloor(
+  grid: CanvasStoryGridEl,
+  heightOf: (el: CanvasEl) => number,
+): number {
+  return grid.y + effectiveStoryGridHeight(grid, heightOf) + STORY_GRID_TO_SECTION_GAP;
+}
+
+export function measureElementHeight(el: CanvasEl, domH?: number): number {
+  if (isImage(el)) return el.h;
+  if (isDivider(el)) return Math.max(el.thickness + 8, 12);
+  if (isStoryGrid(el)) {
+    const est = estimateStoryGridHeight(el);
+    if (domH !== undefined && domH > 0) return Math.max(domH, est);
+    return est;
+  }
+  if (isCta(el)) return ctaInkHeight(el);
+  if (isText(el)) {
+    const h = estimateTextHeight(el);
+    // Issue title (large type, tight line-height) needs slack so the welcome line stacks below the glyphs.
+    if (el.id === "migrated-title") return h + 14;
+    // Story headlines: tight ink box — generous estimates leave a persistent gap before the hero image.
+    if (/^migrated-st-\d+$/.test(el.id)) return storyHeadlineInkHeight(el);
+    // Story body: ink height only — saved measurements must not inflate CTA gap.
+    if (/^migrated-sb-\d+$/.test(el.id)) return storyBodyInkHeight(el);
+    if (domH !== undefined && domH > 0) return domH;
+    return h;
+  }
+  if (domH !== undefined && domH > 0) return domH;
+  return 48;
+}
+
+/** Canonical vertical order for poured newsletter elements (stable even when y overlaps). */
+export function canvasLayoutOrder(el: CanvasEl): number {
+  const id = el.id;
+
+  const fixed: Record<string, number> = {
+    "migrated-top": 10,
+    "migrated-logo": 20,
+    "migrated-portrait": 30,
+    "migrated-hero": 40,
+    "migrated-mission-hd": 50,
+    "migrated-mission": 60,
+    "migrated-div1": 70,
+    "migrated-title": 80,
+    "migrated-div2": 82,
+    "migrated-greeting-hd": 85,
+    "migrated-greeting": 110,
+    "migrated-story-grid": 5000,
+  };
+  if (id in fixed) return fixed[id];
+
+  const bdiv = id.match(/^migrated-bdiv-(\d+)$/);
+  if (bdiv) return 200 + Number(bdiv[1]) * 100;
+  const bh = id.match(/^migrated-bh-(\d+)$/);
+  if (bh) return 201 + Number(bh[1]) * 100;
+  const bt = id.match(/^migrated-bt-(\d+)$/);
+  if (bt) return 202 + Number(bt[1]) * 100;
+  const bi = id.match(/^migrated-bi-(\d+)$/);
+  if (bi) return 203 + Number(bi[1]) * 100;
+
+  const story = id.match(/^migrated-(sdiv|st|si|sb|cta)-(\d+)$/);
+  if (story) {
+    const si = Number(story[2]);
+    const kindOrder: Record<string, number> = { sdiv: 0, st: 1, si: 2, sb: 3, cta: 4 };
+    return 6000 + si * 100 + (kindOrder[story[1]] ?? 0);
+  }
+
+  // User-placed elements: preserve relative order by y, after migrated content
+  return 50_000 + el.y;
+}
+
+export function sortByLayoutOrder(els: CanvasEl[]): CanvasEl[] {
+  return [...els].sort((a, b) => {
+    const oa = canvasLayoutOrder(a);
+    const ob = canvasLayoutOrder(b);
+    if (oa !== ob) return oa - ob;
+    return a.id.localeCompare(b.id);
+  });
+}
+
+/** Banner / logo / portrait / hero overlap — user-positioned, not restacked vertically. */
+export const MASTHEAD_OVERLAY_IDS = new Set([
+  "migrated-top",
+  "migrated-logo",
+  "migrated-portrait",
+  "migrated-hero",
+]);
+
+export function isMastheadOverlayImage(el: CanvasEl): boolean {
+  return isImage(el) && MASTHEAD_OVERLAY_IDS.has(el.id);
+}
+
+/** Masthead tiles are independent — never montage-grouped. */
+export function clearMastheadMontage(elements: CanvasEl[]): CanvasEl[] {
+  return elements.map((e) => {
+    if (!isImage(e) || !MASTHEAD_OVERLAY_IDS.has(e.id)) return e;
+    if (!e.montageGroup && e.montageIndex === undefined && e.montageCols === undefined) return e;
+    const next = { ...e } as CanvasImageEl;
+    delete next.montageGroup;
+    delete next.montageIndex;
+    delete next.montageCols;
+    return next;
+  });
+}
+
+/** Masthead images overlap by design — preserve their Y, only advance the stack cursor. */
+function isMastheadStackUnit(el: CanvasEl): boolean {
+  return isImage(el) && MASTHEAD_OVERLAY_IDS.has(el.id);
+}
+
+/** Montage tiles are user-positioned — preserve each member's Y within the group. */
+function isMontageStackUnit(el: CanvasEl): boolean {
+  return isImage(el) && !!el.montageGroup;
+}
+
+/** Move every id in a layout unit by the same delta (preserves montage mosaic offsets). */
+function placeUnitAtCursor(
+  unit: LayoutUnit,
+  elements: CanvasEl[],
+  heightOf: (el: CanvasEl) => number,
+  placedTop: number,
+  yById: Map<string, number>,
+): number {
+  const delta = placedTop - unit.top;
+  let unitBottom = placedTop;
+  for (const id of unit.ids) {
+    const el = elements.find((e) => e.id === id);
+    if (el) {
+      const ny = Math.max(0, el.y + delta);
+      yById.set(id, ny);
+      unitBottom = Math.max(unitBottom, ny + heightOf(el));
+    }
+  }
+  return unitBottom;
+}
+
+export type LayoutUnit = {
+  order: number;
+  top: number;
+  height: number;
+  ids: Set<string>;
+  locked: boolean;
+  representative: CanvasEl;
+};
+
+export function buildLayoutUnits(
+  elements: CanvasEl[],
+  heightOf: (el: CanvasEl) => number,
+): LayoutUnit[] {
+  const montageMemberIds = new Set<string>();
+  const montageGroups = new Map<string, CanvasImageEl[]>();
+
+  for (const e of elements) {
+    if (isImage(e) && e.montageGroup && !MASTHEAD_OVERLAY_IDS.has(e.id)) {
+      if (!montageGroups.has(e.montageGroup)) montageGroups.set(e.montageGroup, []);
+      montageGroups.get(e.montageGroup)!.push(e);
+      montageMemberIds.add(e.id);
+    }
+  }
+
+  const units: LayoutUnit[] = [];
+
+  for (const group of montageGroups.values()) {
+    const top = Math.min(...group.map((e) => e.y));
+    const bottom = Math.max(...group.map((e) => e.y + e.h));
+    const rep = [...group].sort((a, b) => canvasLayoutOrder(a) - canvasLayoutOrder(b))[0];
+    units.push({
+      order: Math.min(...group.map(canvasLayoutOrder)),
+      top,
+      height: bottom - top,
+      ids: new Set(group.map((e) => e.id)),
+      locked: group.every((e) => (e as { locked?: boolean }).locked),
+      representative: rep,
+    });
+  }
+
+  for (const e of elements) {
+    if (montageMemberIds.has(e.id)) continue;
+    units.push({
+      order: canvasLayoutOrder(e),
+      top: e.y,
+      height: heightOf(e),
+      ids: new Set([e.id]),
+      locked: !!(e as { locked?: boolean }).locked,
+      representative: e,
+    });
+  }
+
+  units.sort((a, b) => a.order - b.order || a.top - b.top);
+  return units;
+}
+
+  /** Stack all units top-to-bottom with measured heights and per-pair gaps. */
+export function stackCanvasElements(
+  elements: CanvasEl[],
+  heightOf: (el: CanvasEl) => number,
+  gapFor: (current: CanvasEl, next: CanvasEl | undefined) => number,
+  preserveIds: Set<string> = new Set(),
+): CanvasEl[] {
+  const units = buildLayoutUnits(elements, heightOf);
+  if (units.length === 0) return elements;
+
+  /** Lowest Y where body content may begin (below banner / hero / portrait). */
+  const mastheadFloor = elements.reduce((max, e) => {
+    if (MASTHEAD_OVERLAY_IDS.has(e.id)) {
+      return Math.max(max, e.y + heightOf(e));
+    }
+    return max;
+  }, 0);
+
+  let cursor = 0;
+  const yById = new Map<string, number>();
+
+  for (let i = 0; i < units.length; i++) {
+    const unit = units[i];
+    const nextUnit = units[i + 1];
+    const nxt = nextUnit?.representative;
+    const gap = gapFor(unit.representative, nxt);
+
+    if (isMontageStackUnit(unit.representative)) {
+      cursor = Math.max(cursor, mastheadFloor);
+      if (unitPreserved(unit, preserveIds)) {
+        const unitBottom = preserveUnitY(unit, elements, heightOf, yById);
+        cursor = Math.max(cursor, unitBottom + gap);
+      } else {
+        const unitBottom = placeUnitAtCursor(unit, elements, heightOf, cursor, yById);
+        cursor = unitBottom + gap;
+      }
+      continue;
+    }
+
+    if (isMastheadStackUnit(unit.representative)) {
+      preserveUnitY(unit, elements, heightOf, yById);
+      continue;
+    }
+
+    if (unitPreserved(unit, preserveIds)) {
+      let unitBottom: number;
+      if (unit.top < cursor - 0.5) {
+        const delta = cursor - unit.top;
+        unitBottom = cursor;
+        for (const id of unit.ids) {
+          const el = elements.find((e) => e.id === id);
+          if (el) {
+            const ny = el.y + delta;
+            yById.set(id, ny);
+            unitBottom = Math.max(unitBottom, ny + heightOf(el));
+          }
+        }
+      } else {
+        unitBottom = preserveUnitY(unit, elements, heightOf, yById);
+      }
+      cursor = Math.max(cursor, mastheadFloor, unitBottom + gap);
+      continue;
+    }
+
+    // Flow content: snap to cursor (compact — ignore stale stored Y).
+    cursor = Math.max(cursor, mastheadFloor);
+    const unitBottom = placeUnitAtCursor(unit, elements, heightOf, cursor, yById);
+    cursor = unitBottom + gap;
+  }
+
+  return elements.map((e) => {
+    const ny = yById.get(e.id);
+    return ny !== undefined ? ({ ...e, y: ny } as CanvasEl) : e;
+  });
+}
+
+const MASTHEAD_CENTER_IDS = new Set([
+  "migrated-top",
+  "migrated-logo",
+  "migrated-hero",
+]);
+
+/** Horizontally center a masthead asset on the 716px canvas (760px full-bleed → x = -22). */
+export function mastheadCenterX(width: number, canvasW = NEWSLETTER_CANVAS_WIDTH): number {
+  return Math.round((canvasW - width) / 2);
+}
+
+/** Full-bleed masthead banner width (760px on 716px canvas → x = -22). */
+export const MASTHEAD_BANNER_W = 760;
+/** Masthead portrait diameter on canvas (66% of original 168px). */
+export const MASTHEAD_PORTRAIT_SIZE = Math.round(168 * 0.66);
+
+/** Rich-text translate(x%, y%) ≈ object-position px offset for object-fit: cover. */
+export function legacyTransformToObjectPosition(
+  tr: { x: number; y: number; zoom: number },
+  width: number,
+  height: number,
+): { objectPositionX: number; objectPositionY: number; imageZoom: number } {
+  return {
+    objectPositionX: Math.round((tr.x / 100) * width),
+    objectPositionY: Math.round((tr.y / 100) * height),
+    imageZoom: Number.isFinite(tr.zoom) && tr.zoom > 0 ? tr.zoom : 1,
+  };
+}
+
+/** Snap banner / portrait / logo to canvas center — fixes locked or legacy X drift. */
+export function ensureMastheadCentered(
+  elements: CanvasEl[],
+  canvasW = NEWSLETTER_CANVAS_WIDTH,
+): CanvasEl[] {
+  return elements.map((e) => {
+    if (!isImage(e) || !MASTHEAD_CENTER_IDS.has(e.id)) return e;
+    const targetX = mastheadCenterX(e.w, canvasW);
+    if (Math.abs(e.x - targetX) <= 1) return e;
+    const next = { ...e, x: targetX } as CanvasEl;
+    if ((e as { locked?: boolean }).locked) {
+      (next as { locked?: boolean }).locked = false;
+    }
+    return next;
+  });
+}
+
+/**
+ * Normalize banner/hero width + horizontal center. Portrait is user-positioned — not touched.
+ */
+export function ensureMastheadLayout(elements: CanvasEl[]): CanvasEl[] {
+  let els = ensureMastheadCentered(elements);
+
+  els = els.map((e) => {
+    if (!isImage(e)) return e;
+
+    if (e.id === "migrated-top" || e.id === "migrated-hero") {
+      const targetX = mastheadCenterX(MASTHEAD_BANNER_W);
+      const changed =
+        e.w !== MASTHEAD_BANNER_W || Math.abs(e.x - targetX) > 1;
+      if (!changed) return e;
+      const next = { ...e, w: MASTHEAD_BANNER_W, x: targetX } as CanvasImageEl;
+      if ((e as { locked?: boolean }).locked) {
+        (next as { locked?: boolean }).locked = false;
+      }
+      return next;
+    }
+
+    // Portrait: user-positioned in the editor — never auto-snapped here.
+
+    return e;
+  });
+
+  return ensureMastheadZOrder(els);
+}
+
+/** Portrait circle should paint above banner / hero in the canvas editor. */
+export function ensureMastheadZOrder(elements: CanvasEl[]): CanvasEl[] {
+  let maxZ = 0;
+  for (const e of elements) {
+    if (MASTHEAD_OVERLAY_IDS.has(e.id) && isImage(e)) {
+      maxZ = Math.max(maxZ, e.zIndex ?? 1);
+    }
+  }
+  const portrait = elements.find((e) => e.id === "migrated-portrait");
+  if (!portrait || !isImage(portrait)) return elements;
+  const pz = portrait.zIndex ?? 1;
+  if (pz > maxZ) return elements;
+  return elements.map((e) =>
+    e.id === "migrated-portrait" ? ({ ...e, zIndex: maxZ + 2 } as CanvasEl) : e,
+  );
+}
+
+/** Issue title accidentally locked or dragged into the masthead band, or dropped below body content. */
+export function issueTitleNeedsReflow(elements: CanvasEl[]): boolean {
+  const title = elements.find((e) => e.id === "migrated-title");
+  if (!title) return false;
+
+  const grid = elements.find((e) => e.id === "migrated-story-grid");
+  if (grid && title.y >= grid.y - 40) return true;
+
+  const anchor =
+    elements.find((e) => e.id === "migrated-hero") ??
+    elements.find((e) => e.id === "migrated-mission");
+  if (!anchor) return false;
+  return title.y < anchor.y + measureElementHeight(anchor) * 0.45;
+}
+
+export function issueHeadingUsesLegacyDividerOrder(elements: CanvasEl[]): boolean {
+  const div2 = elements.find((e) => e.id === "migrated-div2");
+  const greetingHd = elements.find((e) => e.id === "migrated-greeting-hd");
+  if (!div2 || !greetingHd) return false;
+  // Legacy pour: div2 sat between title and welcome subtitle.
+  return div2.y < greetingHd.y;
+}
+
+/** Issue title + welcome subtitle + framing dividers — always stack as one band. */
+export const ISSUE_HEADING_BAND_IDS = new Set([
+  "migrated-div1",
+  "migrated-title",
+  "migrated-greeting-hd",
+  "migrated-div2",
+]);
+
+export type RelayoutOptions = {
+  /** Snap flow blocks to the stack cursor (Apply spacing, export, initial layout). */
+  compact?: boolean;
+  /** Clear locks on the title band and re-stack it fresh (div1 → title → div2 → welcome). */
+  resetIssueHeading?: boolean;
+  /** Keep stored Y for these ids while compacting everything else (e.g. user drag). */
+  preserveIds?: Set<string>;
+};
+
+/** Ids to pin during compact reflow when the user moves an element vertically. */
+export function pinIdsForElement(el: CanvasEl, elements: CanvasEl[]): Set<string> {
+  const ids = new Set<string>();
+  if (isImage(el) && el.montageGroup) {
+    for (const e of elements) {
+      if (isImage(e) && e.montageGroup === el.montageGroup) ids.add(e.id);
+    }
+    return ids;
+  }
+  ids.add(el.id);
+  return ids;
+}
+
+function unitPreserved(unit: LayoutUnit, preserveIds: Set<string>): boolean {
+  if (isMastheadStackUnit(unit.representative)) return true;
+  if (isImage(unit.representative) && unit.representative.montageDetached) return true;
+  if (isSpacingLocked(unit.representative)) return true;
+  for (const id of unit.ids) {
+    if (preserveIds.has(id)) return true;
+  }
+  return false;
+}
+
+function preserveUnitY(
+  unit: LayoutUnit,
+  elements: CanvasEl[],
+  heightOf: (el: CanvasEl) => number,
+  yById: Map<string, number>,
+): number {
+  let unitBottom = unit.top;
+  for (const id of unit.ids) {
+    const el = elements.find((e) => e.id === id);
+    if (el) {
+      yById.set(id, el.y);
+      unitBottom = Math.max(unitBottom, el.y + heightOf(el));
+    }
+  }
+  return unitBottom;
+}
+
+/** Strip legacy lock flags — editor uses free positioning. */
+export function stripLockedFlags(elements: CanvasEl[]): CanvasEl[] {
+  return elements.map((e) => {
+    if (!(e as { locked?: boolean }).locked) return e;
+    const next = { ...e } as CanvasEl & { locked?: boolean };
+    delete next.locked;
+    return next;
+  });
+}
+/** Clear saved locks on the issue heading band so compact can rebuild it. */
+export function resetIssueHeadingBand(elements: CanvasEl[]): CanvasEl[] {
+  return elements.map((e) => {
+    if (!ISSUE_HEADING_BAND_IDS.has(e.id)) return e;
+    const next = { ...e } as CanvasEl & { locked?: boolean };
+    delete next.locked;
+    return next;
+  });
+}
+
+export function unlockIssueHeadingForStack(elements: CanvasEl[]): CanvasEl[] {
+  if (!issueHeadingUsesLegacyDividerOrder(elements)) return elements;
+  return resetIssueHeadingBand(elements);
+}
+
+export function unlockMisplacedIssueHeading(elements: CanvasEl[]): CanvasEl[] {
+  if (!issueTitleNeedsReflow(elements)) return elements;
+  return resetIssueHeadingBand(elements);
+}
+
+/** Canvas px between title ink bottom and welcome subtitle box top. */
+export const ISSUE_TITLE_GREETING_GAP = 40;
+/** Extra padding above welcome line (applied in canvas + email render). */
+export const ISSUE_GREETING_HD_PAD_TOP = 12;
+
+/** Visual height of title glyphs — stack estimates can be shorter than painted type. */
+export function issueTitleInkHeight(title: CanvasTextEl): number {
+  return Math.ceil(title.fontSize * title.lineHeight + 16);
+}
+
+/** Visual height of a CTA pill (padding + optional wrapped label). */
+export function ctaInkHeight(el: CanvasCtaEl): number {
+  const label = el.label ?? "";
+  const charW = el.fontSize * 0.65 + (el.letterSpacing ?? 0);
+  const charsPerLine = Math.max(1, Math.floor(el.w / charW));
+  const lines = Math.max(1, Math.ceil(label.length / charsPerLine));
+  return Math.ceil(32 + lines * el.fontSize * 1.4 + 4);
+}
+
+/** Visual height of story headline glyphs (stack + gap enforcement). */
+export function storyHeadlineInkHeight(el: CanvasTextEl): number {
+  const plain = el.html.replace(/<[^>]+>/g, " ").trim();
+  const charsPerLine = Math.max(1, Math.floor(el.w / (el.fontSize * 0.52)));
+  const lines = Math.max(1, Math.ceil(plain.length / charsPerLine));
+  return Math.ceil(lines * el.fontSize * el.lineHeight + 2);
+}
+
+/** Bottom Y of a story hero + montage siblings when the hero anchor moves to anchorY. */
+function storyImageBlockBottom(
+  elements: CanvasEl[],
+  si: CanvasImageEl,
+  anchorY: number,
+): number {
+  if (!si.montageGroup) return anchorY + si.h;
+  const group = elements.filter(
+    (e): e is CanvasImageEl => isImage(e) && e.montageGroup === si.montageGroup,
+  );
+  if (group.length <= 1) return anchorY + si.h;
+  const dy = anchorY - si.y;
+  return Math.max(...group.map((t) => t.y + dy + t.h));
+}
+
+/** Push story section 0 below TOP STORIES when any block overlaps the grid. */
+export function enforceStoryContentBelowGrid(
+  elements: CanvasEl[],
+  gaps: StorySpacingGaps = DEFAULT_STORY_SPACING_GAPS,
+  heightOf: (el: CanvasEl) => number = measureElementHeight,
+): CanvasEl[] {
+  const grid = elements.find(
+    (e): e is CanvasStoryGridEl => e.id === "migrated-story-grid" && isStoryGrid(e),
+  );
+  if (!grid) return elements;
+
+  const floor = storyGridLayoutFloor(grid, heightOf);
+  const blockers = elements.filter((e) => {
+    if (!/^migrated-(sdiv|st|si|sb|cta)-0$/.test(e.id)) return false;
+    return e.y < floor - 1;
+  });
+  if (blockers.length === 0) return elements;
+
+  const anchor = blockers.sort((a, b) => canvasLayoutOrder(a) - canvasLayoutOrder(b))[0];
+  return pushElementsFromLayoutOrder(elements, canvasLayoutOrder(anchor), floor - anchor.y);
+}
+
+/** True when story section 0 sits inside the TOP STORIES vertical band. */
+export function firstStorySectionOverlapsGrid(
+  elements: CanvasEl[],
+  heightOf: (el: CanvasEl) => number = measureElementHeight,
+): boolean {
+  const grid = elements.find(
+    (e): e is CanvasStoryGridEl => e.id === "migrated-story-grid" && isStoryGrid(e),
+  );
+  if (!grid) return false;
+  const floor = storyGridLayoutFloor(grid, heightOf);
+  return elements.some(
+    (e) => /^migrated-(sdiv|st|si|sb|cta)-0$/.test(e.id) && e.y < floor - 1,
+  );
+}
+
+function pushElementsFromLayoutOrder(
+  elements: CanvasEl[],
+  fromOrder: number,
+  delta: number,
+): CanvasEl[] {
+  if (Math.abs(delta) < 1) return elements;
+  return elements.map((e) => {
+    if (canvasLayoutOrder(e) < fromOrder) return e;
+    if (MASTHEAD_OVERLAY_IDS.has(e.id)) return e;
+    const next = { ...e, y: e.y + delta } as CanvasEl;
+    if ((e as { locked?: boolean }).locked) {
+      (next as { locked?: boolean }).locked = false;
+    }
+    return next;
+  });
+}
+
+/** Chain story sections top-to-bottom — divider → headline → image → body → CTA → next section. */
+export function enforceStorySectionSpacing(
+  elements: CanvasEl[],
+  gaps: StorySpacingGaps = DEFAULT_STORY_SPACING_GAPS,
+  heightOf: (el: CanvasEl) => number = measureElementHeight,
+): CanvasEl[] {
+  const byId = new Map(elements.map((e) => [e.id, e]));
+  const yById = new Map<string, number>();
+
+  let cursor = 0;
+  const grid = byId.get("migrated-story-grid");
+  if (grid && isStoryGrid(grid)) {
+    cursor = storyGridLayoutFloor(grid, heightOf);
+  }
+
+  for (let idx = 0; idx < 50; idx++) {
+    const sdiv = byId.get(`migrated-sdiv-${idx}`);
+    const st = byId.get(`migrated-st-${idx}`);
+    if (!sdiv && !st && !byId.has(`migrated-si-${idx}`)) break;
+
+    if (sdiv && isDivider(sdiv)) {
+      if (isSpacingLocked(sdiv)) {
+        cursor = Math.max(cursor, sdiv.y + heightOf(sdiv) + gaps.aboveHeadline);
+      } else {
+        const sdivY = Math.max(sdiv.y, cursor);
+        yById.set(sdiv.id, sdivY);
+        cursor = sdivY + heightOf(sdiv) + gaps.aboveHeadline;
+      }
+    }
+
+    if (!st || st.kind !== "text") continue;
+
+    let y: number;
+    if (isSpacingLocked(st)) {
+      y = st.y + storyHeadlineInkHeight(st) + gaps.belowHeadline;
+      cursor = Math.max(cursor, y);
+    } else {
+      const stY = Math.max(st.y, cursor);
+      yById.set(st.id, stY);
+      y = stY + storyHeadlineInkHeight(st) + gaps.belowHeadline;
+    }
+
+    const si = byId.get(`migrated-si-${idx}`);
+    if (si && si.kind === "image") {
+      const imageGap = gaps.belowImage;
+      if (si.montageDetached || isSpacingLocked(si)) {
+        y = Math.max(y, si.y + heightOf(si)) + imageGap;
+      } else {
+        yById.set(si.id, y);
+        y = storyImageBlockBottom(elements, si, y) + imageGap;
+      }
+    }
+
+    const sb = byId.get(`migrated-sb-${idx}`);
+    const cta = byId.get(`migrated-cta-${idx}`);
+
+    if (sb && sb.kind === "text") {
+      const sbY = isSpacingLocked(sb) ? sb.y : Math.max(y, sb.y);
+      if (!isSpacingLocked(sb)) yById.set(sb.id, sbY);
+      const sbH = storyBodyInkHeight(sb);
+      const sbBottom = sbY + sbH;
+      if (cta && isCta(cta)) {
+        yById.set(cta.id, sbBottom + gaps.aboveButton);
+        y = sbBottom + gaps.aboveButton + heightOf(cta) + gaps.belowButton;
+      } else {
+        y = sbBottom + gaps.belowButton;
+      }
+    } else if (cta && isCta(cta)) {
+      const ctaY = y + gaps.aboveButton;
+      yById.set(cta.id, ctaY);
+      y = ctaY + heightOf(cta) + gaps.belowButton;
+    } else {
+      y += gaps.belowButton;
+    }
+
+    cursor = y;
+  }
+
+  if (yById.size === 0) return elements;
+
+  return elements.map((e) => {
+    const ny = yById.get(e.id);
+    if (ny !== undefined) return { ...e, y: ny } as CanvasEl;
+
+    // Montage tiles follow their story hero vertical shift.
+    if (isImage(e) && e.montageGroup) {
+      for (const [anchorId, anchorY] of yById) {
+        const anchor = byId.get(anchorId);
+        if (
+          anchor?.kind === "image" &&
+          anchor.montageGroup === e.montageGroup &&
+          anchor.id.startsWith("migrated-si-")
+        ) {
+          const delta = anchorY - anchor.y;
+          if (Math.abs(delta) >= 1) return { ...e, y: e.y + delta } as CanvasEl;
+        }
+      }
+    }
+    return e;
+  });
+}
+
+/** Force welcome subtitle below title — gap tweaks alone miss locked / unstored Y. */
+export function enforceIssueTitleGreetingGap(
+  elements: CanvasEl[],
+  minGap = ISSUE_TITLE_GREETING_GAP,
+): CanvasEl[] {
+  const title = elements.find((e): e is CanvasTextEl => e.id === "migrated-title" && e.kind === "text");
+  const greetingHd = elements.find(
+    (e): e is CanvasTextEl => e.id === "migrated-greeting-hd" && e.kind === "text",
+  );
+  if (!title || !greetingHd) return elements;
+  // Respect manual vertical placement from drag or toolbar nudge.
+  if (isSpacingLocked(title) || isSpacingLocked(greetingHd)) return elements;
+
+  const titleBottom = title.y + issueTitleInkHeight(title);
+  const requiredY = titleBottom + minGap;
+  const delta = requiredY - greetingHd.y;
+  if (Math.abs(delta) < 1) return elements;
+
+  const fromOrder = canvasLayoutOrder(greetingHd);
+  return elements.map((e) => {
+    if (canvasLayoutOrder(e) < fromOrder) return e;
+    if (isSpacingLocked(e)) return e;
+    const next = { ...e, y: e.y + delta } as CanvasEl;
+    if ((e as { locked?: boolean }).locked) {
+      (next as { locked?: boolean }).locked = false;
+    }
+    return next;
+  });
+}
+
+export function paintOrderElements(elements: CanvasEl[]): CanvasEl[] {
+  return [...elements].sort((a, b) => {
+    const za = a.zIndex ?? 1;
+    const zb = b.zIndex ?? 1;
+    if (za !== zb) return za - zb;
+    const oa = canvasLayoutOrder(a);
+    const ob = canvasLayoutOrder(b);
+    if (oa !== ob) return oa - ob;
+    return a.id.localeCompare(b.id);
+  });
+}
+
+/** Full-bleed banner width for email export only — editor keeps user dimensions. */
+export function normalizeEmailBannerWidth(elements: CanvasEl[]): CanvasEl[] {
+  return elements.map((e) => {
+    if (!isImage(e) || (e.id !== "migrated-top" && e.id !== "migrated-hero")) return e;
+    const targetX = mastheadCenterX(MASTHEAD_BANNER_W);
+    if (e.w === MASTHEAD_BANNER_W && Math.abs(e.x - targetX) <= 1) return e;
+    return { ...e, w: MASTHEAD_BANNER_W, x: targetX } as CanvasImageEl;
+  });
+}
+
+/** Full pipeline: optional compact stack + title/welcome gap. Editor uses compact only on demand. */
+export function relayoutNewsletterCanvas(
+  elements: CanvasEl[],
+  gaps: StorySpacingGaps = DEFAULT_STORY_SPACING_GAPS,
+  heightOf: (el: CanvasEl) => number = measureElementHeight,
+  options: RelayoutOptions = {},
+): CanvasEl[] {
+  const compact = options.compact ?? false;
+  let els = stripLockedFlags(clearMastheadMontage(ensureMastheadZOrder(elements)));
+
+  if (options.resetIssueHeading) {
+    els = resetIssueHeadingBand(els);
+  }
+
+  if (!compact) return els;
+
+  els = unlockIssueHeadingForStack(unlockMisplacedIssueHeading(els));
+  const gapFn = (cur: CanvasEl, nxt: CanvasEl | undefined) =>
+    gapBetweenStoryElements(cur, nxt, gaps);
+  els = stackCanvasElements(els, heightOf, gapFn, options.preserveIds ?? new Set());
+  els = enforceIssueTitleGreetingGap(els);
+  els = layoutCanvasStorySpacing(els, gaps, heightOf);
+  return els;
+}
+
+/** Shared story-spacing pass — editor display and email export must use the same order. */
+export function layoutCanvasStorySpacing(
+  elements: CanvasEl[],
+  gaps: StorySpacingGaps = DEFAULT_STORY_SPACING_GAPS,
+  heightOf: (el: CanvasEl) => number = measureElementHeight,
+): CanvasEl[] {
+  let els = enforceStoryContentBelowGrid(elements, gaps, heightOf);
+  els = enforceStorySectionSpacing(els, gaps, heightOf);
+  els = enforceStoryContentBelowGrid(els, gaps, heightOf);
+  return els;
+}
+
+/** Single canonical height helper — editor, email, and view-in-browser share this. */
+export function canvasLayoutHeightOf(
+  measuredHeights?: Record<string, number>,
+): (el: CanvasEl) => number {
+  return (el: CanvasEl) => measureElementHeight(el, measuredHeights?.[el.id]);
+}
+
+/** Canonical element heights for layout (deterministic — no DOM). */
+export function collectCanonicalMeasuredHeights(
+  elements: CanvasEl[],
+  measuredHeights?: Record<string, number>,
+): Record<string, number> {
+  const heightOf = canvasLayoutHeightOf(measuredHeights);
+  const out: Record<string, number> = {};
+  for (const el of elements) {
+    if (isText(el) && /^migrated-sb-\d+$/.test(el.id)) {
+      out[el.id] = storyBodyInkHeight(el);
+    } else if (isCta(el)) {
+      out[el.id] = ctaInkHeight(el);
+    } else {
+      const h = heightOf(el);
+      if (h > 0) out[el.id] = h;
+    }
+  }
+  return out;
+}
+
+/** Story-spacing layout with canonical heights; returns positions + heights for save/export. */
+export function syncCanvasStoryLayout(
+  elements: CanvasEl[],
+  gaps: StorySpacingGaps = DEFAULT_STORY_SPACING_GAPS,
+  measuredHeights?: Record<string, number>,
+): { elements: CanvasEl[]; measuredHeights: Record<string, number> } {
+  const heightOf = canvasLayoutHeightOf(measuredHeights);
+  const ordered = paintOrderElements(layoutCanvasStorySpacing(elements, gaps, heightOf));
+  return {
+    elements: ordered,
+    measuredHeights: collectCanonicalMeasuredHeights(ordered, measuredHeights),
+  };
+}
+
+/** Height helper from a canvas snapshot (same as canvasLayoutHeightOf). */
+export function canvasHeightOf(
+  canvas: { measuredHeights?: Record<string, number> },
+): (el: CanvasEl) => number {
+  return canvasLayoutHeightOf(canvas.measuredHeights);
+}
+
+/** Export: preserve editor Y, then normalise story-section gaps for send. */
+export function prepareCanvasForEmailExport(
+  elements: CanvasEl[],
+  gaps: StorySpacingGaps = DEFAULT_STORY_SPACING_GAPS,
+): CanvasEl[] {
+  let els = stripLockedFlags(clearMastheadMontage(ensureMastheadZOrder(elements)));
+  els = normalizeEmailBannerWidth(els);
+  return paintOrderElements(els);
+}
+
+/** Final pass after montage layout — delegates to syncCanvasStoryLayout. */
+export function finalizeCanvasForEmailExport(
+  elements: CanvasEl[],
+  gaps: StorySpacingGaps = DEFAULT_STORY_SPACING_GAPS,
+  measuredHeights?: Record<string, number>,
+): CanvasEl[] {
+  return syncCanvasStoryLayout(elements, gaps, measuredHeights).elements;
+}
+
+/** Scaled export height in canvas px (716-wide coordinate system). */
+export function canvasExportHeightCanvasPx(
+  elements: CanvasEl[],
+  heightOf: (el: CanvasEl) => number = measureElementHeight,
+): number {
+  if (elements.length === 0) return 400;
+  const minY = Math.min(0, ...elements.map((e) => e.y));
+  let bottom = 0;
+  for (const el of elements) {
+    bottom = Math.max(bottom, el.y - minY + heightOf(el));
+  }
+  return bottom + 80;
+}
+
+export function canvasExportMinY(elements: CanvasEl[]): number {
+  if (elements.length === 0) return 0;
+  return Math.min(0, ...elements.map((e) => e.y));
+}
+
+export function pushElementsAfter(
+  elements: CanvasEl[],
+  anchorId: string,
+  delta: number,
+  excludeIds: Set<string>,
+): CanvasEl[] {
+  if (delta === 0) return elements;
+
+  const anchor = elements.find((e) => e.id === anchorId);
+  if (!anchor) return elements;
+
+  let anchorOrder = canvasLayoutOrder(anchor);
+  if (isImage(anchor) && anchor.montageGroup) {
+    const group = elements.filter(
+      (e): e is CanvasImageEl => isImage(e) && e.montageGroup === anchor.montageGroup,
+    );
+    anchorOrder = Math.max(...group.map(canvasLayoutOrder));
+    for (const e of group) excludeIds.add(e.id);
+  } else {
+    excludeIds.add(anchorId);
+  }
+
+  return elements.map((e) => {
+    if (excludeIds.has(e.id)) return e;
+    if ((e as { locked?: boolean }).locked) return e;
+    if (MASTHEAD_OVERLAY_IDS.has(e.id)) return e;
+    if (canvasLayoutOrder(e) > anchorOrder) {
+      return { ...e, y: Math.max(0, e.y + delta) } as CanvasEl;
+    }
+    return e;
+  });
+}

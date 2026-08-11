@@ -1,12 +1,16 @@
 import type { Metadata } from "next";
+import { headers } from "next/headers";
 import { Montserrat } from "next/font/google";
 import { Cormorant_Garamond } from "next/font/google";
 import { Raleway } from "next/font/google";
 import { Josefin_Sans } from "next/font/google";
 import { readSiteContentFromDisk } from "../lib/read-site-content";
+import { isMaromaMobileUserAgent } from "../lib/mobile-viewport";
 import { SiteFooter } from "./components/SiteFooter";
 import { SiteHeader } from "./components/SiteHeader";
 import "./globals.css";
+import "./home-responsive.css";
+import "./components/home-collections.css";
 
 export const dynamic = "force-dynamic";
 
@@ -43,12 +47,19 @@ const josefin = Josefin_Sans({
 });
 
 export const metadata: Metadata = {
-  title: "Maroma - Hero Preview",
-  description: "Maroma-inspired hero with carousel and cycling phrases."
+  title: "Maroma",
+  description:
+    "Botanical skincare, body care, and home rituals handmade in Auroville. Shop by care category, explore morning and evening rituals, and discover vegan, cruelty-free essentials."
+};
+
+export const viewport = {
+  width: "device-width",
+  initialScale: 1
 };
 
 import { CartProvider } from "../context/CartContext";
-import { CartDrawer } from "./components/cart/CartDrawer";
+import { AdminBar } from "./components/AdminBar";
+import { ViewportRootSync } from "./components/ViewportRootSync";
 
 import Script from "next/script";
 
@@ -59,15 +70,25 @@ export default async function RootLayout({
 }) {
   const initialSiteContent = await readSiteContentFromDisk();
   const initialNav = { brand: initialSiteContent.brand, nav: initialSiteContent.nav };
+  const ua = (await headers()).get("user-agent") ?? "";
+  const initialViewportIsMobile = isMaromaMobileUserAgent(ua);
 
   return (
     <html lang="en" className={`${sans.variable} ${serif.variable} ${raleway.variable} ${josefin.variable}`}>
       <body className="antialiased">
+        <Script
+          id="maroma-viewport-sync"
+          strategy="beforeInteractive"
+          dangerouslySetInnerHTML={{
+            __html: `(function(){try{var q=window.matchMedia("(max-width:900px)");var t=window.matchMedia("(hover:none) and (pointer:coarse)");function s(){var m=q.matches||t.matches;document.documentElement.classList.toggle("maroma-viewport-mobile",m);document.documentElement.toggleAttribute("data-maroma-viewport-mobile",m);}s();q.addEventListener("change",s);t.addEventListener("change",s);}catch(e){}})();`,
+          }}
+        />
+        <ViewportRootSync />
         <Script src="https://elfsightcdn.com/platform.js" strategy="afterInteractive" />
+        <AdminBar />
         <CartProvider>
-          <SiteHeader initialNav={initialNav} />
+          <SiteHeader initialNav={initialNav} initialViewportIsMobile={initialViewportIsMobile} />
           {children}
-          <CartDrawer />
           <SiteFooter />
         </CartProvider>
       </body>

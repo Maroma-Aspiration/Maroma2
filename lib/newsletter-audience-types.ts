@@ -19,8 +19,27 @@ export type NewsletterCampaignMetrics = {
   unsubscribeSubscriberIds: string[];
 };
 
+export type NewsletterMailingList = {
+  id: string;
+  name: string;
+  createdAt: string;
+  updatedAt: string;
+  subscriberIds: string[];
+};
+
+export type NewsletterMailingListSummary = {
+  id: string;
+  name: string;
+  activeCount: number;
+  totalCount: number;
+  updatedAt: string;
+};
+
 export type NewsletterAudienceState = {
   subscribers: NewsletterSubscriber[];
+  mailingLists: NewsletterMailingList[];
+  /** Which list Send campaign uses (persisted server-side). */
+  selectedListId: string | null;
   campaigns: NewsletterCampaignMetrics[];
 };
 

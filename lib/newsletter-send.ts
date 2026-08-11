@@ -85,7 +85,7 @@ export async function sendEmailViaResend(opts: {
   to: string;
   subject: string;
   html: string;
-}): Promise<{ ok: true } | { ok: false; message: string }> {
+}): Promise<SendEmailResult> {
   try {
     const response = await fetch("https://api.resend.com/emails", {
       method: "POST",
@@ -104,9 +104,123 @@ export async function sendEmailViaResend(opts: {
       const text = await response.text();
       return { ok: false, message: text || response.statusText };
     }
-    return { ok: true };
+    return { ok: true, provider: "resend" };
   } catch (e) {
     const message = e instanceof Error ? e.message : "Network error";
     return { ok: false, message };
   }
+}
+
+function htmlToPlainText(html: string): string {
+  return html
+    .replace(/<style[\s\S]*?<\/style>/gi, "")
+    .replace(/<script[\s\S]*?<\/script>/gi, "")
+    .replace(/<br\s*\/?>/gi, "\n")
+    .replace(/<\/p>/gi, "\n\n")
+    .replace(/<[^>]+>/g, "")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
+}
+
+export type SendEmailResult =
+  | { ok: true; messageId?: string; provider: "postmark" | "resend" }
+  | { ok: false; message: string };
+
+export async function sendEmailViaPostmark(opts: {
+  serverToken: string;
+  from: string;
+  to: string;
+  subject: string;
+  html: string;
+  textBody?: string;
+  forTest?: boolean;
+}): Promise<SendEmailResult> {
+  try {
+    const response = await fetch("https://api.postmarkapp.com/email", {
+      method: "POST",
+      headers: {
+        "X-Postmark-Server-Token": opts.serverToken,
+        "Content-Type": "application/json",
+        "Accept": "application/json"
+      },
+      body: JSON.stringify({
+        From: opts.from,
+        To: opts.to,
+        Subject: opts.subject,
+        HtmlBody: opts.html,
+        TextBody: opts.textBody ?? htmlToPlainText(opts.html),
+        MessageStream: postmarkMessageStream(opts.forTest)
+      })
+    });
+    const text = await response.text();
+    if (!response.ok) {
+      try {
+        const j = JSON.parse(text) as { Message?: string };
+        if (j.Message) return { ok: false, message: j.Message };
+      } catch {
+        /* plain text */
+      }
+      return { ok: false, message: text || response.statusText };
+    }
+    try {
+      const j = JSON.parse(text) as { MessageID?: string; Message?: string };
+      if (j.Message && j.Message !== "OK") {
+        return { ok: false, message: j.Message };
+      }
+      return { ok: true, messageId: j.MessageID, provider: "postmark" };
+    } catch {
+      return { ok: true, provider: "postmark" };
+    }
+  } catch (e) {
+    const message = e instanceof Error ? e.message : "Network error";
+    return { ok: false, message };
+  }
+}
+
+function postmarkMessageStream(forTest = false): string {
+  if (forTest) {
+    return process.env.POSTMARK_TEST_MESSAGE_STREAM?.trim() || "outbound";
+  }
+  return process.env.POSTMARK_MESSAGE_STREAM?.trim() || "broadcast";
+}
+
+const FROM_EMAIL_RE = /[^\s@<>]+@[^\s@<>]+\.[^\s@<>]+/;
+
+/** Strip accidental quotes from Vercel env values. */
+export function normalizeFromEmail(raw: string): string {
+  let s = raw.trim();
+  if (
+    (s.startsWith('"') && s.endsWith('"')) ||
+    (s.startsWith("'") && s.endsWith("'"))
+  ) {
+    s = s.slice(1, -1).trim();
+  }
+  return s;
+}
+
+/** Normalized sender from env, or empty if unset/invalid (e.g. `""` on Vercel). */
+export function resolveFromEmail(raw = process.env.NEWSLETTER_FROM_EMAIL): string {
+  if (!raw?.trim()) return "";
+  const normalized = normalizeFromEmail(raw);
+  if (!normalized) return "";
+  return FROM_EMAIL_RE.test(normalized) ? normalized : "";
+}
+
+/** Send via whichever provider is configured (Postmark takes priority over Resend). */
+export async function sendEmail(opts: {
+  from: string;
+  to: string;
+  subject: string;
+  html: string;
+  forTest?: boolean;
+}): Promise<SendEmailResult> {
+  const postmarkToken = process.env.POSTMARK_SERVER_TOKEN?.trim();
+  if (postmarkToken) {
+    return sendEmailViaPostmark({ serverToken: postmarkToken, ...opts });
+  }
+  const resendKey = process.env.RESEND_API_KEY?.trim();
+  if (resendKey) {
+    return sendEmailViaResend({ apiKey: resendKey, ...opts });
+  }
+  return { ok: false, message: "No email provider configured. Set POSTMARK_SERVER_TOKEN or RESEND_API_KEY." };
 }

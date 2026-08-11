@@ -108,17 +108,61 @@ export type AuthUserPublicRow = {
   source: "env" | "stored";
 };
 
-export async function listAuthUsersPublic(): Promise<AuthUserPublicRow[]> {
+export type AuthUserAdminRow = AuthUserPublicRow & {
+  password: string;
+  passwordSource: "env" | "stored";
+};
+
+export async function listAuthUsersAdmin(): Promise<AuthUserAdminRow[]> {
   const envUsers = parseAuthUsersEnv();
   const storedUsers = await readStoredAuthUsers();
-  const byEmail = new Map<string, AuthUserPublicRow>();
-  for (const row of envUsers) {
-    byEmail.set(row.email, { email: row.email, role: row.role, source: "env" });
+  const storedByEmail = new Map(storedUsers.map((u) => [u.email, u]));
+  const envByEmail = new Map(envUsers.map((u) => [u.email, u]));
+  const emails = new Set([...envByEmail.keys(), ...storedByEmail.keys()]);
+  const rows: AuthUserAdminRow[] = [];
+  for (const email of emails) {
+    const stored = storedByEmail.get(email);
+    const env = envByEmail.get(email);
+    const active = stored ?? env;
+    if (!active) continue;
+    rows.push({
+      email,
+      role: active.role,
+      source: stored ? "stored" : "env",
+      password: active.password,
+      passwordSource: stored ? "stored" : "env",
+    });
   }
-  for (const row of storedUsers) {
-    byEmail.set(row.email, { email: row.email, role: row.role, source: "stored" });
-  }
-  return Array.from(byEmail.values()).sort((a, b) => a.email.localeCompare(b.email));
+  return rows.sort((a, b) => a.email.localeCompare(b.email));
+}
+
+export async function listAuthUsersPublic(): Promise<AuthUserPublicRow[]> {
+  const rows = await listAuthUsersAdmin();
+  return rows.map(({ email, role, source }) => ({ email, role, source }));
+}
+
+export async function changeAuthUserPassword(
+  email: string,
+  currentPassword: string,
+  newPassword: string
+): Promise<void> {
+  const normalized = normalizeAuthEmail(email);
+  if (!normalized) throw new Error("invalid_email");
+  if (!newPassword.trim()) throw new Error("invalid_password");
+  const match = await authenticateCredentialsAsync(normalized, currentPassword);
+  if (!match) throw new Error("invalid_current");
+  await resetAuthUserPassword(normalized, newPassword);
+}
+
+export async function resetAuthUserPassword(email: string, newPassword: string): Promise<void> {
+  const normalized = normalizeAuthEmail(email);
+  if (!normalized) throw new Error("invalid_email");
+  const allUsers = await readAllAuthUsers();
+  const existing = allUsers.find((u) => u.email === normalized);
+  if (!existing) throw new Error("not_found");
+  const storedUsers = await readStoredAuthUsers();
+  const others = storedUsers.filter((u) => u.email !== normalized);
+  await writeStoredAuthUsers([...others, { email: normalized, password: newPassword, role: existing.role }]);
 }
 
 export async function setAuthUserRole(email: string, role: UserRole): Promise<AuthUserPublicRow> {

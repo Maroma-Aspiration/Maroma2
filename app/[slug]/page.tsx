@@ -4,7 +4,8 @@ import { ProductListingWithFilters } from "../components/ProductListingWithFilte
 import { resolveCategoryBanner } from "../../lib/category-banner-store";
 import { categoryBySlug, catalogCategories } from "../../lib/catalog-categories";
 import { hasDisplayImage } from "../../lib/product-image";
-import { readOverrides, readProducts, withOverrides, type ProductRecord } from "../../lib/product-db";
+import { readMergedCatalog } from "../../lib/product-catalog-admin";
+import type { ProductRecord } from "../../lib/product-types";
 
 /** Category pages read JSON from disk via `product-db`; keep on Node (not Edge). */
 export const runtime = "nodejs";
@@ -43,12 +44,10 @@ export default async function CategoryPage({ params }: CategoryPageProps) {
     notFound();
   }
 
-  const [products, overrides, resolvedBanner] = await Promise.all([
-    readProducts(),
-    readOverrides(),
+  const [{ products: merged }, resolvedBanner] = await Promise.all([
+    readMergedCatalog(),
     resolveCategoryBanner(params.slug, category)
   ]);
-  const merged = withOverrides(products, overrides);
   const items = merged
     .filter((product) => belongsToCategory(product, category.keywords) && hasDisplayImage(product))
     .slice(0, 280);

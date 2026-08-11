@@ -1,9 +1,33 @@
 "use client";
 
+import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useState } from "react";
+import { useCart } from "../../context/CartContext";
+import type { ProductRecord } from "../../lib/product-types";
 
-export function ProductPdpBuyRow() {
+type Props = {
+  product: ProductRecord;
+};
+
+export function ProductPdpBuyRow({ product }: Props) {
+  const router = useRouter();
+  const { addToCart } = useCart();
   const [qty, setQty] = useState(1);
+  const [added, setAdded] = useState(false);
+
+  const handleAddToBasket = async () => {
+    const ok = await addToCart(product, undefined, qty);
+    if (!ok) return;
+    setAdded(true);
+    window.setTimeout(() => setAdded(false), 2000);
+  };
+
+  const handleBuyNow = async () => {
+    const ok = await addToCart(product, undefined, qty);
+    if (!ok) return;
+    router.push("/cart");
+  };
 
   return (
     <div className="product-pdp-buy-row">
@@ -23,16 +47,23 @@ export function ProductPdpBuyRow() {
         />
       </label>
       <div className="product-pdp-cta-group">
-        <button type="button" className="button primary button-success product-pdp-cta-main">
-          Add to cart
+        <button
+          type="button"
+          className={`button primary product-pdp-cta-main product-pdp-basket-btn${added ? " is-added" : ""}`}
+          onClick={handleAddToBasket}
+        >
+          {added ? "Added to Basket ✓" : "Add to Basket"}
         </button>
-        <button type="button" className="button primary button-success product-pdp-cta-main">
-          Buy now
+        <button type="button" className="button primary product-pdp-cta-main product-pdp-basket-btn" onClick={handleBuyNow}>
+          Buy Now
         </button>
         <button type="button" className="product-pdp-wish" aria-label="Add to wishlist">
           ♡
         </button>
       </div>
+      <Link href="/cart" className="product-pdp-view-basket">
+        View your basket
+      </Link>
     </div>
   );
 }

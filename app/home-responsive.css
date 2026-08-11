@@ -1,0 +1,1313 @@
+/*
+ * Homepage mobile layout — class-driven + viewport/container queries.
+ * Desktop (901px+ viewport, non-preview) is unchanged.
+ */
+
+/* ===== Mobile horizontal nav carousel (≤900px + touch phones + admin preview frame) ===== */
+.nav-basket-slot--desktop {
+  display: flex;
+}
+
+.nav-end {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  flex: 0 0 auto;
+  min-width: 0;
+}
+
+.maroma-nav-shell--desktop {
+  display: block;
+}
+
+.maroma-nav-shell--desktop .nav-basket-slot--desktop {
+  display: none;
+}
+
+.maroma-nav-shell--mobile {
+  display: none;
+}
+
+@media (min-width: 901px) {
+  html:not(.maroma-viewport-mobile) {
+    --nav-basket-bar-height: 0px;
+  }
+
+  html:not(.maroma-viewport-mobile) .maroma-nav-shell--desktop {
+    display: block !important;
+  }
+
+  html:not(.maroma-viewport-mobile) .maroma-nav-shell--mobile {
+    display: none !important;
+  }
+
+  html:not(.maroma-viewport-mobile) .site-header-responsive .maroma-nav-shell--desktop .nav {
+    margin-top: 0 !important;
+    align-items: center;
+    min-height: 72px;
+  }
+
+  html:not(.maroma-viewport-mobile) .site-header-responsive .maroma-nav-shell--desktop .brand {
+    margin-left: 0 !important;
+  }
+
+  html:not(.maroma-viewport-mobile) .site-header-responsive {
+    top: var(--admin-bar-height, 0px) !important;
+  }
+
+  html:not(.maroma-viewport-mobile) .maroma-nav-shell--desktop .nav-end {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    flex: 0 0 auto;
+    margin-right: 5mm;
+  }
+
+  html:not(.maroma-viewport-mobile) .maroma-nav-shell--desktop .spa-cta-wrap {
+    margin-right: 0;
+  }
+
+  html:not(.maroma-viewport-mobile) .maroma-nav-shell--desktop .nav-basket-slot--inline-desktop {
+    display: flex;
+    padding: 0;
+    background: transparent;
+    border-bottom: none;
+    flex-shrink: 0;
+  }
+
+  html:not(.maroma-viewport-mobile) .maroma-nav-shell--desktop .nav-basket-slot--inline-desktop .nav-basket-btn {
+    margin-left: 0;
+  }
+
+  html:not(.maroma-viewport-mobile) .hero {
+    --hero-nav-lift: calc(88px + var(--admin-bar-height, 0px) + var(--nav-bottom-gap));
+  }
+}
+
+@media (max-width: 900px), ((hover: none) and (pointer: coarse)) {
+  html {
+    overflow-x: clip;
+    overflow-y: auto;
+    max-width: 100%;
+    height: auto;
+    min-height: 100%;
+    scroll-padding-top: calc(124px + var(--admin-bar-height, 0px) + var(--nav-bottom-gap));
+    -webkit-overflow-scrolling: touch;
+  }
+
+  body {
+    overflow-x: clip;
+    overflow-y: auto;
+    max-width: 100%;
+    height: auto;
+    min-height: 100%;
+    background-attachment: scroll !important;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .nav-basket-slot--desktop {
+    display: none;
+  }
+
+  .maroma-nav-shell--desktop {
+    display: none !important;
+  }
+
+  .maroma-nav-shell--mobile {
+    display: block;
+  }
+
+  .site-header.site-header-responsive {
+    top: calc(var(--admin-bar-height, 0px) - 0.5cm);
+  }
+
+  .site-header-responsive .nav.nav-mobile {
+    flex-direction: column;
+    align-items: stretch;
+    padding: calc(8px + 2.5mm - 0.5cm) 0 max(4px, calc(10px - 0.5cm));
+    gap: 0;
+    width: 100%;
+    max-width: 100%;
+    overflow-x: hidden;
+    border-bottom: 1px solid transparent;
+    transition:
+      background 0.35s var(--ease),
+      border-color 0.35s var(--ease),
+      backdrop-filter 0.35s var(--ease);
+  }
+
+  .site-header-responsive .nav.nav-mobile.nav-overlay {
+    background: transparent;
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+    border-bottom-color: transparent;
+  }
+
+  .site-header-responsive .nav.nav-mobile.nav-solid {
+    background: rgba(232, 237, 226, 0.96);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    border-bottom: 1px solid rgba(19, 74, 87, 0.08);
+  }
+
+  .site-header-responsive .nav.nav-mobile.nav-overlay::before {
+    opacity: 0 !important;
+  }
+
+  .site-header-responsive .nav.nav-mobile.nav-solid::before,
+  .site-header-responsive .nav.nav-mobile.nav-lift::before {
+    background: rgba(232, 237, 226, 0.96);
+    opacity: 0;
+  }
+
+  .site-header-responsive .nav-mobile-brand-row {
+    position: relative;
+    z-index: 2;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    box-sizing: border-box;
+    min-height: calc(calc(48px * 0.75) + calc(2px + 0.5cm));
+    padding: calc(2px + 0.5cm) 52px 4px;
+    pointer-events: none;
+    overflow: visible;
+  }
+
+  .site-header-responsive .nav-mobile-brand-row .brand {
+    position: absolute;
+    left: 50%;
+    transform: translateX(-50%) translateY(1.5mm);
+    align-self: center;
+    z-index: 3;
+    padding: 8px 12px;
+    margin: 0;
+    display: flex;
+    justify-content: center;
+    pointer-events: auto;
+    touch-action: manipulation;
+  }
+
+  .site-header-responsive .nav-mobile-brand-row .brand-logo {
+    max-height: calc(48px * 0.75);
+    width: auto;
+    max-width: min(165px, 43.5vw);
+  }
+
+  .site-header-responsive .nav-basket-slot--inline {
+    position: absolute;
+    right: calc(12px + 2mm);
+    top: 50%;
+    transform: translateY(calc(-50% + 3.5mm));
+    z-index: 4;
+    padding: 0;
+    background: transparent !important;
+    border-bottom: none !important;
+    pointer-events: auto;
+    overflow: visible;
+  }
+
+  .site-header-responsive .nav-basket-slot--inline .nav-basket-btn {
+    min-height: 36px;
+    min-width: 36px;
+    padding: 0;
+  }
+
+  .site-header-responsive .nav-links.nav-links-carousel {
+    justify-content: flex-start;
+    flex-wrap: nowrap;
+    align-items: center;
+    overflow-x: auto;
+    overflow-y: hidden;
+    gap: 14px;
+    padding: 2px 20px 6px;
+    scroll-snap-type: x proximity;
+    -webkit-overflow-scrolling: touch;
+    scroll-behavior: smooth;
+    scrollbar-width: none;
+    width: 100%;
+    max-width: 100%;
+    touch-action: pan-x;
+    cursor: grab;
+    user-select: none;
+  }
+
+  .site-header-responsive .nav-links.nav-links-carousel.is-dragging {
+    cursor: grabbing;
+    scroll-behavior: auto;
+  }
+
+  .site-header-responsive .nav-links.nav-links-carousel::-webkit-scrollbar {
+    display: none;
+  }
+
+  .site-header-responsive .nav-links.nav-links-carousel .nav-scroll-item {
+    flex: 0 0 auto;
+    scroll-snap-align: center;
+    white-space: nowrap;
+    font-size: calc(11pt * 0.8) !important;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    opacity: 0.55;
+    transform: scale(0.98);
+    padding: 8px 4px;
+    min-height: 44px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .site-header-responsive .nav-links.nav-links-carousel a.nav-scroll-item {
+    color: var(--ink);
+    text-decoration: none;
+  }
+
+  .site-header-responsive .nav-links.nav-links-carousel .nav-scroll-item.is-centered {
+    opacity: 1;
+    color: var(--accent);
+    transform: scale(1.02);
+  }
+}
+
+@container admin-mobile-preview (max-width: 900px) {
+  .admin-mobile-preview-frame .nav-basket-slot--desktop {
+    display: none;
+  }
+
+  .admin-mobile-preview-frame .nav.nav-mobile.nav-overlay {
+    background: transparent;
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+    border-bottom-color: transparent;
+  }
+
+  .admin-mobile-preview-frame .nav.nav-mobile.nav-solid {
+    background: rgba(232, 237, 226, 0.96);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    border-bottom: 1px solid rgba(19, 74, 87, 0.08);
+  }
+
+  .admin-mobile-preview-frame .nav.nav-mobile {
+    flex-direction: column;
+    align-items: stretch;
+    padding: calc(8px + 2.5mm) 0 10px;
+    gap: calc(4px + 1.5mm);
+    width: 100%;
+    max-width: 100%;
+    overflow-x: hidden;
+    border-bottom: 1px solid transparent;
+    transition:
+      background 0.35s var(--ease),
+      border-color 0.35s var(--ease),
+      backdrop-filter 0.35s var(--ease);
+  }
+
+  .admin-mobile-preview-frame .nav-mobile-brand-row {
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    padding: 6px 52px 4px;
+    box-sizing: border-box;
+  }
+
+  .admin-mobile-preview-frame .nav-mobile-brand-row .brand {
+    position: absolute;
+    left: 50%;
+    transform: translateX(-50%) translateY(1.5mm);
+    margin: 0;
+    padding: 0;
+  }
+
+  .admin-mobile-preview-frame .nav-mobile-brand-row .brand-logo {
+    max-height: calc(48px * 0.75);
+    width: auto;
+    max-width: min(165px, 43.5vw);
+  }
+
+  .admin-mobile-preview-frame .nav-links.nav-links-carousel .nav-scroll-item {
+    font-size: calc(11pt * 0.8) !important;
+    padding: 8px 4px;
+    min-height: 44px;
+  }
+
+  .admin-mobile-preview-frame .nav-links.nav-links-carousel {
+    justify-content: flex-start;
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    gap: 14px;
+    padding: 2px 20px 6px;
+    scroll-snap-type: x proximity;
+    -webkit-overflow-scrolling: touch;
+    touch-action: pan-x;
+    cursor: grab;
+    scrollbar-width: none;
+  }
+
+  .admin-mobile-preview-frame .nav-links.nav-links-carousel.is-dragging {
+    cursor: grabbing;
+    scroll-behavior: auto;
+  }
+
+  .admin-mobile-preview-frame .nav-links.nav-links-carousel::-webkit-scrollbar {
+    display: none;
+  }
+}
+
+html[data-maroma-viewport-mobile] .page.maroma.is-mobile-layout,
+html[data-maroma-viewport-mobile] .page.maroma.is-mobile-document-flow,
+body.maroma-mobile-layout-active .page.maroma.is-mobile-layout,
+body.maroma-mobile-layout-active .page.maroma.is-mobile-document-flow {
+  width: 100%;
+  max-width: 100%;
+  overflow-x: clip;
+}
+
+.page.maroma.is-mobile-document-flow {
+  width: 100%;
+  max-width: 100%;
+  overflow-x: clip;
+  overflow-y: visible;
+  box-sizing: border-box;
+}
+
+.page.maroma.is-mobile-document-flow {
+  --mobile-header-clearance: calc(124px + var(--admin-bar-height, 0px) + var(--nav-bottom-gap));
+  min-height: 100vh;
+  height: auto;
+}
+
+.page.maroma.is-mobile-document-flow {
+  container-type: inline-size;
+  container-name: mobile-document;
+  --mobile-canvas-scale: min(1, calc(100cqw / var(--mobile-design-width, 390px)));
+}
+
+.page.maroma.is-mobile-document-flow .hero,
+.page.maroma.is-mobile-document-flow .hero.hero-mobile-layout {
+  --hero-nav-lift: var(--mobile-header-clearance);
+  --hero-bleed-bottom: 0px;
+  --hero-stage-aspect-h: 0px;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  overflow-x: clip;
+  overflow-y: visible;
+  padding-bottom: 0;
+}
+
+.page.maroma.is-mobile-document-flow .hero-artboard:not(.is-mobile-composed),
+.page.maroma.is-mobile-document-flow .hero.hero-mobile-layout .hero-artboard:not(.is-mobile-composed) {
+  position: relative !important;
+  display: block !important;
+  width: 100% !important;
+  max-width: 100% !important;
+  margin: 0 !important;
+  padding: 20px clamp(16px, 5vw, 24px) 0 !important;
+  min-height: 640px !important;
+  height: auto !important;
+  overflow-x: clip !important;
+  overflow-y: visible !important;
+  box-sizing: border-box !important;
+}
+
+.page.maroma.is-mobile-document-flow .hero-artboard.is-admin-layout:not(.is-mobile-composed),
+.page.maroma.is-mobile-document-flow .hero.hero-mobile-layout .hero-artboard.is-admin-layout:not(.is-mobile-composed) {
+  display: block !important;
+  min-height: 640px !important;
+  max-height: none !important;
+  padding: 20px clamp(16px, 5vw, 24px) 16px !important;
+}
+
+.page.maroma.is-mobile-document-flow .hero-artboard.is-mobile-composed:not(.is-admin-layout) .hero-background-layer,
+.page.maroma.is-mobile-document-flow .hero.hero-mobile-layout .hero-artboard.is-mobile-composed:not(.is-admin-layout) .hero-background-layer {
+  inset: auto !important;
+  left: var(--hero-bg-left, 0%) !important;
+  top: var(--hero-bg-top, 0%) !important;
+  width: var(--hero-bg-width, 100%) !important;
+  height: var(--hero-bg-height, 100%) !important;
+  border-radius: 0 0 20px 20px;
+  pointer-events: none !important;
+  touch-action: pan-y !important;
+}
+
+.page.maroma.is-mobile-document-flow .hero-artboard.is-mobile-composed.is-editing-background:not(.is-admin-layout) .hero-background-layer,
+.page.maroma.is-mobile-document-flow .hero.hero-mobile-layout .hero-artboard.is-mobile-composed.is-editing-background:not(.is-admin-layout) .hero-background-layer {
+  pointer-events: auto !important;
+  touch-action: none !important;
+}
+
+.page.maroma.is-mobile-document-flow .hero-artboard.is-mobile-composed:not(.is-admin-layout) > .hero-overlay-frame.hero-media-frame,
+.page.maroma.is-mobile-document-flow .hero.hero-mobile-layout .hero-artboard.is-mobile-composed:not(.is-admin-layout) > .hero-overlay-frame.hero-media-frame {
+  position: absolute !important;
+  left: var(--hero-overlay-left, 50%) !important;
+  top: var(--hero-overlay-top, 50%) !important;
+  width: var(--hero-overlay-width, 80%) !important;
+  height: var(--hero-overlay-height, 64%) !important;
+  transform: var(--hero-overlay-transform, translate(-50%, -50%)) !important;
+  overflow: visible !important;
+  max-height: none !important;
+  margin: 0 !important;
+  pointer-events: none !important;
+  touch-action: pan-y !important;
+}
+
+.page.maroma.is-mobile-document-flow .hero-artboard.is-mobile-composed:not(.is-admin-layout) > .hero-overlay-frame.hero-media-frame :is(img, video),
+.page.maroma.is-mobile-document-flow .hero.hero-mobile-layout .hero-artboard.is-mobile-composed:not(.is-admin-layout) > .hero-overlay-frame.hero-media-frame :is(img, video) {
+  pointer-events: none !important;
+  touch-action: pan-y !important;
+}
+
+.page.maroma.is-mobile-document-flow .hero-artboard.is-mobile-composed:not(.is-admin-layout):not(.is-editing-hero-media) .hero-media .hero-media-frame:not(.hero-overlay-frame),
+.page.maroma.is-mobile-document-flow .hero.hero-mobile-layout .hero-artboard.is-mobile-composed:not(.is-admin-layout):not(.is-editing-hero-media) .hero-media .hero-media-frame:not(.hero-overlay-frame) {
+  pointer-events: none !important;
+  touch-action: pan-y !important;
+}
+
+.page.maroma.is-mobile-document-flow .hero-artboard.is-mobile-composed:not(.is-admin-layout):not(.is-editing-hero-media) .hero-media .hero-media-frame:not(.hero-overlay-frame) :is(img, video),
+.page.maroma.is-mobile-document-flow .hero.hero-mobile-layout .hero-artboard.is-mobile-composed:not(.is-admin-layout):not(.is-editing-hero-media) .hero-media .hero-media-frame:not(.hero-overlay-frame) :is(img, video) {
+  pointer-events: none !important;
+  touch-action: pan-y !important;
+}
+
+.page.maroma.is-mobile-document-flow .hero-artboard.is-mobile-composed.is-editing-hero-media:not(.is-admin-layout) .hero-media .hero-media-frame.hero-media-editable,
+.page.maroma.is-mobile-document-flow .hero.hero-mobile-layout .hero-artboard.is-mobile-composed.is-editing-hero-media:not(.is-admin-layout) .hero-media .hero-media-frame.hero-media-editable {
+  pointer-events: auto !important;
+  touch-action: none !important;
+}
+
+.page.maroma.is-mobile-document-flow .hero-artboard.is-mobile-composed.is-editing-hero-media:not(.is-admin-layout) > .hero-overlay-frame.hero-media-frame.hero-media-editable,
+.page.maroma.is-mobile-document-flow .hero.hero-mobile-layout .hero-artboard.is-mobile-composed.is-editing-hero-media:not(.is-admin-layout) > .hero-overlay-frame.hero-media-frame.hero-media-editable {
+  pointer-events: auto !important;
+  touch-action: none !important;
+}
+
+.page.maroma.is-mobile-document-flow .hero-artboard.is-mobile-composed:not(.is-admin-layout),
+.page.maroma.is-mobile-document-flow.is-mobile-layout .hero.hero-mobile-layout.hero-bg .hero-artboard.is-mobile-composed:not(.is-admin-layout),
+body.admin-mobile-preview-active .page.maroma.is-mobile-document-flow .hero.hero-mobile-layout.hero-bg .hero-artboard.is-mobile-composed:not(.is-admin-layout) {
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: stretch !important;
+  justify-content: flex-start !important;
+  width: 100% !important;
+  max-width: 100% !important;
+  min-width: 0 !important;
+  margin-inline: auto !important;
+  margin-top: 0 !important;
+  padding-top: var(--mobile-header-clearance, 124px) !important;
+  height: auto !important;
+  max-height: none !important;
+  min-height: min(calc(100svh - var(--mobile-header-clearance, 124px)), 520px) !important;
+  padding-bottom: clamp(40px, 10cqw, 56px) !important;
+  overflow-x: clip !important;
+  overflow-y: visible !important;
+  box-sizing: border-box !important;
+}
+
+.page.maroma.is-mobile-document-flow.is-mobile-layout .hero-artboard.is-mobile-composed:not(.is-admin-layout) .hero-copy,
+.page.maroma.is-mobile-document-flow.is-mobile-layout .hero.hero-mobile-layout .hero-artboard.is-mobile-composed:not(.is-admin-layout) .hero-copy,
+body.admin-mobile-preview-active .page.maroma.is-mobile-document-flow .hero-artboard.is-mobile-composed:not(.is-admin-layout) .hero-copy {
+  position: relative !important;
+  left: auto !important;
+  top: auto !important;
+  width: 100% !important;
+  max-width: 100% !important;
+  min-width: 0 !important;
+  order: 1 !important;
+  flex: 0 0 auto !important;
+  align-items: center !important;
+  text-align: center !important;
+  z-index: 3 !important;
+  box-sizing: border-box !important;
+  --hero-copy-offset-y: 0px !important;
+  padding: 0 20px 8px !important;
+}
+
+.page.maroma.is-mobile-document-flow.is-mobile-layout .hero-artboard.is-mobile-composed:not(.is-admin-layout) .hero-headline,
+.page.maroma.is-mobile-document-flow.is-mobile-layout .hero-artboard.is-mobile-composed:not(.is-admin-layout) .hero-eyebrow,
+.page.maroma.is-mobile-document-flow.is-mobile-layout .hero-artboard.is-mobile-composed:not(.is-admin-layout) .hero-actions,
+.page.maroma.is-mobile-document-flow.is-mobile-layout .hero.hero-mobile-layout .hero-artboard.is-mobile-composed:not(.is-admin-layout) .hero-headline,
+.page.maroma.is-mobile-document-flow.is-mobile-layout .hero.hero-mobile-layout .hero-artboard.is-mobile-composed:not(.is-admin-layout) .hero-eyebrow,
+.page.maroma.is-mobile-document-flow.is-mobile-layout .hero.hero-mobile-layout .hero-artboard.is-mobile-composed:not(.is-admin-layout) .hero-actions,
+body.admin-mobile-preview-active .page.maroma.is-mobile-document-flow .hero-artboard.is-mobile-composed:not(.is-admin-layout) .hero-headline,
+body.admin-mobile-preview-active .page.maroma.is-mobile-document-flow .hero-artboard.is-mobile-composed:not(.is-admin-layout) .hero-eyebrow,
+body.admin-mobile-preview-active .page.maroma.is-mobile-document-flow .hero-artboard.is-mobile-composed:not(.is-admin-layout) .hero-actions {
+  opacity: 1 !important;
+  visibility: visible !important;
+}
+
+.page.maroma.is-mobile-document-flow .hero-artboard.is-mobile-composed:not(.is-admin-layout) .hero-headline,
+.page.maroma.is-mobile-document-flow .hero.hero-mobile-layout .hero-artboard.is-mobile-composed:not(.is-admin-layout) .hero-headline {
+  transform: translate(var(--hero-nudge-x, 0px), var(--hero-nudge-y, 0px)) !important;
+}
+
+.page.maroma.is-mobile-document-flow .hero-artboard.is-mobile-composed:not(.is-admin-layout) .hero-eyebrow,
+.page.maroma.is-mobile-document-flow .hero.hero-mobile-layout .hero-artboard.is-mobile-composed:not(.is-admin-layout) .hero-eyebrow {
+  transform: translate(var(--hero-eyebrow-nudge-x, 0px), var(--hero-eyebrow-nudge-y, 0px)) !important;
+}
+
+.page.maroma.is-mobile-document-flow .hero-artboard.is-mobile-composed:not(.is-admin-layout) .hero-actions,
+.page.maroma.is-mobile-document-flow .hero.hero-mobile-layout .hero-artboard.is-mobile-composed:not(.is-admin-layout) .hero-actions {
+  transform: translate(var(--hero-actions-nudge-x, 0px), var(--hero-actions-nudge-y, 0px)) !important;
+}
+
+.page.maroma.is-mobile-document-flow.is-mobile-edit-active .hero-artboard.is-mobile-composed.is-admin-layout .hero-headline,
+.page.maroma.is-mobile-document-flow.is-mobile-edit-active .hero-artboard.is-mobile-composed.is-admin-layout .hero-eyebrow,
+.page.maroma.is-mobile-document-flow.is-mobile-edit-active .hero.hero-mobile-layout .hero-artboard.is-mobile-composed.is-admin-layout .hero-headline,
+.page.maroma.is-mobile-document-flow.is-mobile-edit-active .hero.hero-mobile-layout .hero-artboard.is-mobile-composed.is-admin-layout .hero-eyebrow {
+  transform: translate(var(--hero-nudge-x, 0px), var(--hero-nudge-y, 0px)) !important;
+}
+
+.page.maroma.is-mobile-document-flow.is-mobile-edit-active .hero-artboard.is-mobile-composed.is-admin-layout .hero-actions,
+.page.maroma.is-mobile-document-flow.is-mobile-edit-active .hero.hero-mobile-layout .hero-artboard.is-mobile-composed.is-admin-layout .hero-actions {
+  transform: translate(var(--hero-actions-nudge-x, 0px), var(--hero-actions-nudge-y, 0px)) !important;
+}
+
+.page.maroma.is-mobile-document-flow.is-mobile-layout .hero-artboard.is-mobile-composed .hero-media .hero-media-frame:not(.hero-overlay-frame),
+.page.maroma.is-mobile-document-flow.is-mobile-layout .hero.hero-mobile-layout .hero-artboard.is-mobile-composed .hero-media .hero-media-frame:not(.hero-overlay-frame),
+body.admin-mobile-preview-active .page.maroma.is-mobile-document-flow .hero-artboard.is-mobile-composed .hero-media .hero-media-frame:not(.hero-overlay-frame) {
+  z-index: 1 !important;
+}
+
+.page.maroma.is-mobile-document-flow .hero-ritual-page-layer,
+.page.maroma.is-mobile-document-flow .hero-ritual-page-layer .hero-ritual-panel,
+.page.maroma.is-mobile-document-flow .scroller-loved-for-a-reason {
+  opacity: 1 !important;
+  visibility: visible !important;
+}
+
+.page.maroma.is-mobile-document-flow.is-mobile-layout .hero-artboard.is-mobile-composed:not(.is-admin-layout) .hero-media,
+.page.maroma.is-mobile-document-flow.is-mobile-layout .hero.hero-mobile-layout .hero-artboard.is-mobile-composed:not(.is-admin-layout) .hero-media,
+body.admin-mobile-preview-active .page.maroma.is-mobile-document-flow .hero-artboard.is-mobile-composed:not(.is-admin-layout) .hero-media {
+  position: relative !important;
+  inset: auto !important;
+  order: 2 !important;
+  width: 100% !important;
+  max-width: 100% !important;
+  min-width: 0 !important;
+  flex: 0 0 auto !important;
+  display: block !important;
+  min-height: min(calc(var(--hero-primary-height-pct, 62) * 0.78cqw), 300px) !important;
+  height: min(calc(var(--hero-primary-height-pct, 62) * 0.78cqw), 300px) !important;
+  padding: 0 !important;
+  overflow: visible !important;
+}
+
+.page.maroma.is-mobile-document-flow.is-mobile-layout .hero-artboard.is-mobile-composed:not(.is-admin-layout) .hero-media .hero-media-frame:not(.hero-overlay-frame),
+.page.maroma.is-mobile-document-flow.is-mobile-layout .hero.hero-mobile-layout .hero-artboard.is-mobile-composed:not(.is-admin-layout) .hero-media .hero-media-frame:not(.hero-overlay-frame),
+body.admin-mobile-preview-active .page.maroma.is-mobile-document-flow .hero-artboard.is-mobile-composed:not(.is-admin-layout) .hero-media .hero-media-frame:not(.hero-overlay-frame) {
+  position: absolute !important;
+  left: var(--hero-media-left, 50%) !important;
+  top: var(--hero-media-top, 50%) !important;
+  width: var(--hero-media-width, 78%) !important;
+  height: var(--hero-media-height, 62%) !important;
+  max-width: none !important;
+  max-height: none !important;
+  margin: 0 !important;
+  transform: var(--hero-media-transform, translate(-50%, -50%) scale(1)) !important;
+  transform-origin: center center !important;
+}
+
+.page.maroma.is-mobile-document-flow .hero-artboard.is-mobile-composed .hero-copy > div {
+  width: 100% !important;
+  max-width: 100% !important;
+  min-width: 0 !important;
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: center !important;
+  margin-inline: auto !important;
+  box-sizing: border-box !important;
+}
+
+.page.maroma.is-mobile-document-flow:not(.is-mobile-edit-active) .hero-artboard.is-mobile-composed .hero-headline,
+.page.maroma.is-mobile-document-flow:not(.is-mobile-edit-active) .hero-artboard.is-mobile-composed .hero-eyebrow,
+.page.maroma.is-mobile-document-flow:not(.is-mobile-edit-active) .hero-artboard.is-mobile-composed .hero-actions,
+.page.maroma.is-mobile-document-flow:not(.is-mobile-edit-active) .hero.hero-mobile-layout .hero-artboard.is-mobile-composed .hero-headline,
+.page.maroma.is-mobile-document-flow:not(.is-mobile-edit-active) .hero.hero-mobile-layout .hero-artboard.is-mobile-composed .hero-eyebrow,
+.page.maroma.is-mobile-document-flow:not(.is-mobile-edit-active) .hero.hero-mobile-layout .hero-artboard.is-mobile-composed .hero-actions {
+  opacity: 1 !important;
+  visibility: visible !important;
+}
+
+.page.maroma.is-mobile-document-flow.is-mobile-edit-active .hero-artboard.is-mobile-composed:not(.is-admin-layout).is-editing-eyebrow .hero-eyebrow,
+.page.maroma.is-mobile-document-flow.is-mobile-edit-active .hero.hero-mobile-layout .hero-artboard.is-mobile-composed:not(.is-admin-layout).is-editing-eyebrow .hero-eyebrow {
+  transform: translate(var(--hero-eyebrow-nudge-x, 0px), var(--hero-eyebrow-nudge-y, 0px)) !important;
+}
+
+
+.page.maroma.is-mobile-document-flow .hero-artboard.is-mobile-composed .hero-copy,
+.page.maroma.is-mobile-document-flow .hero.hero-mobile-layout .hero-artboard.is-mobile-composed .hero-copy {
+  --hero-copy-offset-y: 0px !important;
+}
+
+.page.maroma.is-mobile-document-flow .hero-artboard:not(.is-mobile-composed) .hero-copy,
+.page.maroma.is-mobile-document-flow .hero.hero-mobile-layout .hero-artboard:not(.is-mobile-composed) .hero-copy {
+  position: relative !important;
+  left: auto !important;
+  top: auto !important;
+  width: 100% !important;
+  max-width: 100% !important;
+  padding: 8px 0 4px !important;
+  align-items: center !important;
+  text-align: center !important;
+  z-index: var(--hero-z-copy, 9) !important;
+  --hero-copy-offset-y: 0px !important;
+  box-sizing: border-box !important;
+}
+
+.page.maroma.is-mobile-document-flow .hero-artboard:not(.is-mobile-composed) .hero-copy > div,
+.page.maroma.is-mobile-document-flow .hero.hero-mobile-layout .hero-artboard:not(.is-mobile-composed) .hero-copy > div {
+  width: 100% !important;
+  max-width: 100% !important;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+}
+
+.page.maroma.is-mobile-document-flow .hero.hero-bg .hero-artboard .hero-headline,
+.page.maroma.is-mobile-document-flow .hero.hero-bg .hero-artboard .hero-eyebrow {
+  color: var(--accent-dark, #2f6771) !important;
+}
+
+.page.maroma.is-mobile-document-flow .hero-artboard .hero-headline,
+.page.maroma.is-mobile-document-flow .hero.hero-mobile-layout .hero-artboard .hero-headline {
+  width: fit-content !important;
+  max-width: 92% !important;
+  font-size: var(--hero-headline-size, clamp(1.65rem, 7.2cqw, 2.15rem)) !important;
+  line-height: 1.14 !important;
+  text-align: center !important;
+  white-space: pre-line !important;
+  overflow-wrap: normal;
+  word-break: normal;
+  margin-inline: auto !important;
+  opacity: 1 !important;
+  visibility: visible !important;
+}
+
+.page.maroma.is-mobile-document-flow .hero-artboard .hero-actions {
+  width: fit-content !important;
+  max-width: 100% !important;
+}
+
+.page.maroma.is-mobile-document-flow .hero-artboard .hero-eyebrow,
+.page.maroma.is-mobile-document-flow .hero.hero-mobile-layout .hero-artboard .hero-eyebrow {
+  text-align: center !important;
+  width: 100%;
+  opacity: 1 !important;
+}
+
+.page.maroma.is-mobile-document-flow:not(.is-mobile-edit-active) .hero-artboard .hero-headline.scroll-zoom,
+.page.maroma.is-mobile-document-flow:not(.is-mobile-edit-active) .hero-artboard .hero-eyebrow.scroll-zoom,
+.page.maroma.is-mobile-document-flow:not(.is-mobile-edit-active) .hero-artboard .hero-actions.scroll-zoom,
+.page.maroma.is-mobile-document-flow:not(.is-mobile-edit-active) .hero.hero-mobile-layout .hero-artboard .scroll-zoom {
+  opacity: 1 !important;
+  transform: none !important;
+  filter: none !important;
+  transition: none !important;
+}
+
+body.admin-mobile-preview-active .admin-mobile-preview-frame .page.maroma,
+body.admin-mobile-preview-active .admin-mobile-preview-frame .hero {
+  width: 100% !important;
+  max-width: 100% !important;
+  overflow-x: clip !important;
+  box-sizing: border-box !important;
+}
+
+body.admin-mobile-preview-active .admin-mobile-preview-frame .hero-artboard {
+  width: 100% !important;
+  max-width: 100% !important;
+  overflow-x: clip !important;
+  box-sizing: border-box !important;
+}
+
+/* Saved mobile layout — absolute media layers within the artboard (admin % edit only, not composed stack) */
+.page.maroma.is-mobile-document-flow .hero-artboard:not(.is-mobile-composed) .hero-media,
+.page.maroma.is-mobile-document-flow .hero.hero-mobile-layout .hero-artboard:not(.is-mobile-composed) .hero-media {
+  position: absolute !important;
+  inset: 0 !important;
+  order: unset !important;
+  width: 100% !important;
+  height: 100% !important;
+  min-height: 100% !important;
+  flex: none !important;
+  display: block !important;
+  padding: 0 !important;
+  overflow: visible !important;
+  z-index: var(--hero-z-media, 1);
+}
+
+.page.maroma.is-mobile-document-flow .hero-artboard:not(.is-mobile-composed) .hero-media .hero-media-frame,
+.page.maroma.is-mobile-document-flow .hero.hero-mobile-layout .hero-artboard:not(.is-mobile-composed) .hero-media .hero-media-frame {
+  position: absolute !important;
+  margin: 0 !important;
+  max-height: none !important;
+  max-width: none !important;
+}
+
+/* Beat globals.css stacked-mobile overrides — apply saved % layout via custom properties (admin edit) */
+.page.maroma.is-mobile-layout.is-mobile-document-flow .hero.hero-mobile-layout .hero-artboard:not(.is-mobile-composed) .hero-media .hero-media-frame {
+  left: var(--hero-media-left, 50%) !important;
+  top: var(--hero-media-top, 50%) !important;
+  width: var(--hero-media-width, 42%) !important;
+  height: var(--hero-media-height, 42%) !important;
+  transform: var(--hero-media-transform, translate(-50%, -50%)) !important;
+}
+
+.page.maroma.is-mobile-document-flow .hero-artboard:not(.is-mobile-composed) .hero-headline {
+  transform: translate(var(--hero-nudge-x, 0px), var(--hero-nudge-y, 0px)) !important;
+}
+
+.page.maroma.is-mobile-document-flow .hero-artboard:not(.is-mobile-composed) .hero-actions {
+  transform: translate(var(--hero-actions-nudge-x, 0px), var(--hero-actions-nudge-y, 0px)) !important;
+}
+
+.page.maroma.is-mobile-document-flow .hero-artboard:not(.is-mobile-composed) .hero-actions,
+.page.maroma.is-mobile-document-flow .hero.hero-mobile-layout .hero-artboard:not(.is-mobile-composed) .hero-actions {
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 10px !important;
+  width: 100% !important;
+  max-width: 100% !important;
+  margin-top: 4px !important;
+  padding-inline: 0 !important;
+  box-sizing: border-box !important;
+}
+
+.page.maroma.is-mobile-document-flow .hero-artboard .hero-actions .button,
+.page.maroma.is-mobile-document-flow .hero.hero-mobile-layout .hero-artboard .hero-actions .button {
+  width: min(100%, 268px) !important;
+  max-width: 100% !important;
+  white-space: normal !important;
+  text-align: center !important;
+  padding: 12px 18px !important;
+  font-size: 0.7rem !important;
+}
+
+.page.maroma.is-mobile-document-flow .hero-ritual-page-layer.is-mobile-ritual-stack {
+  display: grid !important;
+  grid-template-columns: minmax(0, 1fr) !important;
+  grid-template-rows: auto !important;
+  align-items: start !important;
+  justify-items: stretch !important;
+  position: relative !important;
+  top: auto !important;
+  left: 0 !important;
+  width: 100% !important;
+  max-width: 100% !important;
+  min-width: 0 !important;
+  height: auto !important;
+  margin: calc(-1 * clamp(24px, calc(var(--mobile-design-width, 390px) * 0.06), 48px)) 0 0 !important;
+  padding: 0 !important;
+  overflow: visible !important;
+  pointer-events: none !important;
+  box-sizing: border-box !important;
+  z-index: var(--page-layer-z-rituals, 20) !important;
+  isolation: isolate !important;
+}
+
+.page.maroma.is-mobile-document-flow .hero-ritual-page-layer.is-mobile-ritual-stack .hero-ritual-panel.is-mobile-stack-panel {
+  position: relative !important;
+  display: flex !important;
+  justify-content: center !important;
+  width: 100% !important;
+  transform: scale(var(--mobile-canvas-scale, 1)) !important;
+  transform-origin: center top !important;
+}
+
+.page.maroma.is-mobile-document-flow .hero-ritual-page-layer.is-mobile-ritual-stack .hero-ritual-panel.is-mobile-stack-panel > .hero-ritual-row-sync {
+  display: grid !important;
+  grid-template-columns: minmax(0, 1fr) !important;
+  grid-template-rows: auto !important;
+  align-items: center !important;
+  justify-items: center !important;
+  width: var(--mobile-design-width, 390px) !important;
+  max-width: none !important;
+  height: fit-content !important;
+  min-height: 0 !important;
+  overflow: visible !important;
+  --ritual-card-size: var(--mobile-ritual-card-px, 35px);
+  transform-origin: center center !important;
+}
+
+.page.maroma.is-mobile-document-flow .hero-ritual-page-layer.is-mobile-ritual-stack .hero-ritual-row-sync > .hero-ritual-band.is-mobile-flow-band {
+  grid-area: 1 / 1 !important;
+  position: relative !important;
+  left: auto !important;
+  top: auto !important;
+  width: calc(var(--ritual-band-width-px) * var(--ritual-band-size-mult, 1)) !important;
+  height: calc(var(--ritual-band-height-px) * var(--ritual-band-size-mult, 1)) !important;
+  min-height: 0 !important;
+  max-width: none !important;
+  margin: 0 !important;
+  box-sizing: border-box !important;
+  transform: translate(var(--ritual-band-x-shift-px, 0px), var(--ritual-band-y-px, 0px)) !important;
+  transform-origin: center center !important;
+  pointer-events: none !important;
+  z-index: 0 !important;
+}
+
+.page.maroma.is-mobile-document-flow .hero-ritual-page-layer.is-mobile-ritual-stack .hero-ritual-row-sync > .ritual-face-teaser {
+  grid-area: 1 / 1 !important;
+  position: relative !important;
+  z-index: 1 !important;
+  width: 100% !important;
+  max-width: 100% !important;
+  transform-origin: center center !important;
+}
+
+.page.maroma.is-mobile-document-flow .hero-ritual-page-layer.is-mobile-ritual-stack.is-editing-ritual-band .hero-ritual-row-sync > .hero-ritual-band.is-mobile-flow-band.is-ritual-band-admin-edit {
+  pointer-events: auto !important;
+  touch-action: none !important;
+  z-index: 1 !important;
+}
+
+.page.maroma.is-mobile-document-flow .hero-ritual-page-layer.is-mobile-ritual-stack.is-editing-ritual-band .hero-ritual-panel {
+  pointer-events: none !important;
+  z-index: 2 !important;
+}
+
+.page.maroma.is-mobile-document-flow .hero-ritual-page-layer.is-mobile-ritual-stack .hero-ritual-panel:not(.is-mobile-stack-panel) {
+  grid-area: 1 / 1 !important;
+  position: relative !important;
+  z-index: 2 !important;
+  width: 100% !important;
+  max-width: 100% !important;
+  pointer-events: auto !important;
+  transform: translateY(var(--hero-ritual-lift, 0px)) scale(var(--hero-ritual-scale, 1)) !important;
+  transform-origin: center top !important;
+}
+
+.page.maroma.is-mobile-document-flow .hero-ritual-page-layer.is-ritual-edit-overlay {
+  position: absolute !important;
+  left: 0 !important;
+  width: 100% !important;
+  max-width: 100% !important;
+  min-width: 0 !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  overflow: visible !important;
+  pointer-events: none !important;
+  box-sizing: border-box !important;
+  z-index: var(--page-layer-z-rituals, 20) !important;
+}
+
+.page.maroma.is-mobile-document-flow .hero-ritual-page-layer.is-ritual-edit-overlay .hero-ritual-panel.is-ritual-live-positioned {
+  pointer-events: auto !important;
+}
+
+.page.maroma.is-mobile-document-flow .hero-ritual-page-layer:not(.is-mobile-ritual-stack):not(.is-ritual-edit-overlay) {
+  position: relative !important;
+  top: auto !important;
+  left: 0 !important;
+  width: 100% !important;
+  max-width: 100% !important;
+  min-width: 0 !important;
+  height: auto !important;
+  min-height: 140px !important;
+  margin: 8px 0 0 !important;
+  padding: 0 !important;
+  overflow: visible !important;
+  pointer-events: auto !important;
+  box-sizing: border-box !important;
+  z-index: var(--page-layer-z-rituals, 20) !important;
+}
+
+.page.maroma.is-mobile-document-flow .hero-ritual-page-layer:not(.is-mobile-ritual-stack) .hero-ritual-panel:not(.is-ritual-live-positioned),
+.page.maroma.is-mobile-document-flow .hero-ritual-page-layer:not(.is-mobile-ritual-stack) .hero-ritual-panel.is-artboard-positioned:not(.is-ritual-live-positioned),
+body.admin-mobile-preview-active .page.maroma.is-mobile-document-flow .hero-ritual-page-layer:not(.is-mobile-ritual-stack) .hero-ritual-panel:not(.is-ritual-live-positioned),
+body.admin-mobile-preview-active .page.maroma.is-mobile-document-flow .hero-ritual-page-layer:not(.is-mobile-ritual-stack) .hero-ritual-panel.is-artboard-positioned:not(.is-ritual-live-positioned) {
+  position: relative !important;
+  left: auto !important;
+  top: auto !important;
+  transform: none !important;
+  width: 100% !important;
+  max-width: 100% !important;
+  margin: 0 auto !important;
+  padding: 6px 0 8px !important;
+  box-sizing: border-box !important;
+}
+
+.page.maroma.is-mobile-document-flow .hero-ritual-page-layer .hero-ritual-panel.is-ritual-live-positioned {
+  position: absolute !important;
+  left: calc(var(--hero-ritual-x-pct, 50) * 1%) !important;
+  top: calc(var(--hero-ritual-y-pct, 88) * 1%) !important;
+  transform: translateX(-50%) translateY(var(--hero-ritual-lift, 0px)) scale(var(--hero-ritual-scale, 1)) !important;
+  transform-origin: center top !important;
+  width: min(96%, 100%) !important;
+  max-width: 100% !important;
+  margin: 0 !important;
+  padding: 0 clamp(12px, 4vw, 20px) 8px !important;
+  box-sizing: border-box !important;
+  pointer-events: auto !important;
+  z-index: var(--hero-z-rituals, 3) !important;
+}
+
+.page.maroma.is-mobile-document-flow :is(.hero, .hero-ritual-page-layer) .hero-ritual-panel .ritual-face-teaser-inner {
+  width: 100% !important;
+  max-width: 100% !important;
+  margin-inline: auto;
+  padding-inline: 0 !important;
+  box-sizing: border-box !important;
+}
+
+.page.maroma.is-mobile-document-flow .hero-ritual-page-layer.is-mobile-ritual-stack .hero-ritual-panel.is-mobile-stack-panel .ritual-face-triple-stage,
+.page.maroma.is-mobile-document-flow .hero-ritual-page-layer.is-mobile-ritual-stack .hero-ritual-panel .ritual-face-triple-stage,
+.page.maroma.is-mobile-document-flow .hero-ritual-panel.is-mobile-stack-panel .ritual-face-triple-stage {
+  --ritual-card-size: var(--mobile-ritual-card-px, 35px) !important;
+  --ritual-card-min: 32px;
+  --ritual-card-max: 99px;
+  --ritual-gap: 5px;
+  --ritual-zoom-room: 0px !important;
+  width: 100% !important;
+  max-width: 100% !important;
+  min-height: 0 !important;
+  height: auto !important;
+  padding: 0 !important;
+  margin-inline: 0 !important;
+  overflow: visible !important;
+  justify-content: center !important;
+}
+
+.page.maroma.is-mobile-document-flow .hero-ritual-page-layer.is-mobile-ritual-stack .hero-ritual-panel.is-mobile-stack-panel .ritual-face-tile {
+  min-height: 0 !important;
+  height: auto !important;
+}
+
+.page.maroma.is-mobile-document-flow .hero-ritual-page-layer.is-mobile-ritual-stack .hero-ritual-panel .ritual-face-track-wrap {
+  display: flex !important;
+  justify-content: center !important;
+  overflow-x: clip !important;
+  overflow-y: visible !important;
+  width: 100% !important;
+}
+
+.page.maroma.is-mobile-document-flow .hero-ritual-page-layer.is-mobile-ritual-stack .hero-ritual-panel .ritual-face-compact {
+  opacity: 1 !important;
+  visibility: visible !important;
+}
+
+.page.maroma.is-mobile-document-flow :is(.hero, .hero-ritual-page-layer) .hero-ritual-panel .ritual-face-caption {
+  display: none !important;
+  height: 0 !important;
+  min-height: 0 !important;
+  margin: 0 !important;
+  overflow: hidden !important;
+  visibility: hidden !important;
+}
+
+.page.maroma.is-mobile-document-flow .hero-ritual-page-layer.is-mobile-ritual-stack .ritual-face-frame {
+  border-radius: 5px !important;
+}
+
+.page.maroma.is-mobile-document-flow .hero-ritual-page-layer.is-mobile-ritual-stack .ritual-face-spotlight .ritual-face-frame {
+  border-radius: 6px !important;
+}
+
+.page.maroma.is-mobile-document-flow :is(.hero, .hero-ritual-page-layer) .hero-ritual-panel:not(.is-mobile-stack-panel) .ritual-face-triple-stage {
+  --ritual-card-size: var(--mobile-ritual-card-px, 35px);
+  --ritual-card-min: 32px;
+  --ritual-card-max: 99px;
+  --ritual-gap: 5px;
+  --ritual-zoom-room: 0px !important;
+  width: 100% !important;
+  max-width: 100% !important;
+  padding-inline: 0 !important;
+  margin-inline: 0 !important;
+  justify-content: center !important;
+}
+
+.page.maroma.is-mobile-document-flow .scroller-loved-for-a-reason {
+  --loved-mobile-card-width: min(94cqw, 684px);
+  position: relative !important;
+  width: 100% !important;
+  max-width: 100% !important;
+  margin-top: calc(-48px + var(--loved-divider-offset-y, 0px)) !important;
+  margin-bottom: 0 !important;
+  padding-top: 28px !important;
+  padding-bottom: 0 !important;
+  overflow-x: clip !important;
+  overflow-y: visible !important;
+  container-type: inline-size;
+}
+
+.page.maroma.is-mobile-document-flow .scroller-section.scroller-loved-for-a-reason {
+  margin-top: calc(-48px + var(--loved-divider-offset-y, 0px)) !important;
+}
+
+.page.maroma.is-mobile-document-flow .scroller-loved-for-a-reason::before {
+  top: 0 !important;
+  left: 0 !important;
+  right: 0 !important;
+  bottom: auto !important;
+  height: min(320px, 52%) !important;
+  max-height: 320px !important;
+  inset: unset !important;
+}
+
+.page.maroma.is-mobile-document-flow .scroller-loved-for-a-reason .loved-veil-wash,
+.page.maroma.is-mobile-document-flow .scroller-loved-for-a-reason .loved-veil-band {
+  top: 0 !important;
+  bottom: auto !important;
+  height: min(320px, 52%) !important;
+  max-height: 320px !important;
+}
+
+.page.maroma.is-mobile-document-flow .scroller-loved-for-a-reason .scroller-header {
+  text-align: center !important;
+  padding-inline: 16px !important;
+  margin-top: 0 !important;
+  margin-bottom: 20px !important;
+  width: 100% !important;
+  max-width: 100% !important;
+  box-sizing: border-box !important;
+}
+
+.page.maroma.is-mobile-document-flow .scroller-loved-for-a-reason .scroller-title {
+  font-size: clamp(1.875rem, 8.25vw, 2.8125rem) !important;
+  line-height: 1.1 !important;
+}
+
+.page.maroma.is-mobile-document-flow .scroller-loved-for-a-reason .scroller-subtitle-loved {
+  font-size: clamp(0.63rem, 2.52vw, 0.84rem) !important;
+  line-height: 1.35 !important;
+}
+
+.page.maroma.is-mobile-document-flow .scroller-loved-for-a-reason .loved-scroll-invite {
+  margin-bottom: 8px !important;
+}
+
+.page.maroma.is-mobile-document-flow .scroller-loved-for-a-reason .carousel-fade-wrapper,
+.page.maroma.is-mobile-document-flow .scroller-loved-for-a-reason .scroller-viewport-container,
+.page.maroma.is-mobile-document-flow .scroller-loved-for-a-reason .scroller-viewport {
+  width: 100% !important;
+  max-width: 100% !important;
+  box-sizing: border-box !important;
+  margin-bottom: 0 !important;
+}
+
+.page.maroma.is-mobile-document-flow .scroller-loved-for-a-reason .scroller-viewport {
+  padding: 0 0 4px !important;
+}
+
+.page.maroma.is-mobile-document-flow .scroller-loved-for-a-reason .scroller-card {
+  width: var(--loved-mobile-card-width) !important;
+  max-width: var(--loved-mobile-card-width) !important;
+}
+
+.page.maroma.is-mobile-document-flow .scroller-loved-for-a-reason .scroller-card-media {
+  aspect-ratio: 1 / 1.12 !important;
+  border-radius: 20px !important;
+}
+
+.page.maroma.is-mobile-document-flow .scroller-loved-for-a-reason .scroller-card-label {
+  font-size: clamp(1.75rem, 6.5vw, 2.35rem) !important;
+  line-height: 1.15 !important;
+  margin-top: 10px !important;
+}
+
+.page.maroma.is-mobile-document-flow .scroller-loved-for-a-reason .scroller-card-desc {
+  font-size: clamp(1.05rem, 3.8vw, 1.35rem) !important;
+  line-height: 1.45 !important;
+  margin-top: 8px !important;
+  -webkit-line-clamp: 4 !important;
+}
+
+.page.maroma.is-mobile-document-flow .scroller-loved-for-a-reason .scroller-track {
+  gap: 20px !important;
+  padding-inline: max(16px, calc((100cqi - var(--loved-mobile-card-width)) / 2)) !important;
+  scroll-padding-inline: max(16px, calc((100cqi - var(--loved-mobile-card-width)) / 2)) !important;
+  min-width: 100% !important;
+  box-sizing: border-box !important;
+  padding-bottom: 0 !important;
+}
+
+.page.maroma.is-mobile-layout .instagram-section,
+.page.maroma.is-mobile-document-flow .instagram-section {
+  width: 100%;
+  max-width: 100%;
+  min-height: 320px;
+  isolation: isolate;
+}
+
+.page.maroma.is-mobile-layout .instagram-section .scroll-zoom,
+.page.maroma.is-mobile-layout .scrolling-ticker-section .scroll-zoom,
+.page.maroma.is-mobile-layout .product-database .scroll-zoom,
+.page.maroma.is-mobile-document-flow .scroll-zoom {
+  opacity: 1 !important;
+  transform: none !important;
+  filter: none !important;
+  transition: none !important;
+}
+
+.page.maroma.is-mobile-layout .ticker-top-banner img,
+.page.maroma.is-mobile-document-flow .ticker-top-banner img {
+  width: 100%;
+  max-width: 100%;
+  height: auto;
+  display: block;
+}
+
+@container admin-mobile-preview (max-width: 900px) {
+  .admin-mobile-preview-frame {
+    overflow-x: hidden !important;
+    overflow-y: auto !important;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .admin-mobile-preview-frame .page.maroma.is-mobile-document-flow {
+    width: 100%;
+    max-width: 100%;
+    overflow-x: clip;
+    overflow-y: visible;
+    min-height: 100%;
+    padding-top: 0;
+  }
+
+  .admin-mobile-preview-frame .page.maroma.is-mobile-document-flow .hero-artboard.is-mobile-composed:not(.is-admin-layout) {
+    min-height: min(calc(100cqh - var(--mobile-header-clearance, 124px)), 520px) !important;
+    padding-bottom: clamp(40px, 10cqw, 56px) !important;
+  }
+
+  .admin-mobile-preview-frame .page.maroma.is-mobile-document-flow .hero-ritual-page-layer.is-mobile-ritual-stack {
+    width: 100% !important;
+    max-width: 100% !important;
+    left: 0 !important;
+    margin-left: 0 !important;
+  }
+
+  /* Manual mobile edit — do not apply consumer auto-stack */
+  .admin-mobile-preview-frame .page.maroma.is-admin-mobile-preview:not(.is-mobile-document-flow) {
+    padding-top: 0;
+  }
+}
+
+@media (max-width: 900px), ((hover: none) and (pointer: coarse)) {
+  .page.maroma {
+    width: 100%;
+    max-width: 100%;
+    overflow-x: clip;
+    overflow-y: visible;
+    min-height: 0;
+  }
+
+  /* Artboard negative margin + padding handles fixed header — avoid double clearance on phones */
+  .page.maroma.is-mobile-document-flow {
+    padding-top: 0;
+  }
+
+  .page.maroma.is-mobile-layout .scroller-section.scroller-loved-for-a-reason,
+  .page.maroma.is-mobile-document-flow .scroller-section.scroller-loved-for-a-reason,
+  .page.maroma.is-mobile-document-flow .scroller-loved-for-a-reason {
+    margin-top: calc(-48px + var(--loved-divider-offset-y, 0px)) !important;
+  }
+
+  .floating-admin-toggle.is-mobile-controls {
+    top: auto !important;
+    bottom: 16px !important;
+    right: 12px !important;
+    max-width: calc(100vw - 24px);
+  }
+
+  /* Pull shop database over the ethics ticker — mobile homepage only */
+  .page.maroma.is-mobile-layout .product-database,
+  .page.maroma.is-mobile-document-flow .product-database {
+    margin-top: calc(-1 * var(--mobile-ethics-ticker-height, 34px));
+    position: relative;
+    z-index: 2;
+    background: var(--maroma-site-bg);
+  }
+
+  .page.maroma.is-mobile-layout .scrolling-ticker-section,
+  .page.maroma.is-mobile-document-flow .scrolling-ticker-section {
+    pointer-events: none;
+  }
+}
+
+@container admin-mobile-preview (max-width: 900px) {
+  .admin-mobile-preview-frame .product-database {
+    margin-top: calc(-1 * var(--mobile-ethics-ticker-height, 34px));
+    position: relative;
+    z-index: 2;
+    background: var(--maroma-site-bg);
+  }
+
+  .admin-mobile-preview-frame .scrolling-ticker-section {
+    pointer-events: none;
+  }
+}
+
+/*
+ * Desktop/tablet composition bridge (700px–1099px).
+ * Fixes hero ribbon + "Loved for a reason" overlap on window resize.
+ * Scoped to non-mobile pages only — phones keep is-mobile-document-flow untouched.
+ * Revert: delete this block or `git checkout -- app/home-responsive.css`
+ */
+@media (min-width: 700px) and (max-width: 1099px) {
+  .page.maroma:not(.is-mobile-layout):not(.is-mobile-document-flow) .hero-ritual-page-layer {
+    position: relative !important;
+    top: auto !important;
+    left: auto !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    height: auto !important;
+    min-height: 0 !important;
+    margin: clamp(16px, 2.5vw, 28px) 0 0 !important;
+    margin-left: 0 !important;
+    padding: clamp(24px, 4vw, 40px) clamp(16px, 3vw, 32px) !important;
+    background: rgba(214, 221, 213, 0.42);
+    box-sizing: border-box;
+    pointer-events: auto !important;
+    overflow: visible !important;
+    z-index: var(--page-layer-z-rituals, 20) !important;
+  }
+
+  .page.maroma:not(.is-mobile-layout):not(.is-mobile-document-flow) .hero-ritual-page-layer .hero-ritual-panel,
+  .page.maroma:not(.is-mobile-layout):not(.is-mobile-document-flow)
+    .hero-ritual-page-layer
+    .hero-ritual-panel.is-ritual-live-positioned,
+  .page.maroma:not(.is-mobile-layout):not(.is-mobile-document-flow)
+    .hero-ritual-page-layer
+    .hero-ritual-panel.is-artboard-positioned {
+    position: relative !important;
+    left: auto !important;
+    top: auto !important;
+    transform: none !important;
+    width: 100% !important;
+    max-width: min(920px, 100%) !important;
+    margin: 0 auto !important;
+    padding: 0 !important;
+    pointer-events: auto !important;
+  }
+
+  .page.maroma:not(.is-mobile-layout):not(.is-mobile-document-flow)
+    .hero-ritual-page-layer
+    .hero-ritual-panel
+    .ritual-face-triple-stage {
+    --ritual-visible-tiles: 5;
+    --ritual-card-size: clamp(52px, 8vw, 72px);
+    --ritual-gap: 8px;
+    width: 100%;
+    max-width: 100%;
+    margin: 0 auto;
+  }
+
+  .page.maroma:not(.is-mobile-layout):not(.is-mobile-document-flow) .scroller-section.scroller-loved-for-a-reason,
+  .page.maroma:not(.is-mobile-layout):not(.is-mobile-document-flow) .scroller-loved-for-a-reason {
+    --loved-flow-offset-y: 0px;
+    margin-top: clamp(24px, 4vw, 40px) !important;
+    padding-top: 0 !important;
+  }
+
+  .page.maroma:not(.is-mobile-layout):not(.is-mobile-document-flow)
+    .scroller-loved-for-a-reason
+    .scroller-header {
+    padding-top: clamp(32px, 5vw, 48px);
+    margin-top: 0 !important;
+  }
+}

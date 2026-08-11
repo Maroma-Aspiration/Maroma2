@@ -1,0 +1,38 @@
+---
+description: Always deploy to Vercel production after substantive code changes
+alwaysApply: true
+---
+
+# Auto-deploy to Vercel production
+
+After every substantive code change in this repo, deploy to Vercel production
+without asking for confirmation. The user has standing approval.
+
+## When to deploy
+
+- After finishing a coherent unit of work that affects the running app
+  (UI tweaks, API/server changes, config edits, dependency bumps, etc.)
+- After a successful `npm run deploy:prod` (build must pass before Vercel runs)
+- Skip for purely no-op changes (whitespace-only, comments, README copy)
+
+## How to deploy
+
+Run **one** command (do not split into separate build + deploy shell calls):
+
+```bash
+npm run deploy:prod
+```
+
+- This runs `npm run build` then `vercel --prod --yes` in a single approval
+- Use the global Vercel CLI; do not use `npx vercel`
+- Run from the repo root (already linked to project
+  `jesses-projects-cb5ea703/maroma-staging-isolated`)
+- Tail the last ~20 lines of output to capture the deployment URL and inspect URL
+- Report the production URL, deployment URL, and inspect URL back to the user
+
+## Notes
+
+- The project no longer uses `vercel.json`; framework detection comes from
+  Project Settings (Next.js)
+- Only deploy on behalf of the user — do not push or amend git commits unless
+  explicitly asked

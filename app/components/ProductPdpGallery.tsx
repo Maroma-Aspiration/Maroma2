@@ -27,6 +27,9 @@ export function ProductPdpGallery({ images, productName }: Props) {
 
   return (
     <div className="product-pdp-gallery" aria-label="Product gallery">
+      <div className="product-pdp-main-visual">
+        <img src={main} alt={decodedName} />
+      </div>
       {list.length > 1 ? (
         <div className="product-pdp-thumbs" role="tablist" aria-label="Gallery thumbnails">
           {list.map((src, index) => (
@@ -43,9 +46,6 @@ export function ProductPdpGallery({ images, productName }: Props) {
           ))}
         </div>
       ) : null}
-      <div className="product-pdp-main-visual">
-        <img src={main} alt={decodedName} />
-      </div>
     </div>
   );
 }

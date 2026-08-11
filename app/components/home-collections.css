@@ -1,0 +1,217 @@
+/* Shared: collection tile styling (desktop + mobile). */
+.home-collections-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: clamp(14px, 2vw, 22px);
+  padding-inline: clamp(12px, 3vw, 28px);
+}
+
+.home-collection-card {
+  display: flex;
+  flex-direction: column;
+  text-decoration: none;
+  color: inherit;
+  border-radius: 16px;
+  overflow: hidden;
+  background: rgba(255, 255, 255, 0.72);
+  border: 1px solid rgba(19, 74, 87, 0.1);
+  box-shadow: 0 10px 28px rgba(19, 74, 87, 0.08);
+  transition: transform 0.18s ease, box-shadow 0.18s ease;
+}
+
+.home-collection-card:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 16px 36px rgba(19, 74, 87, 0.12);
+}
+
+.home-collection-card-media {
+  position: relative;
+  aspect-ratio: 4 / 3;
+  background-color: #f2eee8;
+  background-size: cover;
+  background-position: center;
+}
+
+.home-collection-card-veil {
+  position: absolute;
+  inset: 0;
+  background:
+    linear-gradient(135deg, rgba(15, 35, 40, 0.52) 0%, rgba(15, 35, 40, 0.08) 42%, rgba(15, 35, 40, 0.02) 100%),
+    linear-gradient(180deg, rgba(15, 35, 40, 0.02) 35%, rgba(15, 35, 40, 0.42) 100%);
+  pointer-events: none;
+}
+
+.home-collection-card-title {
+  position: absolute;
+  top: clamp(14px, 2.2vw, 22px);
+  left: clamp(14px, 2.2vw, 22px);
+  z-index: 1;
+  margin: 0;
+  max-width: calc(100% - 28px);
+  font-family: var(--font-serif), "Cormorant Garamond", Georgia, serif;
+  font-size: clamp(1.55rem, 2.8vw, 2.35rem);
+  font-weight: 500;
+  line-height: 1.05;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #f8f6f1;
+  text-shadow: 0 2px 18px rgba(8, 24, 28, 0.45);
+}
+
+.home-collection-card-body {
+  padding: 12px 16px 14px;
+}
+
+.home-collection-card-desc {
+  margin: 6px 0 0;
+  font-size: 0.82rem;
+  line-height: 1.45;
+  color: var(--soft-ink);
+}
+
+.home-collections-subtitle {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15em;
+}
+
+@media (max-width: 960px) {
+  .home-collections-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 560px) {
+  .home-collections-grid {
+    grid-template-columns: 1fr;
+    padding-inline: 16px;
+  }
+
+  .home-collection-card-media {
+    aspect-ratio: 16 / 10;
+  }
+}
+
+.page.maroma.is-mobile-document-flow .home-collections-grid,
+.page.maroma.is-mobile-layout .home-collections-grid {
+  padding-inline: 16px;
+}
+
+.page.maroma.is-mobile-document-flow .home-collection-card-title,
+.page.maroma.is-mobile-layout .home-collection-card-title {
+  left: 0;
+  right: 0;
+  width: auto;
+  max-width: none;
+  padding-inline: 14px;
+  text-align: center;
+  font-family: var(--font-sans), "Montserrat", "Helvetica", sans-serif;
+  font-size: calc(0.78rem * 1.75);
+  font-weight: 500;
+  letter-spacing: 0.12em;
+}
+
+/* Desktop only: title + tiles, no floral band, stable position below hero overlap. */
+.page.maroma:not(.is-mobile-layout):not(.is-mobile-document-flow)
+  .scroller-section.scroller-loved-for-a-reason.home-collections-section {
+  position: relative;
+  z-index: var(--page-layer-z-loved, 10) !important;
+  isolation: isolate;
+  overflow: visible !important;
+  padding: clamp(20px, 3vw, 32px) 0 clamp(24px, 4vw, 40px) !important;
+  margin-top: calc(clamp(24px, 4vw, 40px) - 5.7cm) !important;
+}
+
+.page.maroma:not(.is-mobile-layout):not(.is-mobile-document-flow)
+  .home-collections-section .scroll-zoom {
+  opacity: 1 !important;
+  transform: none !important;
+  filter: none !important;
+  visibility: visible !important;
+}
+
+.page.maroma:not(.is-mobile-layout):not(.is-mobile-document-flow) .home-collections-hero {
+  position: relative;
+  z-index: 3;
+  display: block;
+  height: auto;
+  margin-bottom: 3mm;
+  overflow: visible;
+  background: none;
+  pointer-events: none;
+}
+
+.page.maroma:not(.is-mobile-layout):not(.is-mobile-document-flow)
+  .home-collections-section.scroller-loved-for-a-reason .home-collections-header {
+  position: static;
+  z-index: 1;
+  margin: 0 !important;
+  padding-inline: clamp(16px, 4vw, 6vw);
+  width: 100%;
+  box-sizing: border-box;
+  pointer-events: none;
+  text-align: center;
+}
+
+.page.maroma:not(.is-mobile-layout):not(.is-mobile-document-flow)
+  .scroller-section.scroller-loved-for-a-reason.home-collections-section::before,
+.page.maroma:not(.is-mobile-layout):not(.is-mobile-document-flow)
+  .scroller-section.scroller-loved-for-a-reason.home-collections-section .loved-veil-wash,
+.page.maroma:not(.is-mobile-layout):not(.is-mobile-document-flow)
+  .scroller-section.scroller-loved-for-a-reason.home-collections-section .loved-veil-band {
+  display: none !important;
+}
+
+.page.maroma:not(.is-mobile-layout):not(.is-mobile-document-flow)
+  .home-collections-section .home-collections-header .scroller-title {
+  margin-top: 0;
+  color: var(--ink, #134a57);
+  opacity: 1 !important;
+  transform: none !important;
+  filter: none !important;
+  visibility: visible !important;
+}
+
+.page.maroma:not(.is-mobile-layout):not(.is-mobile-document-flow)
+  .home-collections-section.scroller-loved-for-a-reason .home-collections-grid {
+  position: relative;
+  z-index: 1;
+  margin-top: 0;
+  pointer-events: auto;
+}
+
+/* Hero CTAs stay above the collections band; don't raise all of hero-copy. */
+.page.maroma:not(.is-mobile-layout):not(.is-mobile-document-flow) .hero-bg .hero-artboard .hero-actions {
+  position: relative;
+  z-index: 20;
+  pointer-events: auto;
+}
+
+/* Mobile: no heading, tiles 1mm below ritual carousel. */
+.page.maroma.is-mobile-document-flow .scroller-section.scroller-loved-for-a-reason.home-collections-section,
+.page.maroma.is-mobile-layout .scroller-section.scroller-loved-for-a-reason.home-collections-section {
+  margin-top: calc(5mm - 3.25cm) !important;
+  padding-top: 0 !important;
+  padding-bottom: 0 !important;
+}
+
+.page.maroma.is-mobile-document-flow .scroller-section.scroller-loved-for-a-reason.home-collections-section::before,
+.page.maroma.is-mobile-layout .scroller-section.scroller-loved-for-a-reason.home-collections-section::before,
+.page.maroma.is-mobile-document-flow .scroller-section.scroller-loved-for-a-reason.home-collections-section .loved-veil-wash,
+.page.maroma.is-mobile-layout .scroller-section.scroller-loved-for-a-reason.home-collections-section .loved-veil-wash,
+.page.maroma.is-mobile-document-flow .scroller-section.scroller-loved-for-a-reason.home-collections-section .loved-veil-band,
+.page.maroma.is-mobile-layout .scroller-section.scroller-loved-for-a-reason.home-collections-section .loved-veil-band {
+  display: none !important;
+}
+
+.page.maroma.is-mobile-document-flow .home-collections-hero,
+.page.maroma.is-mobile-layout .home-collections-hero {
+  display: none;
+}
+
+.page.maroma.is-mobile-document-flow .home-collections-section .home-collections-header,
+.page.maroma.is-mobile-layout .home-collections-section .home-collections-header {
+  position: static;
+  margin: 0 !important;
+  padding-inline: 16px;
+}

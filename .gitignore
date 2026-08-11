@@ -9,3 +9,8 @@ yarn-debug.log*
 yarn-error.log*
 .DS_Store
 .vercel
+.env*.local
+.env.vercel.*
+data/commerce-carts.json
+data/commerce-stock.json
+data/product-catalog-edits.json

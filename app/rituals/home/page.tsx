@@ -2,8 +2,6 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
-import { siteContent } from "../../content";
-import { SiteHeader } from "../../components/SiteHeader";
 
 export default function HomeRitualPage() {
   const [isVisible, setIsVisible] = useState(false);
@@ -34,8 +32,6 @@ export default function HomeRitualPage() {
 
   return (
     <div className="rituals-page-container">
-      <SiteHeader initialNav={{ brand: siteContent.brand, nav: siteContent.nav }} />
-      
       <main className={`rituals-content ${isVisible ? "is-visible" : ""}`}>
         <header className="rituals-hero">
           <span className="rituals-eyebrow">The Art of Wellbeing</span>

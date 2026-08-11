@@ -32,8 +32,17 @@ export const parseSiteContent = (value: unknown): SiteContent | null => {
 
 export const mergeWithDefaults = (value: unknown): SiteContent => {
   const parsed = parseSiteContent(value);
-  if (!parsed) {
-    return structuredClone(siteContent);
+  const base = parsed ? structuredClone(parsed) : structuredClone(siteContent);
+  const storedSrc = base.hero.video.src?.trim() ?? "";
+  const legacyDesktopSrc = "https://youtu.be/S_uYmuKyMRg";
+  if (!storedSrc || storedSrc === legacyDesktopSrc) {
+    base.hero.video.src = siteContent.hero.video.src;
+    if (!base.hero.video.poster?.trim()) {
+      base.hero.video.poster = siteContent.hero.video.poster;
+    }
   }
-  return parsed;
+  if (!base.hero.video.mobileSrc?.trim() && siteContent.hero.video.mobileSrc) {
+    base.hero.video.mobileSrc = siteContent.hero.video.mobileSrc;
+  }
+  return base;
 };

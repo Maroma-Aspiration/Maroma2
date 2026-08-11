@@ -1,15 +1,23 @@
-import { readHeroVisualState } from "../lib/hero-media-layout-state";
+import { headers } from "next/headers";
+import { readPersistedHeroVisualState } from "../lib/hero-media-layout-state";
+import { isMaromaMobileUserAgent } from "../lib/mobile-viewport";
 import { readSiteContentFromDisk } from "../lib/read-site-content";
 import HomePageClient from "./home-page-client";
 
 export const dynamic = "force-dynamic";
 
 export default async function Home() {
+  const ua = (await headers()).get("user-agent") ?? "";
+  const initialViewportIsMobile = isMaromaMobileUserAgent(ua);
   const [initialHeroVisual, initialSiteContent] = await Promise.all([
-    readHeroVisualState(),
+    readPersistedHeroVisualState(),
     readSiteContentFromDisk()
   ]);
   return (
-    <HomePageClient initialHeroVisual={initialHeroVisual} initialSiteContent={initialSiteContent} />
+    <HomePageClient
+      initialHeroVisual={initialHeroVisual}
+      initialSiteContent={initialSiteContent}
+      initialViewportIsMobile={initialViewportIsMobile}
+    />
   );
 }

@@ -4,7 +4,7 @@ import { unsubscribeFromSignedToken } from "../../../lib/newsletter-audience-sto
 export const dynamic = "force-dynamic";
 
 export const metadata = {
-  title: "Unsubscribe — Maroma Newsletter"
+  title: "Unsubscribe | Maroma Newsletter"
 };
 
 export default async function NewsletterUnsubscribePage({

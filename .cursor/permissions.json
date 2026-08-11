@@ -1,0 +1,7 @@
+{
+  "terminalAllowlist": [
+    "npm run build",
+    "npm run deploy:prod",
+    "vercel"
+  ]
+}

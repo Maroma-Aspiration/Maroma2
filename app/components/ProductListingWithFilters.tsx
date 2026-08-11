@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useMemo, useState, useEffect } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { decodeBasicHtmlEntities } from "../../lib/decode-html-entities";
 import { formatInrPrice, parseInrPriceNumber } from "../../lib/format-price";
 import {
@@ -10,8 +10,16 @@ import {
   filterProductsByFacetSelections,
   type FacetGroup
 } from "../../lib/product-facets";
+import {
+  buildPerfumeGenderNav,
+  perfumeSelectionLabel,
+  productMatchesPerfumeNavSelection,
+  type PerfumeGender,
+  type PerfumeNavSelection,
+} from "../../lib/perfume-shop-nav";
 import { getDisplayImageUrl } from "../../lib/product-image";
 import type { ProductRecord } from "../../lib/product-types";
+import { useAdminSession } from "../../lib/use-admin-session";
 
 type Props = {
   products: ProductRecord[];
@@ -140,16 +148,18 @@ export function ProductListingWithFilters({ products, categorySlug }: Props) {
   const [giftFor, setGiftFor] = useState<(typeof giftingAudienceOptions)[number]["value"]>("any");
   const [giftEvent, setGiftEvent] = useState<(typeof giftingEventOptions)[number]["value"]>("any");
   const [giftPriceBand, setGiftPriceBand] = useState<GiftPriceBand>("any");
-  const [isAdmin, setIsAdmin] = useState(false);
+  const [perfumeNavSelection, setPerfumeNavSelection] = useState<PerfumeNavSelection>({
+    gender: null,
+    typeKey: null,
+    lineKey: null,
+  });
+  const { adminModeEnabled: isAdmin } = useAdminSession();
 
-  useEffect(() => {
-    const check = () => {
-      setIsAdmin(window.localStorage.getItem("maroma-admin-drag") === "true");
-    };
-    check();
-    window.addEventListener("maroma-admin-changed", check);
-    return () => window.removeEventListener("maroma-admin-changed", check);
-  }, []);
+  const showPerfumeGenderNav = categorySlug === "perfumes";
+  const perfumeGenderNav = useMemo(
+    () => (showPerfumeGenderNav ? buildPerfumeGenderNav(products) : []),
+    [products, showPerfumeGenderNav]
+  );
 
   const handleSlotUpload = async (productId: string, slot: string, file: File) => {
     const formData = new FormData();
@@ -186,12 +196,21 @@ export function ProductListingWithFilters({ products, categorySlug }: Props) {
     });
   }, [giftEvent, giftFor, giftPriceBand, products, showGiftingSelector]);
 
+  const perfumeNavFilteredProducts = useMemo(() => {
+    if (!showPerfumeGenderNav || !perfumeNavSelection.gender) {
+      return giftingFilteredProducts;
+    }
+    return giftingFilteredProducts.filter((product) =>
+      productMatchesPerfumeNavSelection(product, perfumeNavSelection, perfumeGenderNav)
+    );
+  }, [giftingFilteredProducts, perfumeGenderNav, perfumeNavSelection, showPerfumeGenderNav]);
+
   const facetGroups: FacetGroup[] = useMemo(
     () =>
-      buildFacetGroups(giftingFilteredProducts).filter(
+      buildFacetGroups(perfumeNavFilteredProducts).filter(
         (group) => group.id.toLowerCase() !== "size" && group.label.toLowerCase() !== "size"
       ),
-    [giftingFilteredProducts]
+    [perfumeNavFilteredProducts]
   );
 
   const priceBounds = useMemo(() => {
@@ -208,8 +227,8 @@ export function ProductListingWithFilters({ products, categorySlug }: Props) {
   const priceFilterActive = priceBounds.min !== null || priceBounds.max !== null;
 
   const productsInPriceRange = useMemo(
-    () => giftingFilteredProducts.filter((p) => productPassesPriceBounds(p, priceBounds)),
-    [giftingFilteredProducts, priceBounds]
+    () => perfumeNavFilteredProducts.filter((p) => productPassesPriceBounds(p, priceBounds)),
+    [perfumeNavFilteredProducts, priceBounds]
   );
 
   const filtered = useMemo(
@@ -233,12 +252,31 @@ export function ProductListingWithFilters({ products, categorySlug }: Props) {
     [selected]
   );
 
-  const hasActiveFilters = hasFacetFilters || priceFilterActive;
+  const hasPerfumeNavFilter = Boolean(perfumeNavSelection.gender);
+
+  const hasActiveFilters = hasFacetFilters || priceFilterActive || hasPerfumeNavFilter;
 
   const pricedProductCount = useMemo(
-    () => giftingFilteredProducts.filter((p) => parseInrPriceNumber(p.price) !== null).length,
-    [giftingFilteredProducts]
+    () => perfumeNavFilteredProducts.filter((p) => parseInrPriceNumber(p.price) !== null).length,
+    [perfumeNavFilteredProducts]
   );
+
+  const selectPerfumeGender = useCallback((gender: PerfumeGender) => {
+    setPerfumeNavSelection((prev) =>
+      prev.gender === gender && !prev.typeKey && !prev.lineKey
+        ? { gender: null, typeKey: null, lineKey: null }
+        : { gender, typeKey: null, lineKey: null }
+    );
+  }, []);
+
+  const selectPerfumeLine = useCallback((gender: PerfumeGender, typeKey: string, lineKey: string) => {
+    setPerfumeNavSelection((prev) => {
+      if (prev.gender === gender && prev.lineKey === lineKey) {
+        return { gender, typeKey: null, lineKey: null };
+      }
+      return { gender, typeKey, lineKey };
+    });
+  }, []);
 
   const toggleValue = useCallback((facetId: string, value: string) => {
     setSelected((prev) => {
@@ -260,6 +298,7 @@ export function ProductListingWithFilters({ products, categorySlug }: Props) {
     setGiftFor("any");
     setGiftEvent("any");
     setGiftPriceBand("any");
+    setPerfumeNavSelection({ gender: null, typeKey: null, lineKey: null });
   }, []);
 
   const removeChip = useCallback((facetId: string, value: string) => {
@@ -273,6 +312,11 @@ export function ProductListingWithFilters({ products, categorySlug }: Props) {
       return next;
     });
   }, []);
+
+  const perfumeNavChipLabel = useMemo(
+    () => perfumeSelectionLabel(perfumeNavSelection, perfumeGenderNav),
+    [perfumeGenderNav, perfumeNavSelection]
+  );
 
   const chips = useMemo(() => selectionChipEntries(selected), [selected]);
 
@@ -319,6 +363,75 @@ export function ProductListingWithFilters({ products, categorySlug }: Props) {
                   <option value="above-5000">Above Rs. 5,000</option>
                 </select>
               </label>
+              <div className="gifting-builder-links">
+                <Link href="/gifting/build-your-set" className="gifting-builder-cta maroma-btn maroma-btn-primary">
+                  Build your own gift set
+                </Link>
+                <Link
+                  href="/gifting/build-your-set?corporate=1"
+                  className="gifting-corporate-link"
+                >
+                  Corporate gifting
+                </Link>
+              </div>
+            </section>
+          ) : null}
+          {showPerfumeGenderNav && perfumeGenderNav.length > 0 ? (
+            <section className="perfume-gender-nav" aria-label="Shop perfumes by category">
+              <p className="perfume-gender-nav-title">Shop by</p>
+              <div className="perfume-gender-nav-tabs" role="tablist" aria-label="Perfume gender">
+                {perfumeGenderNav.map((section) => (
+                  <button
+                    key={section.gender}
+                    type="button"
+                    role="tab"
+                    aria-selected={perfumeNavSelection.gender === section.gender}
+                    className={`perfume-gender-tab${perfumeNavSelection.gender === section.gender ? " is-active" : ""}`}
+                    onClick={() => selectPerfumeGender(section.gender)}
+                  >
+                    {section.label}
+                    <span className="perfume-gender-tab-count">{section.productCount}</span>
+                  </button>
+                ))}
+              </div>
+              {perfumeGenderNav.map((section) => (
+                <details
+                  key={section.gender}
+                  className={`perfume-gender-group${perfumeNavSelection.gender === section.gender ? " is-selected" : ""}`}
+                  open={perfumeNavSelection.gender === section.gender || perfumeNavSelection.gender === null}
+                >
+                  <summary className="perfume-gender-group-summary">
+                    <span>{section.label}</span>
+                    <span className="product-facet-count-badge">{section.productCount}</span>
+                  </summary>
+                  <div className="perfume-gender-types">
+                    {section.types.map((type) => (
+                      <div key={type.key} className="perfume-gender-type">
+                        <p className="perfume-gender-type-label">{type.type}</p>
+                        <ul className="perfume-gender-lines">
+                          {type.lines.map((line) => {
+                            const active =
+                              perfumeNavSelection.gender === section.gender &&
+                              perfumeNavSelection.lineKey === line.key;
+                            return (
+                              <li key={line.key}>
+                                <button
+                                  type="button"
+                                  className={`perfume-gender-line-btn${active ? " is-active" : ""}`}
+                                  onClick={() => selectPerfumeLine(section.gender, type.key, line.key)}
+                                >
+                                  <span>{line.line}</span>
+                                  <span className="perfume-gender-line-count">{line.productIds.length}</span>
+                                </button>
+                              </li>
+                            );
+                          })}
+                        </ul>
+                      </div>
+                    ))}
+                  </div>
+                </details>
+              ))}
             </section>
           ) : null}
           {hasActiveFilters ? (
@@ -330,6 +443,25 @@ export function ProductListingWithFilters({ products, categorySlug }: Props) {
                 </button>
               </div>
               <div className="product-filter-chips" role="list">
+                {perfumeNavChipLabel ? (
+                  <button
+                    key="perfume-nav"
+                    type="button"
+                    className="product-filter-chip"
+                    onClick={() =>
+                      setPerfumeNavSelection({ gender: null, typeKey: null, lineKey: null })
+                    }
+                    aria-label={`Remove ${perfumeNavChipLabel}`}
+                    role="listitem"
+                  >
+                    <span className="product-filter-chip-facet">Category</span>
+                    <span className="product-filter-chip-sep">·</span>
+                    <span>{perfumeNavChipLabel}</span>
+                    <span className="product-filter-chip-x" aria-hidden="true">
+                      ×
+                    </span>
+                  </button>
+                ) : null}
                 {priceBounds.min !== null ? (
                   <button
                     key="price-min"
@@ -489,7 +621,7 @@ export function ProductListingWithFilters({ products, categorySlug }: Props) {
                     <div className="product-copy">
                       <h3 className="product-card-title">{decodeBasicHtmlEntities(product.name)}</h3>
                       <p className="product-card-price">{priceLabel}</p>
-                      <span className="product-card-cta">Add to cart</span>
+                      <span className="product-card-cta">Add to Basket</span>
                     </div>
                   </article>
                 </Link>

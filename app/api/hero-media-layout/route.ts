@@ -1,64 +1,62 @@
-import { promises as fs } from "fs";
-import path from "path";
 import { NextResponse } from "next/server";
-import { kv } from "@vercel/kv";
 import {
   parseHeroVisualState,
-  readHeroVisualState,
+  readPersistedHeroVisualState,
+  writePersistedHeroVisualState,
   type HeroVisualState
 } from "../../../lib/hero-media-layout-state";
 
-const storageDir = path.join(process.cwd(), "data");
-const storagePath = path.join(storageDir, "hero-media-layout.json");
-const heroLayoutKvKey = "maroma:hero-media-layout";
-
-const hasKvConfig = Boolean(process.env.KV_REST_API_URL && process.env.KV_REST_API_TOKEN);
-
-const readPersistedHeroVisualState = async (): Promise<HeroVisualState> => {
-  if (hasKvConfig) {
-    try {
-      const stored = await kv.get<HeroVisualState>(heroLayoutKvKey);
-      if (stored && typeof stored === "object") {
-        return parseHeroVisualState(stored);
-      }
-    } catch {
-      // Fall back to file-based state when KV is unavailable.
-    }
-  }
-  return readHeroVisualState();
-};
-
-const writePersistedHeroVisualState = async (next: HeroVisualState): Promise<void> => {
-  if (hasKvConfig) {
-    try {
-      await kv.set(heroLayoutKvKey, next);
-      return;
-    } catch {
-      // Fall back to file-based state when KV write fails.
-    }
-  }
-  await fs.mkdir(storageDir, { recursive: true });
-  await fs.writeFile(storagePath, JSON.stringify(next, null, 2), "utf8");
+const noStoreHeaders = {
+  "Cache-Control": "no-store, no-cache, must-revalidate, max-age=0"
 };
 
 export async function GET() {
   const state = await readPersistedHeroVisualState();
-  return NextResponse.json({ ...state, layout: state.layout });
+  return NextResponse.json({ ...state, layout: state.layout }, { headers: noStoreHeaders });
 }
 
 export async function POST(request: Request) {
   try {
     const body = (await request.json()) as unknown;
-    const current = await readPersistedHeroVisualState();
-    const next = parseHeroVisualState(body, current);
+    const existing = await readPersistedHeroVisualState();
+    const patch =
+      body && typeof body === "object" ? (body as Record<string, unknown>) : {};
+    const merged = {
+      ...existing,
+      ...patch,
+      ...(patch.mobile && typeof patch.mobile === "object"
+        ? { mobile: { ...(existing.mobile ?? {}), ...(patch.mobile as object) } }
+        : {}),
+      ...(patch.primarySettings && typeof patch.primarySettings === "object"
+        ? {
+            primarySettings: {
+              ...existing.primarySettings,
+              ...(patch.primarySettings as object),
+            },
+          }
+        : {}),
+      ...(patch.overlayLayer && typeof patch.overlayLayer === "object"
+        ? {
+            overlayLayer: {
+              ...existing.overlayLayer,
+              ...(patch.overlayLayer as object),
+              layout:
+                (patch.overlayLayer as { layout?: unknown }).layout ??
+                existing.overlayLayer.layout,
+            },
+          }
+        : {}),
+    };
+    const next = parseHeroVisualState(merged, existing);
 
     await writePersistedHeroVisualState(next);
-    return NextResponse.json({ ...next, layout: next.layout });
-  } catch {
+    return NextResponse.json({ ...next, layout: next.layout }, { headers: noStoreHeaders });
+  } catch (error) {
+    const message =
+      error instanceof Error ? error.message : "Unable to save hero media layout.";
     return NextResponse.json(
-      { error: "Unable to save hero media layout." },
-      { status: 500 }
+      { error: message },
+      { status: 500, headers: noStoreHeaders }
     );
   }
 }
-

@@ -3,11 +3,20 @@ import path from "path";
 import { NextResponse } from "next/server";
 import { kv } from "@vercel/kv";
 import { mergeWithDefaults, parseSiteContent } from "../../../lib/site-content-api";
+import type { SiteContent } from "../../../app/content";
 
 const storageDir = path.join(process.cwd(), "data");
 const storagePath = path.join(storageDir, "site-content.json");
 const siteContentKvKey = "maroma:site-content";
 const hasKvConfig = Boolean(process.env.KV_REST_API_URL && process.env.KV_REST_API_TOKEN);
+const legacyCarouselSubtitles = new Set([
+  "Our bestsellers bring balance and well-being.",
+  "Check out what people are loving right now",
+  "See what people are loving right now",
+  "See what people are\nloving right now",
+]);
+const carouselSubtitle = "See what people\nAre loving right now";
+const shopCareCtaPrimary = "Shop by Care";
 
 const readSiteContent = async () => {
   if (hasKvConfig) {
@@ -42,12 +51,39 @@ const writeSiteContent = async (next: unknown) => {
   await fs.writeFile(storagePath, JSON.stringify(next, null, 2), "utf8");
 };
 
+const maybeMigrateCarouselSubtitle = async (content: SiteContent) => {
+  if (!legacyCarouselSubtitles.has(content.carousel.subtitle)) {
+    return content;
+  }
+  const next = mergeWithDefaults({
+    ...content,
+    carousel: { ...content.carousel, subtitle: carouselSubtitle },
+  });
+  await writeSiteContent(next);
+  return next;
+};
+
+const maybeMigrateShopCareCta = async (content: SiteContent) => {
+  if (content.hero.ctaPrimary !== "Shop Luxury") {
+    return content;
+  }
+  const next = mergeWithDefaults({
+    ...content,
+    hero: { ...content.hero, ctaPrimary: shopCareCtaPrimary },
+  });
+  await writeSiteContent(next);
+  return next;
+};
+
 export async function GET() {
   const content = await readSiteContent();
   if (!content) {
-    return NextResponse.json({ content: null });
+    return NextResponse.json({ content: mergeWithDefaults(null) });
   }
-  return NextResponse.json({ content });
+  let migrated = mergeWithDefaults(content);
+  migrated = await maybeMigrateCarouselSubtitle(migrated);
+  migrated = await maybeMigrateShopCareCta(migrated);
+  return NextResponse.json({ content: migrated });
 }
 
 export async function POST(request: Request) {

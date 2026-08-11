@@ -5,9 +5,10 @@ import { ProductPdpBuyRow } from "../../components/ProductPdpBuyRow";
 import { ProductPdpGallery } from "../../components/ProductPdpGallery";
 import { decodeBasicHtmlEntities } from "../../../lib/decode-html-entities";
 import { derivePdpSections } from "../../../lib/pdp-sections";
+import { deriveProductPdpCopy, stripIndiaOnlyFromProductName } from "../../../lib/product-sale-region";
 import { formatInrPrice } from "../../../lib/format-price";
 import { getGalleryImageUrls } from "../../../lib/product-gallery";
-import { readOverrides, readProducts, withOverrides } from "../../../lib/product-db";
+import { readMergedCatalog } from "../../../lib/product-catalog-admin";
 import { getDisplayImageUrl } from "../../../lib/product-image";
 import { getSuggestedProducts } from "../../../lib/product-suggestions";
 import type { ProductRecord } from "../../../lib/product-types";
@@ -17,28 +18,29 @@ export const runtime = "nodejs";
 type Props = { params: { id: string } };
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
-  const [products, overrides] = await Promise.all([readProducts(), readOverrides()]);
-  const merged = withOverrides(products, overrides);
+  const { products: merged } = await readMergedCatalog();
   const product = merged.find((entry) => entry.id === params.id);
   if (!product) {
     return { title: "Product" };
   }
+  const { displayName } = stripIndiaOnlyFromProductName(product.name);
   return {
-    title: `${decodeBasicHtmlEntities(product.name)} · Maroma`,
+    title: `${displayName} · Maroma`,
     description: decodeBasicHtmlEntities(product.shortDescription).slice(0, 160)
   };
 }
 
 function SuggestedCard({ product }: { product: ProductRecord }) {
   const imageSrc = getDisplayImageUrl(product);
-  const priceLabel = formatInrPrice(product.price) ?? "—";
+  const priceLabel = formatInrPrice(product.price) ?? "-";
+  const { displayName } = stripIndiaOnlyFromProductName(product.name);
   return (
     <Link href={`/product/${product.id}`} className="product-pdp-suggestion-card">
       <div className="product-pdp-suggestion-media">
         {imageSrc ? <img src={imageSrc} alt="" /> : <span>No image</span>}
       </div>
       <div className="product-pdp-suggestion-copy">
-        <p className="product-pdp-suggestion-name">{decodeBasicHtmlEntities(product.name)}</p>
+        <p className="product-pdp-suggestion-name">{displayName}</p>
         <p className="product-pdp-suggestion-price">{priceLabel}</p>
       </div>
     </Link>
@@ -46,8 +48,7 @@ function SuggestedCard({ product }: { product: ProductRecord }) {
 }
 
 export default async function ProductPage({ params }: Props) {
-  const [products, overrides] = await Promise.all([readProducts(), readOverrides()]);
-  const merged = withOverrides(products, overrides);
+  const { products: merged } = await readMergedCatalog();
   const product = merged.find((entry) => entry.id === params.id);
   if (!product) {
     notFound();
@@ -56,28 +57,21 @@ export default async function ProductPage({ params }: Props) {
   const gallery = getGalleryImageUrls(product);
   const suggested = getSuggestedProducts(merged, product, 8);
   const sections = derivePdpSections(product);
+  const { displayName, subtitleText } = deriveProductPdpCopy(product.name, product.shortDescription);
   const priceLabel = formatInrPrice(product.price) ?? "Price on request";
   const keyIngredients = product.attributes["Key Ingredients"] ?? [];
 
   return (
     <main className="product-pdp-page">
-      <nav className="product-pdp-breadcrumb" aria-label="Breadcrumb">
-        <Link href="/">Home</Link>
-        <span aria-hidden="true"> / </span>
-        <span>{decodeBasicHtmlEntities(product.name)}</span>
-      </nav>
-
       <div className="product-pdp-layout">
-        <ProductPdpGallery images={gallery} productName={product.name} />
+        <h1 className="product-pdp-title">{displayName}</h1>
+        <ProductPdpGallery images={gallery} productName={displayName} />
 
         <div className="product-pdp-info">
-          <h1 className="product-pdp-title">{decodeBasicHtmlEntities(product.name)}</h1>
-          {product.shortDescription ? (
-            <p className="product-pdp-subtitle">{decodeBasicHtmlEntities(product.shortDescription)}</p>
-          ) : null}
+          {subtitleText ? <p className="product-pdp-subtitle">{subtitleText}</p> : null}
           <p className="product-pdp-price">{priceLabel}</p>
 
-          <ProductPdpBuyRow />
+          <ProductPdpBuyRow product={product} />
 
           {suggested.length > 0 ? (
             <section className="product-pdp-suggestions-inline" aria-labelledby="pdp-suggestions-inline">

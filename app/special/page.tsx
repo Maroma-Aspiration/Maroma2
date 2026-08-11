@@ -2,8 +2,6 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
-import { siteContent } from "../content";
-import { SiteHeader } from "../components/SiteHeader";
 
 export default function SpecialPage() {
   const [isVisible, setIsVisible] = useState(false);
@@ -30,8 +28,6 @@ export default function SpecialPage() {
 
   return (
     <div className="special-page-container">
-      <SiteHeader initialNav={{ brand: siteContent.brand, nav: siteContent.nav }} />
-      
       <main className={`special-content ${isVisible ? "is-visible" : ""}`}>
         <div className="special-hero">
           <span className="special-eyebrow">Personalized Selection</span>
@@ -218,7 +214,7 @@ export default function SpecialPage() {
           padding: 18px 40px;
           border-radius: 40px;
           border: 1px solid rgba(0, 0, 0, 0.1);
-          background: rgba(255, 255, 255, 0.6);
+          background: var(--maroma-site-bg);
           color: #1a1816;
           font-family: var(--font-sans), sans-serif;
           font-size: 0.9rem;
@@ -229,7 +225,7 @@ export default function SpecialPage() {
         }
 
         .assistant-btn:hover {
-          background: #fff;
+          background: var(--maroma-site-bg);
           transform: translateY(-3px) scale(1.02);
           box-shadow: 0 10px 25px rgba(0, 0, 0, 0.05);
           border-color: rgba(0, 0, 0, 0.2);

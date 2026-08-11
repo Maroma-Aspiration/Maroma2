@@ -4,7 +4,6 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useSearchParams, useRouter } from "next/navigation";
 import { useCart } from "../../../context/CartContext";
-import type { ProductRecord } from "../../../lib/product-types";
 
 const SUGGESTIONS = [
   {
@@ -60,31 +59,17 @@ export default function SuggestionsClient() {
   const searchParams = useSearchParams();
   const router = useRouter();
   const ritualFilter = searchParams.get("ritual");
-  const { addToCart, setDiscount } = useCart();
+  const { addToCart } = useCart();
 
   useEffect(() => {
     setIsVisible(true);
   }, []);
 
-  const handleShopSet = (sug: RitualSuggestion) => {
-    const ritualSetProduct: ProductRecord = {
-      id: sug.id,
-      sku: sug.id,
-      name: sug.name,
-      description: sug.description,
-      shortDescription: sug.description,
-      price: String(sug.price),
-      categories: ["Ritual Set"],
-      tags: [sug.ritual, "ritual-set"],
-      brand: "Maroma",
-      images: sug.items.map((item) => item.image),
-      imageUrl: sug.items[0].image,
-      attributes: {}
-    };
-
-    addToCart(ritualSetProduct);
-    setDiscount(0.1); // 10%
-    router.push('/checkout');
+  const handleShopSet = async (sug: RitualSuggestion) => {
+    // Server resolves ritual-set price + 10% discount; client cannot set either.
+    const ok = await addToCart({ id: sug.id });
+    if (!ok) return;
+    router.push("/checkout");
   };
 
   return (
@@ -146,7 +131,7 @@ export default function SuggestionsClient() {
         }
 
         .suggestion-card {
-          background: rgba(255, 255, 255, 0.7);
+          background: var(--maroma-site-bg);
           backdrop-filter: blur(20px);
           border-radius: 20px;
           padding: 40px;
@@ -181,7 +166,7 @@ export default function SuggestionsClient() {
           background-size: cover;
           background-position: center;
           border-radius: 12px;
-          background-color: #fff;
+          background-color: var(--maroma-site-bg);
           box-shadow: 0 10px 20px rgba(0,0,0,0.1);
           border: 1px solid #f0f0f0;
           opacity: 0;

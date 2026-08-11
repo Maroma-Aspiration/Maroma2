@@ -21,6 +21,31 @@ export type HeroOverlayLayer = HeroLayerSettings & {
   layout: HeroMediaLayout;
 };
 
+export type HeroMobileOverrides = {
+  layout?: HeroMediaLayout;
+  overlayLayout?: HeroMediaLayout;
+  /** Mobile gradient fill position/size (% of artboard). */
+  backgroundLayout?: HeroMediaLayout;
+  primaryScale?: number;
+  overlayScale?: number;
+  ritualCarouselPosPct?: XY;
+  eyebrowPos?: XY;
+  headlinePos?: XY;
+  heroActionsPos?: XY;
+  headlineSizeRem?: number;
+  heroCopyWidthVw?: number;
+  lovedDividerOffsetY?: number;
+  lovedFloralOffsetY?: number;
+  lovedTintOpacity?: number;
+  heroCopyOffsetY?: string;
+  ritualCarouselScale?: number;
+  /** Mobile carousel band position/size (% of ritual stack). */
+  ritualBandLayout?: HeroMediaLayout;
+  ritualBandScale?: number;
+  /** Mobile carousel band visibility (independent from desktop). */
+  ritualBandVisible?: boolean;
+};
+
 export type HeroVisualState = {
   layout: HeroMediaLayout;
   backgroundVisible: boolean;
@@ -38,6 +63,8 @@ export type HeroVisualState = {
   primarySettings: HeroLayerSettings;
   overlayLayer: HeroOverlayLayer;
   ritualCarouselPos: XY;
+  /** Artboard-relative carousel position (% of artboard width/height) — canonical for cross-browser sync. */
+  ritualCarouselPosPct: XY;
   bgColors: string[];
   bgAngle: number;
   lovedSectionVisible: boolean;
@@ -45,6 +72,10 @@ export type HeroVisualState = {
   lovedWashVisible: boolean;
   lovedBandVisible: boolean;
   lovedDividerOffsetY: number;
+  /** Auto-measured gap from hero bottom to carousel/band; frozen when loved position is customized. */
+  lovedFlowOffsetPx?: number;
+  /** When true, loved section vertical position is user-set (do not auto-recalculate flow offset). */
+  lovedPositionCustomized?: boolean;
   lovedFloralOffsetY: number;
   lovedFloralOpacity: number;
   /** Full-section wash layer horizontal nudge. */
@@ -60,9 +91,60 @@ export type HeroVisualState = {
   lovedTint2TopPct: number;
   /** Band height (5–100% of section). */
   lovedTint2HeightPct: number;
+  /** Band width (20–100% of section). */
+  lovedTint2WidthPct: number;
+  /** Band left edge (0–100% of section). */
+  lovedTint2LeftPct: number;
   heroLayout: HeroMediaLayout;
   productShowcasePos: XY;
   heroSectionHeight: number;
+  /** Extra top offset for the hero copy stack (headline + CTAs), e.g. `7cm` or `48px`. */
+  heroCopyOffsetY: string;
+  /** Stacking order vs other hero blocks (higher = in front). */
+  heroBackgroundStackZ: number;
+  heroMediaStackZ: number;
+  heroRitualStackZ: number;
+  /** Frosted band behind ritual carousel (% of artboard). */
+  ritualBandVisible: boolean;
+  /** Mobile document-flow carousel band (independent from desktop). */
+  ritualBandVisibleMobile: boolean;
+  ritualBandLayout: HeroMediaLayout;
+  ritualBandScale: number;
+  ritualBandOpacity: number;
+  /** Carousel band fill color (hex). */
+  ritualBandColor: string;
+  heroRitualBandStackZ: number;
+  ritualCarouselScale: number;
+  heroCopyStackZ: number;
+  /** Loved section veil/content stacking (1–10; mapped to z-index inside the section). */
+  lovedFloralsStackZ: number;
+  lovedWashStackZ: number;
+  lovedBandStackZ: number;
+  lovedContentStackZ: number;
+  /** When true, X/Y for that admin layer cannot be changed via drag or sliders. */
+  positionLocks: HeroPositionLocks;
+  /** Derived mobile layout cache (auto-generated from desktop; not separately edited). */
+  mobile?: HeroMobileOverrides;
+  /** Milliseconds since epoch — used to merge local vs server state across browsers. */
+  updatedAt?: number;
+  /** Internal migration rev for carousel stack baseline resets. */
+  ritualCarouselStackRev?: number;
 };
+
+export type HeroPositionLockKey =
+  | "primary"
+  | "overlay"
+  | "background"
+  | "headline"
+  | "eyebrow"
+  | "actions"
+  | "rituals"
+  | "ritual-band"
+  | "loved-section"
+  | "loved-florals"
+  | "loved-wash"
+  | "loved-band";
+
+export type HeroPositionLocks = Partial<Record<HeroPositionLockKey, boolean>>;
 
 export const VISUAL_STATE_STORAGE_KEY = "maroma-hero-visual-state";

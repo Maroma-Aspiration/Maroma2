@@ -158,9 +158,10 @@ export function DynamicProductShowcase({ products, pos }: DynamicProductShowcase
                     src={product.imageUrl} 
                     alt={product.name}
                     style={{
-                      maxWidth: '85%',
-                      maxHeight: '85%',
-                      objectFit: 'contain',
+                      width: '100%',
+                      height: '100%',
+                      objectFit: 'cover',
+                      objectPosition: 'center',
                       filter: 'drop-shadow(0 25px 45px rgba(0,0,0,0.12)) grayscale(0.1) sepia(0.08)',
                       transition: 'filter 0.3s ease'
                     }}

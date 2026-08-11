@@ -1,121 +1,239 @@
 "use client";
 
-import React, { createContext, useContext, useState, useEffect } from 'react';
-import { ProductRecord } from '../lib/product-types';
+import React, { createContext, useCallback, useContext, useEffect, useState } from "react";
+import { formatInrPrice } from "../lib/format-price";
+import type { CartItemView, CartView } from "../lib/commerce-types";
+import type { ProductRecord } from "../lib/product-types";
 
-export type CartItem = {
-  id: string;
-  productId: string;
-  name: string;
-  price: number;
-  image: string;
-  quantity: number;
-  variant?: string;
-};
+export type CartItem = CartItemView;
 
 type CartContextType = {
   cart: CartItem[];
-  addToCart: (product: ProductRecord, variant?: string) => void;
-  removeFromCart: (id: string) => void;
-  updateQuantity: (id: string, delta: number) => void;
-  clearCart: () => void;
+  cartId: string | null;
+  couponCode: string | null;
+  loading: boolean;
+  error: string | null;
+  addToCart: (product: ProductRecord | { id: string }, variant?: string, quantity?: number) => Promise<boolean>;
+  removeFromCart: (id: string) => Promise<void>;
+  updateQuantity: (id: string, delta: number) => Promise<void>;
+  clearCart: () => Promise<void>;
+  applyCoupon: (code: string) => Promise<boolean>;
+  removeCoupon: () => Promise<void>;
+  refreshCart: () => Promise<void>;
   totalItems: number;
   subtotal: number;
   discount: number;
+  discountAmount: number;
+  shipping: number;
+  total: number;
+  /** @deprecated Discount is server-controlled (e.g. ritual sets). Kept as no-op for callers. */
   setDiscount: (amount: number) => void;
-  isDrawerOpen: boolean;
-  setIsDrawerOpen: (open: boolean) => void;
+  formatItemPrice: (price: number) => string;
 };
 
 const CartContext = createContext<CartContextType | undefined>(undefined);
 
-export function CartProvider({ children }: { children: React.ReactNode }) {
-  const [cart, setCart] = useState<CartItem[]>([]);
-  const [discount, setDiscount] = useState(0);
-  const [isDrawerOpen, setIsDrawerOpen] = useState(false);
+function applyCartView(
+  view: CartView,
+  setState: {
+    setCart: (items: CartItemView[]) => void;
+    setCartId: (id: string | null) => void;
+    setCouponCode: (code: string | null) => void;
+    setSubtotal: (n: number) => void;
+    setDiscount: (n: number) => void;
+    setDiscountAmount: (n: number) => void;
+    setShipping: (n: number) => void;
+    setTotal: (n: number) => void;
+    setTotalItems: (n: number) => void;
+  }
+) {
+  setState.setCart(view.items);
+  setState.setCartId(view.id);
+  setState.setCouponCode(view.couponCode ?? null);
+  setState.setSubtotal(view.subtotal);
+  setState.setDiscount(view.discountRate);
+  setState.setDiscountAmount(view.discountAmount);
+  setState.setShipping(view.shipping);
+  setState.setTotal(view.total);
+  setState.setTotalItems(view.totalItems);
+}
 
-  // Load cart from local storage
-  useEffect(() => {
-    const savedCart = localStorage.getItem('maroma-cart');
-    const savedDiscount = localStorage.getItem('maroma-discount');
-    if (savedCart) {
-      try {
-        setCart(JSON.parse(savedCart));
-      } catch (e) {
-        console.error("Failed to parse cart", e);
+async function postCart(body: Record<string, unknown>): Promise<CartView> {
+  const res = await fetch("/api/cart", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    credentials: "same-origin",
+    body: JSON.stringify(body),
+  });
+  const data = (await res.json()) as { cart?: CartView; error?: string };
+  if (!res.ok || !data.cart) {
+    throw new Error(data.error || "Cart request failed.");
+  }
+  return data.cart;
+}
+
+export function CartProvider({ children }: { children: React.ReactNode }) {
+  const [cart, setCart] = useState<CartItemView[]>([]);
+  const [cartId, setCartId] = useState<string | null>(null);
+  const [couponCode, setCouponCode] = useState<string | null>(null);
+  const [subtotal, setSubtotal] = useState(0);
+  const [discount, setDiscountState] = useState(0);
+  const [discountAmount, setDiscountAmount] = useState(0);
+  const [shipping, setShipping] = useState(0);
+  const [total, setTotal] = useState(0);
+  const [totalItems, setTotalItems] = useState(0);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  const setters = {
+    setCart,
+    setCartId,
+    setCouponCode,
+    setSubtotal,
+    setDiscount: setDiscountState,
+    setDiscountAmount,
+    setShipping,
+    setTotal,
+    setTotalItems,
+  };
+
+  const refreshCart = useCallback(async () => {
+    try {
+      const res = await fetch("/api/cart", { credentials: "same-origin", cache: "no-store" });
+      const data = (await res.json()) as { cart?: CartView; error?: string };
+      if (!res.ok || !data.cart) {
+        throw new Error(data.error || "Failed to load cart.");
       }
+      applyCartView(data.cart, setters);
+      setError(null);
+    } catch (err) {
+      console.error(err);
+      setError(err instanceof Error ? err.message : "Failed to load cart.");
+    } finally {
+      setLoading(false);
     }
-    if (savedDiscount) {
-      setDiscount(Number(savedDiscount));
-    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- setters are stable state dispatchers
   }, []);
 
-  // Save cart to local storage
   useEffect(() => {
-    localStorage.setItem('maroma-cart', JSON.stringify(cart));
-    localStorage.setItem('maroma-discount', discount.toString());
-  }, [cart, discount]);
+    void refreshCart();
+    // Clear legacy client-only cart so old manipulated prices cannot linger.
+    try {
+      localStorage.removeItem("maroma-cart");
+      localStorage.removeItem("maroma-discount");
+    } catch {
+      // ignore
+    }
+  }, [refreshCart]);
 
-  const addToCart = (product: ProductRecord, variant?: string) => {
-    setCart(prev => {
-      const price = typeof product.price === 'number' ? product.price : Number(product.price) || 0;
-      const existing = prev.find(item => item.productId === product.id && item.variant === variant);
-      if (existing) {
-        return prev.map(item => 
-          item.productId === product.id && item.variant === variant
-            ? { ...item, quantity: item.quantity + 1 }
-            : item
-        );
-      }
-      return [...prev, {
-        id: `${product.id}-${variant || 'default'}-${Date.now()}`,
+  const addToCart = async (
+    product: ProductRecord | { id: string },
+    variant?: string,
+    quantity = 1
+  ): Promise<boolean> => {
+    try {
+      const view = await postCart({
+        action: "add",
         productId: product.id,
-        name: product.name,
-        price,
-        image: product.imageUrl,
-        quantity: 1,
-        variant
-      }];
-    });
-    setIsDrawerOpen(true);
+        quantity,
+        variant,
+      });
+      applyCartView(view, setters);
+      setError(null);
+      return true;
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Could not add to basket.";
+      setError(message);
+      console.error(err);
+      return false;
+    }
   };
 
-  const removeFromCart = (id: string) => {
-    setCart(prev => prev.filter(item => item.id !== id));
+  const removeFromCart = async (id: string) => {
+    try {
+      const view = await postCart({ action: "remove", lineId: id });
+      applyCartView(view, setters);
+      setError(null);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not remove item.");
+    }
   };
 
-  const updateQuantity = (id: string, delta: number) => {
-    setCart(prev => prev.map(item => {
-      if (item.id === id) {
-        const newQty = Math.max(1, item.quantity + delta);
-        return { ...item, quantity: newQty };
-      }
-      return item;
-    }));
+  const updateQuantity = async (id: string, delta: number) => {
+    try {
+      const view = await postCart({ action: "update", lineId: id, delta });
+      applyCartView(view, setters);
+      setError(null);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not update quantity.");
+    }
   };
 
-  const clearCart = () => {
-    setCart([]);
-    setDiscount(0);
+  const clearCart = async () => {
+    try {
+      const view = await postCart({ action: "clear" });
+      applyCartView(view, setters);
+      setError(null);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not clear cart.");
+    }
   };
 
-  const totalItems = cart.reduce((acc, item) => acc + item.quantity, 0);
-  const subtotal = cart.reduce((acc, item) => acc + (item.price * item.quantity), 0);
+  const applyCoupon = async (code: string): Promise<boolean> => {
+    try {
+      const view = await postCart({ action: "apply-coupon", code });
+      applyCartView(view, setters);
+      setError(null);
+      return true;
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Could not apply promo code.";
+      setError(message);
+      return false;
+    }
+  };
+
+  const removeCoupon = async () => {
+    try {
+      const view = await postCart({ action: "remove-coupon" });
+      applyCartView(view, setters);
+      setError(null);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not remove promo code.");
+    }
+  };
+
+  const setDiscount = (_amount: number) => {
+    // Discount rates are applied server-side (e.g. when adding a ritual set).
+  };
+
+  const formatItemPrice = (price: number) =>
+    formatInrPrice(String(price)) ?? `₹${price.toLocaleString("en-IN")}`;
 
   return (
-    <CartContext.Provider value={{ 
-      cart, 
-      addToCart, 
-      removeFromCart, 
-      updateQuantity, 
-      clearCart,
-      totalItems,
-      subtotal,
-      discount,
-      setDiscount,
-      isDrawerOpen,
-      setIsDrawerOpen
-    }}>
+    <CartContext.Provider
+      value={{
+        cart,
+        cartId,
+        couponCode,
+        loading,
+        error,
+        addToCart,
+        removeFromCart,
+        updateQuantity,
+        clearCart,
+        applyCoupon,
+        removeCoupon,
+        refreshCart,
+        totalItems,
+        subtotal,
+        discount,
+        discountAmount,
+        shipping,
+        total,
+        setDiscount,
+        formatItemPrice,
+      }}
+    >
       {children}
     </CartContext.Provider>
   );
@@ -124,7 +242,7 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
 export function useCart() {
   const context = useContext(CartContext);
   if (context === undefined) {
-    throw new Error('useCart must be used within a CartProvider');
+    throw new Error("useCart must be used within a CartProvider");
   }
   return context;
 }

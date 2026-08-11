@@ -96,6 +96,9 @@ export function LoginForm() {
             />
             Show password
           </label>
+          <p className="login-footer" style={{ margin: "0 0 8px", textAlign: "left" }}>
+            <Link href="/forgot-password">Forgot password?</Link>
+          </p>
           {error ? <p className="login-error">{error}</p> : null}
           <button type="submit" className="button primary button-sage" disabled={pending}>
             {pending ? "Signing in…" : "Sign in"}

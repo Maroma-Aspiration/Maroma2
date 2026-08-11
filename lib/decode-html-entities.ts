@@ -4,6 +4,9 @@ export function decodeBasicHtmlEntities(text: string): string {
     return text;
   }
   return text
+    .replace(/\\n/g, "\n")
+    .replace(/\\r/g, "")
+    .replace(/\\t/g, " ")
     .replace(/&amp;/g, "&")
     .replace(/&lt;/g, "<")
     .replace(/&gt;/g, ">")

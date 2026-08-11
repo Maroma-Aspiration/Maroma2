@@ -1,4 +1,5 @@
 import { decodeBasicHtmlEntities } from "./decode-html-entities";
+import { cleanProductSaleRegionCopy, stripIndiaOnlyFromProductName } from "./product-sale-region";
 import type { ProductRecord } from "./product-types";
 
 const normalizeNewlines = (text: string): string =>
@@ -33,8 +34,16 @@ export type PdpAccordionSections = {
 };
 
 export function derivePdpSections(product: ProductRecord): PdpAccordionSections {
-  const body = normalizeNewlines(product.description);
-  const short = normalizeNewlines(product.shortDescription);
+  const { indiaOnlyNote } = stripIndiaOnlyFromProductName(product.name);
+  const hasInternationalRestriction = /not\s+for\s+international/i.test(product.shortDescription);
+  const suppressInternationalNote = Boolean(indiaOnlyNote || hasInternationalRestriction);
+
+  const body = cleanProductSaleRegionCopy(normalizeNewlines(product.description), {
+    suppressInternationalNote,
+  });
+  const short = cleanProductSaleRegionCopy(normalizeNewlines(product.shortDescription), {
+    suppressInternationalNote,
+  });
 
   let benefits = "";
   if (body.includes("BENEFITS")) {

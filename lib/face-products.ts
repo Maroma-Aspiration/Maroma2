@@ -16,10 +16,21 @@ const faceNameHint = (name: string): boolean => {
   );
 };
 
+const isLuxuryCategory = (categories: string[]): boolean =>
+  categories.some((category) => category.toLowerCase().includes("luxury"));
+
+/** Face Care > Luxury products with catalog images. */
+export function selectLuxuryProducts(products: ProductRecord[]): ProductRecord[] {
+  return products.filter((p) => hasDisplayImage(p) && isLuxuryCategory(p.categories));
+}
+
 /** Face / facial care products that have a real catalog image (not placeholders). */
 export function selectFaceCareProducts(products: ProductRecord[]): ProductRecord[] {
   return products.filter((p) => {
     if (!hasDisplayImage(p)) {
+      return false;
+    }
+    if (isLuxuryCategory(p.categories)) {
       return false;
     }
     if (p.categories.some(faceCategory)) {

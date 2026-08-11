@@ -510,6 +510,8 @@ export default function AdminPage() {
         <a href="/">Home</a>
         <a href="/newsletter?edit=1">Newsletter editor</a>
         <a href="/admin/users">Manage Users</a>
+        <a href="/admin/products">Products</a>
+        <a href="/admin/orders">Production board</a>
         <a href="/blog">Blog</a>
         <a href="/newsletter">Newsletter</a>
         <a href="#brand-nav">Brand + Navigation</a>
@@ -642,7 +644,7 @@ export default function AdminPage() {
         <p style={{ fontSize: "0.85rem", color: "#5c5a57", maxWidth: "42rem", margin: "4px 0 12px" }}>
           CTA placement: on the homepage, turn on Admin mode and drag the button row. When you release,
           the position is saved to the server (same file as hero headline/eyebrow layout) so every desktop
-          browser loads it—no extra Save needed for that.
+          browser loads it. No extra Save needed for that.
         </p>
         <label>
           Hero phrases (one per line)
@@ -658,11 +660,19 @@ export default function AdminPage() {
             />
           </label>
           <label>
-            Hero video URL
+            Hero video URL (MP4 or YouTube)
             <input
               type="text"
               value={content.hero.video.src}
               onChange={(event) => updateField("hero.video.src", event.target.value)}
+            />
+          </label>
+          <label>
+            Hero video URL (mobile, optional YouTube)
+            <input
+              type="text"
+              value={content.hero.video.mobileSrc ?? ""}
+              onChange={(event) => updateField("hero.video.mobileSrc", event.target.value)}
             />
           </label>
           <label>

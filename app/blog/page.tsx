@@ -1,41 +1,63 @@
 import Link from "next/link";
 import { unstable_noStore as noStore } from "next/cache";
-import { formatStoryDate } from "../../lib/story-format";
+import { formatStoryDate, truncateStoryExcerpt } from "../../lib/story-format";
 import { readStoriesState } from "../../lib/story-storage";
+import { resolveStoryThumbnailUrl } from "../../lib/story-thumbnail";
 
 export const dynamic = "force-dynamic";
 
 export const metadata = {
-  title: "Maroma Blog",
-  description: "Stories, rituals, sourcing updates, and social highlights from Maroma."
+  title: "The Maroma Journal",
+  description: "Stories and events from the world of Maroma."
 };
 
 export default async function BlogPage() {
   noStore();
   const state = await readStoriesState();
-  const stories = state.stories;
+  const stories = state.stories.filter((story) => story.kind !== "divider" && story.kind !== "text");
+
+  const cards = await Promise.all(
+    stories.map(async (story, index) => {
+      const thumb = await resolveStoryThumbnailUrl(story, state, index);
+      return { story, thumb };
+    })
+  );
+
   return (
     <main className="stories-page">
       <section className="stories-hero">
-        <p className="stories-eyebrow">Maroma Journal</p>
-        <h1>Stories for your ritual life</h1>
-        <p>SEO-friendly updates automatically and manually curated from Maroma social and editorial stories.</p>
+        <h1 className="stories-hero-title">Welcome to The Maroma Journal</h1>
+        <p className="stories-hero-subhead">Stories and Events from the World of Maroma</p>
+        <p className="stories-hero-cta">
+          <Link href="/newsletter" className="button primary button-sage">Read the newsletter</Link>
+          <Link href="/newsletter/archive" className="button secondary">Newsletter archive</Link>
+        </p>
       </section>
 
       <section className="stories-grid">
-        {stories.length === 0 ? (
+        {cards.length === 0 ? (
           <article className="story-card">
             <h2>No stories yet</h2>
             <p>Add stories from <Link href="/newsletter?edit=1">the newsletter editor</Link> to start publishing blog content.</p>
           </article>
         ) : (
-          stories.map((story) => (
+          cards.map(({ story, thumb }) => (
             <article key={story.id} className="story-card">
-              {story.imageUrl ? <img src={story.imageUrl} alt={story.title} /> : null}
-              <p className="story-meta">{formatStoryDate(story.publishedAt)} - {story.source}</p>
+              <div className="story-card-media">
+                {thumb ? (
+                  <img src={thumb} alt={story.title} loading="lazy" />
+                ) : (
+                  <div className="story-card-media-placeholder" aria-hidden="true" />
+                )}
+              </div>
               <h2>{story.title}</h2>
-              <p>{story.excerpt}</p>
-              <Link href={`/blog/${story.slug}`} className="button secondary">Read story</Link>
+              {story.publishedAt ? (
+                <p className="story-meta">{formatStoryDate(story.publishedAt)}</p>
+              ) : null}
+              <p className="story-card-excerpt">{truncateStoryExcerpt(story.excerpt || story.body)}</p>
+              <Link href={`/blog/${story.slug}`} className="button story-read-btn">
+                Read story
+              </Link>
             </article>
           ))
         )}
