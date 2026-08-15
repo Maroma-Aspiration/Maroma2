@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 import { SignOutButton } from "../components/SignOutButton";
 import { ChangePasswordForm } from "../components/ChangePasswordForm";
 import { getSessionSecret, SESSION_COOKIE, verifySessionPayload } from "../../lib/auth-session";
+import { getB2bCompanyByUserEmail } from "../../lib/b2b-store";
 import { listOrdersForEmail } from "../../lib/commerce-orders";
 import { formatInrPrice } from "../../lib/format-price";
 
@@ -29,6 +30,7 @@ export default async function AccountPage({
   }
 
   const orders = await listOrdersForEmail(session.email, 20);
+  const b2bCompany = await getB2bCompanyByUserEmail(session.email);
 
   const notice =
     searchParams.reason === "admin_only"
@@ -48,6 +50,15 @@ export default async function AccountPage({
         {notice ? <p className="login-reason">{notice}</p> : null}
 
         <ChangePasswordForm />
+
+        {b2bCompany ? (
+          <p className="login-reason" style={{ marginTop: 16 }}>
+            Wholesale page:{" "}
+            <Link href={`/b2b/${b2bCompany.slug}`}>
+              {b2bCompany.name} (/b2b/{b2bCompany.slug})
+            </Link>
+          </p>
+        ) : null}
 
         <h2 style={{ fontSize: "1.1rem", marginTop: 24, marginBottom: 12 }}>Your orders</h2>
         {orders.length === 0 ? (
@@ -75,6 +86,9 @@ export default async function AccountPage({
               </Link>
               <Link href="/admin/orders" className="button secondary">
                 Orders
+              </Link>
+              <Link href="/admin/b2b" className="button secondary">
+                B2B
               </Link>
             </>
           ) : null}

@@ -21,6 +21,7 @@ export async function AdminBar() {
     { href: "/admin", label: "Site editor" },
     { href: "/newsletter?edit=1", label: "Newsletter" },
     { href: "/admin/products", label: "Products" },
+    { href: "/admin/b2b", label: "B2B" },
     { href: "/admin/users", label: "Manage users" },
   ];
 

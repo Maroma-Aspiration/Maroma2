@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { readMergedCatalog } from "../../../lib/product-catalog-admin";
+import { readLiveStorefrontCatalog } from "../../../lib/product-catalog-admin";
 import { filterProducts } from "../../../lib/product-db";
 
 export async function GET(request: Request) {
@@ -11,7 +11,7 @@ export async function GET(request: Request) {
     const limit = Number.isFinite(limitValue) ? Math.max(0, limitValue) : undefined;
     const onlyWithImages = url.searchParams.get("onlyWithImages") === "1";
 
-    const { products: merged } = await readMergedCatalog();
+    const { products: merged } = await readLiveStorefrontCatalog();
     const filtered = filterProducts(merged, { q, category, limit, onlyWithImages });
 
     return NextResponse.json(

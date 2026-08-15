@@ -5,8 +5,26 @@ import { readCatalogEdits, isProductPublished, type ProductCatalogEdit } from ".
 import { filterProducts, readOverrides, readProducts, withOverrides } from "./product-db";
 import { readStockStore } from "./commerce-stock";
 import type { ProductRecord } from "./product-types";
+import { readCreatedProducts } from "./admin-created-products";
+import { deriveProductInciStatus, productMissingRelevantInci, type ProductInciStatus } from "./product-inci";
+import liveProductIds from "../data/maroma-live-product-ids.json";
 
-export type AdminProductStatus = "active" | "draft" | "out_of_stock" | "no_image";
+const liveMaromaProductIdSet = new Set<string>(liveProductIds.map(String));
+
+function isAdminCreatedProduct(product: ProductRecord): boolean {
+  return String(product.id).startsWith("admin-");
+}
+
+function isVisibleOnStorefront(
+  product: ProductRecord,
+  catalogEdit?: ProductCatalogEdit
+): boolean {
+  if (catalogEdit?.deleted || catalogEdit?.published === false) return false;
+  return liveMaromaProductIdSet.has(String(product.id)) ||
+    (isAdminCreatedProduct(product) && isProductPublished(catalogEdit));
+}
+
+export type AdminProductStatus = "live" | "not_live" | "draft" | "out_of_stock" | "no_image";
 
 export type AdminProductSummary = {
   id: string;
@@ -19,10 +37,14 @@ export type AdminProductSummary = {
   categories: string[];
   stock: number;
   published: boolean;
+  liveStatus: "live" | "not_live" | "draft";
+  hasImage: boolean;
   status: AdminProductStatus;
   hasCatalogEdit: boolean;
   hasImageOverride: boolean;
   updatedAt?: string;
+  /** Full INCI / ingredient list status for personal-care style products. */
+  inciStatus: ProductInciStatus;
 };
 
 export type AdminProductDetail = AdminProductSummary & {
@@ -57,19 +79,39 @@ export async function readMergedCatalog(): Promise<{
   catalogEdits: Record<string, ProductCatalogEdit>;
   imageOverrideIds: Set<string>;
 }> {
-  const [base, imageStore, catalogStore] = await Promise.all([
+  const [base, created, imageStore, catalogStore] = await Promise.all([
     readProducts(),
+    readCreatedProducts(),
     readOverrides(),
     readCatalogEdits(),
   ]);
-  const withImages = withOverrides(base, imageStore);
-  const products = withImages.map((product) =>
-    applyCatalogEdit(product, catalogStore.edits[product.id])
-  );
+  const withImages = withOverrides([...created, ...base], imageStore);
+  const products = withImages
+    .filter((product) => !catalogStore.edits[product.id]?.deleted)
+    .map((product) => applyCatalogEdit(product, catalogStore.edits[product.id]));
   return {
     products,
     catalogEdits: catalogStore.edits,
     imageOverrideIds: new Set(Object.keys(imageStore.overrides)),
+  };
+}
+
+/**
+ * The public shop is intentionally restricted to products verified as published
+ * by maroma.com's WooCommerce Store API. The complete recovered catalogue stays
+ * available to Commerce admin for reconciliation and editing.
+ */
+export async function readLiveStorefrontCatalog(): Promise<{
+  products: ProductRecord[];
+  catalogEdits: Record<string, ProductCatalogEdit>;
+  imageOverrideIds: Set<string>;
+}> {
+  const catalog = await readMergedCatalog();
+  return {
+    ...catalog,
+    products: catalog.products.filter((product) =>
+      isVisibleOnStorefront(product, catalog.catalogEdits[product.id])
+    ),
   };
 }
 
@@ -81,7 +123,8 @@ export function deriveAdminProductStatus(
   if (!published) return "draft";
   if (!hasDisplayImage(product)) return "no_image";
   if (stock <= 0) return "out_of_stock";
-  return "active";
+  if (isVisibleOnStorefront(product)) return "live";
+  return "not_live";
 }
 
 export function toAdminProductSummary(
@@ -91,6 +134,7 @@ export function toAdminProductSummary(
   hasImageOverride = false
 ): AdminProductSummary {
   const published = isProductPublished(catalogEdit);
+  const hasImage = hasDisplayImage(product);
   const primaryCategory = product.categories[0] ?? "Uncategorised";
   return {
     id: product.id,
@@ -103,10 +147,13 @@ export function toAdminProductSummary(
     categories: product.categories,
     stock,
     published,
+    liveStatus: !published ? "draft" : isVisibleOnStorefront(product) ? "live" : "not_live",
+    hasImage,
     status: deriveAdminProductStatus(product, stock, published),
     hasCatalogEdit: Boolean(catalogEdit),
     hasImageOverride,
     updatedAt: catalogEdit?.updatedAt,
+    inciStatus: deriveProductInciStatus(product),
   };
 }
 
@@ -134,13 +181,43 @@ export function stockForProduct(productId: string, stockMap: Record<string, numb
   return DEFAULT_STOCK;
 }
 
+export type AdminProductFilter =
+  | AdminProductStatus
+  | "low_stock"
+  | "missing_inci";
+
 export type AdminProductListQuery = {
   q?: string;
   category?: string;
-  status?: "all" | AdminProductStatus | "low_stock";
+  /** @deprecated Prefer `statuses` for multi-select AND filters. */
+  status?: "all" | AdminProductFilter;
+  /** Active filters combined with AND. Empty / omitted means no status filter. */
+  statuses?: AdminProductFilter[];
   page?: number;
   limit?: number;
+  sortBy?: "product" | "status" | "inventory" | "category" | "price";
+  sortDirection?: "asc" | "desc";
+  /** When true, return every matching row (capped) for export. */
+  all?: boolean;
 };
+
+function normalizeAdminFilters(query: AdminProductListQuery): AdminProductFilter[] {
+  const fromList = (query.statuses ?? []).filter(Boolean);
+  if (fromList.length > 0) return Array.from(new Set(fromList));
+  if (query.status && query.status !== "all") return [query.status];
+  return [];
+}
+
+function productMatchesAdminFilter(
+  product: ProductRecord,
+  filter: AdminProductFilter,
+  stock: number,
+  published: boolean
+): boolean {
+  if (filter === "missing_inci") return productMissingRelevantInci(product);
+  if (filter === "low_stock") return published && stock > 0 && stock <= 5;
+  return deriveAdminProductStatus(product, stock, published) === filter;
+}
 
 export async function listAdminProducts(query: AdminProductListQuery): Promise<{
   products: AdminProductSummary[];
@@ -149,8 +226,11 @@ export async function listAdminProducts(query: AdminProductListQuery): Promise<{
   limit: number;
   categories: string[];
 }> {
+  const filters = normalizeAdminFilters(query);
   const page = Math.max(1, query.page ?? 1);
-  const limit = Math.min(100, Math.max(10, query.limit ?? 25));
+  const limit = query.all
+    ? Math.min(5000, Math.max(1, query.limit ?? 5000))
+    : Math.min(100, Math.max(10, query.limit ?? 25));
   const [{ products, catalogEdits, imageOverrideIds }, stockStore] = await Promise.all([
     readMergedCatalog(),
     readStockStore(),
@@ -166,23 +246,15 @@ export async function listAdminProducts(query: AdminProductListQuery): Promise<{
     category: query.category,
   });
 
-  if (query.status && query.status !== "all") {
+  if (filters.length > 0) {
     filtered = filtered.filter((product) => {
       const stock = stockForProduct(product.id, stockStore.stock);
       const published = isProductPublished(catalogEdits[product.id]);
-      const status = deriveAdminProductStatus(product, stock, published);
-      if (query.status === "low_stock") {
-        return published && stock > 0 && stock <= 5;
-      }
-      return status === query.status;
+      return filters.every((filter) => productMatchesAdminFilter(product, filter, stock, published));
     });
   }
 
-  const total = filtered.length;
-  const start = (page - 1) * limit;
-  const pageItems = filtered.slice(start, start + limit);
-
-  const summaries = pageItems.map((product) =>
+  const summaries = filtered.map((product) =>
     toAdminProductSummary(
       product,
       stockForProduct(product.id, stockStore.stock),
@@ -191,11 +263,28 @@ export async function listAdminProducts(query: AdminProductListQuery): Promise<{
     )
   );
 
+  const sortBy = query.sortBy ?? "product";
+  const direction = query.sortDirection === "desc" ? -1 : 1;
+  const textCompare = (a: string, b: string) =>
+    a.localeCompare(b, undefined, { numeric: true, sensitivity: "base" });
+  summaries.sort((a, b) => {
+    let result = 0;
+    if (sortBy === "product") result = textCompare(a.name, b.name);
+    if (sortBy === "status") result = textCompare(a.liveStatus, b.liveStatus);
+    if (sortBy === "inventory") result = a.stock - b.stock;
+    if (sortBy === "category") result = textCompare(a.primaryCategory, b.primaryCategory);
+    if (sortBy === "price") result = (a.priceNumber ?? -1) - (b.priceNumber ?? -1);
+    return (result || textCompare(a.name, b.name)) * direction;
+  });
+
+  const total = summaries.length;
+  const pageItems = query.all ? summaries.slice(0, limit) : summaries.slice((page - 1) * limit, (page - 1) * limit + limit);
+
   return {
-    products: summaries,
+    products: pageItems,
     total,
-    page,
-    limit,
+    page: query.all ? 1 : page,
+    limit: query.all ? pageItems.length : limit,
     categories: Array.from(categorySet).sort((a, b) => a.localeCompare(b)),
   };
 }

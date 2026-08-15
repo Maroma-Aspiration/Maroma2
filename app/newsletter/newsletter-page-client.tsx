@@ -4128,7 +4128,7 @@ export default function NewsletterPageClient({ initialState, editMode, isAdmin =
   const createNewIssue = async () => {
     if (
       !window.confirm(
-        "Create a new newsletter issue?\n\nThis keeps your masthead images, portrait, hero, mission text, colours, and layout exactly as they are. Stories are cleared and the issue title + CEO greeting reset to placeholders.",
+        "Create a new newsletter issue?\n\nStories clear and the issue title + CEO greeting reset. Masthead (banner, logo, portrait, hero) stays as on this issue. Other chrome uses your saved default layout when one exists.",
       )
     ) {
       return;
@@ -4489,6 +4489,40 @@ export default function NewsletterPageClient({ initialState, editMode, isAdmin =
       );
     } catch {
       setDeliveryStatus("Could not switch mailing list.");
+    }
+  };
+
+  const hostNewsletterImages = async () => {
+    setDeliveryStatus("Hosting newsletter images for email…");
+    try {
+      await saveStories();
+      const response = await fetch("/api/admin/migrate-canvas-to-firebase", {
+        method: "POST",
+        credentials: "include",
+      });
+      const payload = (await response.json().catch(() => ({}))) as {
+        error?: string;
+        urlsFound?: number;
+        migrated?: number;
+        skipped?: number;
+        failed?: number;
+        saved?: boolean;
+      };
+      if (!response.ok) {
+        setDeliveryStatus(payload.error ?? `Image hosting failed (${response.status}).`);
+        return;
+      }
+      setDeliveryStatus(
+        `Hosted images: found ${payload.urlsFound ?? 0}, uploaded ${payload.migrated ?? 0}, already public ${payload.skipped ?? 0}, failed ${payload.failed ?? 0}. Reloading…`
+      );
+      try {
+        localStorage.removeItem(CANVAS_LS_KEY);
+        localStorage.setItem(CANVAS_LS_SAVED_KEY, String(Date.now()));
+      } catch { /* ignore */ }
+      window.location.reload();
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Image hosting failed.";
+      setDeliveryStatus(message);
     }
   };
 
@@ -5009,6 +5043,14 @@ export default function NewsletterPageClient({ initialState, editMode, isAdmin =
                 <div className="newsletter-send-actions">
                   <button
                     type="button"
+                    className="button secondary"
+                    disabled={sendingTest || sendingCampaign}
+                    onClick={() => void hostNewsletterImages()}
+                  >
+                    Host images for email
+                  </button>
+                  <button
+                    type="button"
                     className={`button newsletter-test-send${sendingTest ? " is-sending" : ""}${testSent ? " is-sent" : ""}`}
                     disabled={sendingTest || testMailingList.length === 0}
                     onClick={() => void sendTestNewsletter()}
@@ -5024,6 +5066,9 @@ export default function NewsletterPageClient({ initialState, editMode, isAdmin =
                     {sendingCampaign ? "Sending" : campaignSent ? "Sent!" : "Send campaign now"}
                   </button>
                 </div>
+                <p className="admin-status newsletter-send-status" style={{ opacity: 0.85 }}>
+                  Email clients block inline images. Use Host images (or send test) so photos upload to Firebase/Blob as public HTTPS links.
+                </p>
                 {deliveryStatus ? <p className="admin-status newsletter-send-status">{deliveryStatus}</p> : null}
               </>
             ) : null}

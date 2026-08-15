@@ -4,10 +4,22 @@ import { Montserrat } from "next/font/google";
 import { Cormorant_Garamond } from "next/font/google";
 import { Raleway } from "next/font/google";
 import { Josefin_Sans } from "next/font/google";
+import Script from "next/script";
 import { readSiteContentFromDisk } from "../lib/read-site-content";
 import { isMaromaMobileUserAgent } from "../lib/mobile-viewport";
+import {
+  buildPageMetadata,
+  organizationJsonLd,
+  websiteJsonLd,
+} from "../lib/site-seo";
+import { CartProvider } from "../context/CartContext";
+import { CurrencyProvider } from "../context/CurrencyContext";
+import { AdminBar } from "./components/AdminBar";
+import { JsonLd } from "./components/JsonLd";
 import { SiteFooter } from "./components/SiteFooter";
 import { SiteHeader } from "./components/SiteHeader";
+import { SlowNetworkAlert } from "./components/SlowNetworkAlert";
+import { ViewportRootSync } from "./components/ViewportRootSync";
 import "./globals.css";
 import "./home-responsive.css";
 import "./components/home-collections.css";
@@ -46,22 +58,21 @@ const josefin = Josefin_Sans({
   adjustFontFallback: true
 });
 
-export const metadata: Metadata = {
-  title: "Maroma",
+export const metadata: Metadata = buildPageMetadata({
+  title: "Maroma | Natural fragrance & botanical care from Auroville",
   description:
-    "Botanical skincare, body care, and home rituals handmade in Auroville. Shop by care category, explore morning and evening rituals, and discover vegan, cruelty-free essentials."
-};
+    "Maroma makes botanical skincare, natural perfume oils, incense, handmade candles, and home rituals in Auroville, India. Shop face care, body care, hair care, and gifting.",
+  path: "/",
+  image: "/maroma-logo.png",
+});
 
 export const viewport = {
   width: "device-width",
-  initialScale: 1
-};
-
-import { CartProvider } from "../context/CartContext";
-import { AdminBar } from "./components/AdminBar";
-import { ViewportRootSync } from "./components/ViewportRootSync";
-
-import Script from "next/script";
+  initialScale: 1,
+  maximumScale: 1,
+  userScalable: false,
+  viewportFit: "cover",
+} as const;
 
 export default async function RootLayout({
   children
@@ -76,6 +87,14 @@ export default async function RootLayout({
   return (
     <html lang="en" className={`${sans.variable} ${serif.variable} ${raleway.variable} ${josefin.variable}`}>
       <body className="antialiased">
+        <JsonLd data={[organizationJsonLd(), websiteJsonLd()]} />
+        <Script
+          id="maroma-force-device-viewport"
+          strategy="beforeInteractive"
+          dangerouslySetInnerHTML={{
+            __html: `(function(){var m=document.querySelector('meta[name="viewport"]');if(!m){m=document.createElement('meta');m.name='viewport';document.head.appendChild(m);}m.content='width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover';})();`,
+          }}
+        />
         <Script
           id="maroma-viewport-sync"
           strategy="beforeInteractive"
@@ -86,11 +105,14 @@ export default async function RootLayout({
         <ViewportRootSync />
         <Script src="https://elfsightcdn.com/platform.js" strategy="afterInteractive" />
         <AdminBar />
-        <CartProvider>
-          <SiteHeader initialNav={initialNav} initialViewportIsMobile={initialViewportIsMobile} />
-          {children}
-          <SiteFooter />
-        </CartProvider>
+        <SlowNetworkAlert />
+        <CurrencyProvider>
+          <CartProvider>
+            <SiteHeader initialNav={initialNav} initialViewportIsMobile={initialViewportIsMobile} />
+            {children}
+            <SiteFooter />
+          </CartProvider>
+        </CurrencyProvider>
       </body>
     </html>
   );

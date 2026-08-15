@@ -28,7 +28,7 @@ export function ProductPdpGallery({ images, productName }: Props) {
   return (
     <div className="product-pdp-gallery" aria-label="Product gallery">
       <div className="product-pdp-main-visual">
-        <img src={main} alt={decodedName} />
+        <img src={main} alt={`${decodedName} — Maroma product photo`} fetchPriority="high" />
       </div>
       {list.length > 1 ? (
         <div className="product-pdp-thumbs" role="tablist" aria-label="Gallery thumbnails">
@@ -41,7 +41,7 @@ export function ProductPdpGallery({ images, productName }: Props) {
               className={`product-pdp-thumb ${index === active ? "is-active" : ""}`}
               onClick={() => setActive(index)}
             >
-              <img src={src} alt="" loading="lazy" />
+              <img src={src} alt={`${decodedName} view ${index + 1}`} loading="lazy" />
             </button>
           ))}
         </div>

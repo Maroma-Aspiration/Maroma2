@@ -7,7 +7,6 @@ import {
   validateProductCatalogPatch,
   type ProductCatalogPatch,
 } from "../../../../../lib/product-catalog-admin";
-import { readProducts } from "../../../../../lib/product-db";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -34,8 +33,7 @@ export async function PATCH(request: Request, context: RouteContext) {
     return NextResponse.json({ error: "Product id is required." }, { status: 400 });
   }
 
-  const baseProducts = await readProducts();
-  if (!baseProducts.some((product) => product.id === productId)) {
+  if (!(await getAdminProduct(productId))) {
     return NextResponse.json({ error: "Product not found." }, { status: 404 });
   }
 
@@ -75,4 +73,18 @@ export async function PATCH(request: Request, context: RouteContext) {
 
   const product = await getAdminProduct(productId);
   return NextResponse.json({ ok: true, product });
+}
+
+export async function DELETE(_request: Request, context: RouteContext) {
+  const productId = context.params.productId?.trim();
+  if (!productId) {
+    return NextResponse.json({ error: "Product id is required." }, { status: 400 });
+  }
+  if (!(await getAdminProduct(productId))) {
+    return NextResponse.json({ error: "Product not found." }, { status: 404 });
+  }
+
+  await upsertCatalogEdit(productId, { published: false, deleted: true });
+  invalidateCatalogCache();
+  return NextResponse.json({ ok: true });
 }

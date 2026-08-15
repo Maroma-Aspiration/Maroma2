@@ -79,6 +79,13 @@ export async function setProductStock(productId: string, quantity: number): Prom
   return writeStockStore(store);
 }
 
+export async function setProductsStock(productIds: string[], quantity: number): Promise<StockStore> {
+  const store = await readStockStore();
+  const normalized = Math.max(0, Math.floor(quantity));
+  for (const productId of productIds) store.stock[productId] = normalized;
+  return writeStockStore(store);
+}
+
 /** Decrement stock for each order line. Skips virtual ritual bundles. */
 export async function decrementStockForOrder(
   lines: Array<{ productId: string; quantity: number }>

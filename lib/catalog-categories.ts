@@ -2,6 +2,11 @@ export type CatalogCategory = {
   slug: string;
   label: string;
   description: string;
+  /**
+   * Longer, crawlable intro shown below the hero. Keep factual — used for SEO/GEO.
+   * Prefer this over stuffing keywords into the visual hero tagline.
+   */
+  seoIntro?: string;
   keywords: string[];
   /** Optional hero image (local `/staging-media/...` path), e.g. from maroma.com category asset. */
   bannerImage?: string;
@@ -17,7 +22,9 @@ export const catalogCategories: CatalogCategory[] = [
   {
     slug: "face-care",
     label: "Face Care",
-    description: "Botanical cleansers, serums, and skincare rituals for daily glow.",
+    description: "Botanical face care from Maroma — cleansers, serums, and daily skincare rituals handmade in Auroville, India.",
+    seoIntro:
+      "Maroma face care focuses on botanical cleansers, serums, and simple daily rituals. Formulations are made in Auroville, India, for people looking for natural skincare that supports balanced, glowing skin.",
     keywords: ["face", "facial", "skin care", "serum", "cleanser", "face care"],
     bannerImage: "/staging-media/admin-category-banners/face-care-1776928521609.png",
     bannerLayout: "wide-cover",
@@ -28,7 +35,9 @@ export const catalogCategories: CatalogCategory[] = [
   {
     slug: "body-care",
     label: "Body Care",
-    description: "Body washes, soaps, oils, and nourishing care essentials.",
+    description: "Natural body care from Maroma — soaps, washes, oils, and nourishing essentials handmade in Auroville.",
+    seoIntro:
+      "Explore Maroma body care: aromatic soaps, washes, oils, and everyday essentials made with botanical ingredients in Auroville, India.",
     keywords: ["body care", "bath", "soap", "body", "lotion"],
     bannerImage: "/staging-media/admin-category-banners/body-care-1776932025032.png",
     bannerLayout: "wide-cover"
@@ -36,7 +45,9 @@ export const catalogCategories: CatalogCategory[] = [
   {
     slug: "hair-care",
     label: "Hair Care",
-    description: "Shampoos, conditioners, and hair rituals made with natural ingredients.",
+    description: "Natural hair care from Maroma — shampoos, conditioners, and scalp rituals with botanical ingredients.",
+    seoIntro:
+      "Maroma hair care includes shampoos, conditioners, and rituals made with natural ingredients for cleansing and caring for hair and scalp.",
     keywords: ["hair", "shampoo", "conditioner", "scalp"],
     bannerImage: "/staging-media/admin-category-banners/hair-care-1776932050901.png",
     bannerLayout: "wide-cover"
@@ -44,7 +55,9 @@ export const catalogCategories: CatalogCategory[] = [
   {
     slug: "baby",
     label: "Baby",
-    description: "Gentle, natural care formulated for delicate baby skin.",
+    description: "Gentle Maroma baby care formulated with natural ingredients for delicate skin.",
+    seoIntro:
+      "Maroma baby products are made for gentle, everyday care of delicate skin, using natural ingredients suitable for little ones.",
     keywords: ["baby"],
     bannerImage: "/staging-media/wp-content/uploads/2023/09/Baby-Shampoo-01.jpeg",
     bannerLayout: "wide-cover",
@@ -54,7 +67,9 @@ export const catalogCategories: CatalogCategory[] = [
   {
     slug: "man",
     label: "Man",
-    description: "Grooming, beard care, and fragrances made for men.",
+    description: "Natural grooming, beard care, and fragrance for men from Maroma, handmade in Auroville.",
+    seoIntro:
+      "The Maroma Man collection covers natural grooming, beard care, and fragrance options designed for everyday use.",
     keywords: ["men", "man", "beard", "shave", "grooming"],
     bannerImage: "/staging-media/wp-content/uploads/2023/08/EA29-A33_Man-Travel-Kit-001-copy.jpg",
     bannerLayout: "wide-cover",
@@ -64,7 +79,9 @@ export const catalogCategories: CatalogCategory[] = [
   {
     slug: "perfumes",
     label: "Perfumes",
-    description: "Fine fragrances and aromatics designed around mood and memory.",
+    description: "Natural perfume oils and fine fragrances from Maroma — botanical aromatics handmade in Auroville, India.",
+    seoIntro:
+      "Maroma perfumes include natural perfume oils and botanical fragrances created in Auroville. Browse mood-led aromatics for personal fragrance rituals.",
     keywords: ["perfume", "fragrance", "aroma", "eau", "attar"],
     bannerImage: "/staging-media/admin-category-banners/perfumes-1776932080574.png",
     bannerLayout: "wide-cover"
@@ -72,7 +89,9 @@ export const catalogCategories: CatalogCategory[] = [
   {
     slug: "home-essentials",
     label: "Home Essentials",
-    description: "Incense, candles, and ambient rituals for your space.",
+    description: "Natural incense, handmade candles, and home fragrance from Maroma in Auroville, India.",
+    seoIntro:
+      "Maroma Home Essentials brings natural incense, candles, and ambient fragrance for living spaces. Many pieces continue Auroville’s tradition of handmade home fragrance.",
     keywords: ["home", "incense", "candle", "ambient", "room", "diffuser"],
     bannerImage: "/staging-media/admin-category-banners/home-essentials-1776932101259.png",
     bannerLayout: "wide-cover"
@@ -80,9 +99,11 @@ export const catalogCategories: CatalogCategory[] = [
   {
     slug: "colibri",
     label: "Colibri",
-    description: "Natural outdoor incense leaves and garden fragrances.",
+    description: "Colibri botanical incense leaves for home and garden — natural outdoor fragrance from Maroma.",
+    seoIntro:
+      "Colibri is Maroma’s line of botanical incense leaves for home and garden use — a natural outdoor fragrance format.",
     keywords: ["colibri"],
-    bannerImage: "/staging-media/wp-content/uploads/2023/12/Colibri-Cedarwood1-min.jpg",
+    bannerImage: "/staging-media/wp-content/uploads/2025/09/Leaf-Incemse-Cedarwood-01.webp",
     bannerLayout: "wide-cover",
     heroTitle: "Colibri",
     heroTagline: "Botanical incense leaves for home and garden."
@@ -90,7 +111,9 @@ export const catalogCategories: CatalogCategory[] = [
   {
     slug: "gifting",
     label: "Gifting",
-    description: "Gift-ready selections and curated wellbeing sets.",
+    description: "Maroma gift sets and curated wellbeing selections — natural fragrance and care, ready to give.",
+    seoIntro:
+      "Choose Maroma gifting sets and curated selections spanning skincare, perfume oils, incense, and home fragrance — suitable for thoughtful, nature-led presents.",
     keywords: ["gift", "gifting", "set", "hamper", "collection"],
     bannerImage: "/staging-media/admin-category-banners/gifting-1776932133753.png",
     bannerLayout: "wide-cover"
@@ -120,7 +143,7 @@ const slugify = (value: string): string =>
 
 const navHrefByNormalizedLabel: Record<string, string> = (() => {
   const map: Record<string, string> = {
-    home: "/"
+    home: "/?skipIntro=1"
   };
   for (const category of catalogCategories) {
     map[normalize(category.label)] = `/${category.slug}`;
@@ -141,7 +164,7 @@ export const getNavHref = (label: string): string => {
 export const categoryPathByLabel = (label: string): string => {
   const cleaned = normalize(label);
   if (!cleaned || cleaned === "home") {
-    return "/";
+    return "/?skipIntro=1";
   }
 
   const matched = catalogCategories.find(

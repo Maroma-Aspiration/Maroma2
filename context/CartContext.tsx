@@ -1,7 +1,7 @@
 "use client";
 
 import React, { createContext, useCallback, useContext, useEffect, useState } from "react";
-import { formatInrPrice } from "../lib/format-price";
+import { useCurrency } from "./CurrencyContext";
 import type { CartItemView, CartView } from "../lib/commerce-types";
 import type { ProductRecord } from "../lib/product-types";
 
@@ -73,6 +73,7 @@ async function postCart(body: Record<string, unknown>): Promise<CartView> {
 }
 
 export function CartProvider({ children }: { children: React.ReactNode }) {
+  const { formatMoney } = useCurrency();
   const [cart, setCart] = useState<CartItemView[]>([]);
   const [cartId, setCartId] = useState<string | null>(null);
   const [couponCode, setCouponCode] = useState<string | null>(null);
@@ -206,8 +207,7 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
     // Discount rates are applied server-side (e.g. when adding a ritual set).
   };
 
-  const formatItemPrice = (price: number) =>
-    formatInrPrice(String(price)) ?? `₹${price.toLocaleString("en-IN")}`;
+  const formatItemPrice = (price: number) => formatMoney(price);
 
   return (
     <CartContext.Provider

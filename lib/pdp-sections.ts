@@ -6,6 +6,7 @@ const normalizeNewlines = (text: string): string =>
   decodeBasicHtmlEntities(text || "")
     .replace(/\\n/g, "\n")
     .replace(/\r\n/g, "\n")
+    .replace(/\[\/?bg_collapse[^\]]*\]/gi, "")
     .trim();
 
 const sliceAfter = (text: string, marker: string): string => {
@@ -31,6 +32,7 @@ export type PdpAccordionSections = {
   description: string;
   ingredients: string;
   benefits: string;
+  howToUse: string;
 };
 
 export function derivePdpSections(product: ProductRecord): PdpAccordionSections {
@@ -51,10 +53,24 @@ export function derivePdpSections(product: ProductRecord): PdpAccordionSections 
     benefits = sliceUntil(after, ["HOW TO USE", "FULL INGREDIENT LIST", "INGREDIENT LIST"]).trim();
   }
 
-  let ingredients = "";
-  if (body.includes("FULL INGREDIENT LIST")) {
+  let howToUse = "";
+  if (body.includes("HOW TO USE")) {
+    howToUse = sliceUntil(sliceAfter(body, "HOW TO USE"), [
+      "FULL INGREDIENT LIST",
+      "INGREDIENT LIST",
+      "BENEFITS",
+    ]).trim();
+  }
+
+  const fullIngredients =
+    product.attributes["Full INCI"] ??
+    product.attributes["INCI"] ??
+    product.attributes["Full Ingredient List"] ??
+    product.attributes["Ingredients"];
+  let ingredients = fullIngredients?.filter(Boolean).join(", ").trim() ?? "";
+  if (!ingredients && body.includes("FULL INGREDIENT LIST")) {
     ingredients = sliceAfter(body, "FULL INGREDIENT LIST").trim();
-  } else if (body.includes("INGREDIENT LIST")) {
+  } else if (!ingredients && body.includes("INGREDIENT LIST")) {
     ingredients = sliceAfter(body, "INGREDIENT LIST").trim();
   }
 
@@ -63,6 +79,8 @@ export function derivePdpSections(product: ProductRecord): PdpAccordionSections 
     let intro = body;
     if (body.includes("BENEFITS")) {
       intro = body.slice(0, body.indexOf("BENEFITS")).trim();
+    } else if (body.includes("HOW TO USE")) {
+      intro = body.slice(0, body.indexOf("HOW TO USE")).trim();
     }
     if (intro && intro.length > 40) {
       description = short ? `${short}\n\n${intro}` : intro;
@@ -79,14 +97,8 @@ export function derivePdpSections(product: ProductRecord): PdpAccordionSections 
   }
 
   if (!ingredients) {
-    const key = product.attributes["Key Ingredients"] ?? product.attributes["Ingredients"];
-    if (key && key.length > 0) {
-      ingredients = key.join(", ");
-    }
-  }
-  if (!ingredients) {
-    ingredients = "Full INCI is printed on the product label and available from Maroma.";
+    ingredients = "Full INCI ingredient list is not yet available online. Please refer to the product label or contact Maroma before purchase.";
   }
 
-  return { description, ingredients, benefits };
+  return { description, ingredients, benefits, howToUse };
 }

@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useState } from "react";
+import { useEffect } from "react";
 
 const reasonCopy: Record<string, string> = {
   auth_not_configured:
@@ -20,6 +21,11 @@ export function LoginForm() {
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState("");
   const [pending, setPending] = useState(false);
+
+  useEffect(() => {
+    document.body.classList.add("auth-screen-active");
+    return () => document.body.classList.remove("auth-screen-active");
+  }, []);
 
   const reason = searchParams.get("reason") ?? "";
   const reasonMessage = reason ? reasonCopy[reason] ?? "" : "";
@@ -108,6 +114,9 @@ export function LoginForm() {
           <Link href="/signup">Create account</Link> ·{" "}
           <Link href="/">Back to site</Link>
         </p>
+        <Link href="/admin/install" className="login-install-link">
+          Install Production App
+        </Link>
       </section>
     </main>
   );

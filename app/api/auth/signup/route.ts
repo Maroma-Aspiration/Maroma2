@@ -32,7 +32,7 @@ export async function POST(request: Request) {
   }
 
   try {
-    const user = await createAuthUser(email, password, "admin");
+    const user = await createAuthUser(email, password, "user");
     const exp = Date.now() + SESSION_DURATION_MS;
     const token = await signSessionPayload({ email: user.email, role: user.role, exp }, secret);
     cookies().set(SESSION_COOKIE, token, {

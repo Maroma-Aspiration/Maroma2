@@ -19,6 +19,8 @@ type HeroVideoMediaProps = {
   loop?: boolean;
   /** Fired when a non-looping YouTube/native video ends. */
   onEnded?: () => void;
+  /** Fired once playback has actually started. */
+  onPlaying?: () => void;
 };
 
 export function HeroVideoMedia({
@@ -28,17 +30,20 @@ export function HeroVideoMedia({
   variant = "frame",
   loop = true,
   onEnded,
+  onPlaying,
 }: HeroVideoMediaProps) {
   const youTubeId = isYouTubeUrl(src) ? parseYouTubeVideoId(src) : null;
   const iframeRef = useRef<HTMLIFrameElement | null>(null);
   const onEndedRef = useRef(onEnded);
+  const onPlayingRef = useRef(onPlaying);
   onEndedRef.current = onEnded;
+  onPlayingRef.current = onPlaying;
   const iframeDomId = useId().replace(/:/g, "");
   const wrapClass =
     variant === "background" ? "hero-youtube-wrap hero-youtube-wrap--background" : "hero-youtube-wrap";
 
   useEffect(() => {
-    if (!youTubeId || loop || !onEndedRef.current) return;
+    if (!youTubeId || (!onEndedRef.current && !onPlayingRef.current)) return;
     const iframe = iframeRef.current;
     if (!iframe) return;
     let cancelled = false;
@@ -47,6 +52,9 @@ export function HeroVideoMedia({
     void bindYouTubePlayer(iframe, {
       onEnded: () => {
         if (!cancelled) onEndedRef.current?.();
+      },
+      onPlaying: () => {
+        if (!cancelled) onPlayingRef.current?.();
       },
     }).then((bound) => {
       if (cancelled) {
@@ -81,7 +89,7 @@ export function HeroVideoMedia({
           className="hero-youtube-embed"
           src={youTubeHeroEmbedUrl(youTubeId, {
             loop,
-            enableJsApi: !loop,
+            enableJsApi: !loop || Boolean(onPlaying),
             origin,
           })}
           title=""
@@ -105,6 +113,7 @@ export function HeroVideoMedia({
         onEnded={() => {
           if (!loop) onEnded?.();
         }}
+        onPlaying={onPlaying}
       >
         <source src={src} />
       </video>

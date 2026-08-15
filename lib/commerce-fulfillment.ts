@@ -28,6 +28,7 @@ export type FulfillmentChecklistItem = {
 
 export type OrderFulfillmentState = {
   checked: Record<string, boolean>;
+  taskOverrides?: Record<string, { label?: string; deleted?: boolean }>;
   updatedAt: string;
 };
 
@@ -59,6 +60,7 @@ function parseStore(raw: unknown): FulfillmentStore {
     }
     orders[orderId] = {
       checked,
+      taskOverrides: value.taskOverrides && typeof value.taskOverrides === "object" ? value.taskOverrides as OrderFulfillmentState["taskOverrides"] : {},
       updatedAt: typeof value.updatedAt === "string" ? value.updatedAt : new Date(0).toISOString(),
     };
   }
@@ -220,6 +222,15 @@ export async function getOrderFulfillmentState(orderId: string): Promise<OrderFu
   return store.orders[orderId] ?? { checked: {}, updatedAt: new Date(0).toISOString() };
 }
 
+export async function setFulfillmentTaskOverride(orderId: string, key: string, patch: { label?: string; deleted?: boolean }): Promise<OrderFulfillmentState> {
+  const store = await readStore();
+  const existing = store.orders[orderId] ?? { checked: {}, taskOverrides: {}, updatedAt: new Date(0).toISOString() };
+  const next = { ...existing, taskOverrides: { ...(existing.taskOverrides ?? {}), [key]: { ...(existing.taskOverrides?.[key] ?? {}), ...patch } }, updatedAt: new Date().toISOString() };
+  store.orders[orderId] = next;
+  await writeStore(store);
+  return next;
+}
+
 export async function setFulfillmentItemChecked(
   orderId: string,
   key: string,
@@ -232,6 +243,7 @@ export async function setFulfillmentItemChecked(
     delete nextChecked[key];
   }
   const next: OrderFulfillmentState = {
+    ...existing,
     checked: nextChecked,
     updatedAt: new Date().toISOString(),
   };
@@ -262,7 +274,7 @@ export function buildFulfillmentOrderSummary(
   order: OrderRecord,
   fulfillment: OrderFulfillmentState
 ): FulfillmentOrderSummary {
-  const checklist = buildOrderChecklist(order);
+  const checklist = applyTaskOverrides(buildOrderChecklist(order), fulfillment);
   const giftSets = expandOrderGiftSets(order);
   const previewImages = checklist
     .map((item) => item.image)
@@ -288,6 +300,17 @@ export function buildFulfillmentOrderSummary(
   };
 }
 
+function applyTaskOverrides(
+  checklist: FulfillmentChecklistItem[],
+  fulfillment: OrderFulfillmentState
+): FulfillmentChecklistItem[] {
+  return checklist.flatMap((item) => {
+    const override = fulfillment.taskOverrides?.[item.key];
+    if (override?.deleted) return [];
+    return [{ ...item, label: override?.label?.trim() || item.label }];
+  });
+}
+
 export type FulfillmentOrderDetail = FulfillmentOrderSummary & {
   order: OrderRecord;
   giftSets: ProductionGiftSetLine[];
@@ -300,7 +323,7 @@ export async function buildFulfillmentOrderDetail(order: OrderRecord): Promise<F
   const fulfillment = await getOrderFulfillmentState(order.id);
   const giftSets = expandOrderGiftSets(order);
   const regularLines = orderRegularLines(order, giftSets);
-  const checklist = buildOrderChecklist(order);
+  const checklist = applyTaskOverrides(buildOrderChecklist(order), fulfillment);
 
   return {
     ...buildFulfillmentOrderSummary(order, fulfillment),

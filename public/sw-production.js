@@ -1,5 +1,5 @@
-const CACHE_NAME = "maroma-production-shell-v1";
-const SHELL = ["/admin/orders", "/manifest-production.webmanifest", "/icons/production-icon-192.svg"];
+const CACHE_NAME = "maroma-production-shell-v4";
+const SHELL = ["/admin/install", "/manifest.webmanifest", "/icons/maroma-production-safe-192.png"];
 
 self.addEventListener("install", (event) => {
   event.waitUntil(

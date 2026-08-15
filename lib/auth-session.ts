@@ -81,7 +81,7 @@ export async function verifySessionPayload(token: string, secret: string): Promi
     if (typeof parsed.email !== "string" || typeof parsed.exp !== "number") {
       return null;
     }
-    if (parsed.role !== "admin" && parsed.role !== "user") {
+    if (parsed.role !== "admin" && parsed.role !== "production" && parsed.role !== "user") {
       return null;
     }
     if (parsed.exp < Date.now()) {

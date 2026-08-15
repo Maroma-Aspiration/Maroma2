@@ -18,10 +18,30 @@ import {
   buildArchiveSlug,
   pickThumbnailFromCanvas,
 } from "../../../../lib/newsletter-archive-utils";
-import { readStoriesState } from "../../../../lib/story-storage";
-import { ensureCanvasPublicImageUrls } from "../../../../lib/canvas-email-images";
+import { readStoriesState, writeStoriesState } from "../../../../lib/story-storage";
+import { ensureCanvasPublicImageUrlsDetailed } from "../../../../lib/canvas-email-images";
 import { parseStorySpacingGaps, type StorySpacingGaps } from "../../../../lib/story-spacing-gaps";
 import { canvasToEmailHtml, canvasEmailOptionsFromState } from "../../../../lib/canvas-to-email";
+import type { NewsletterCanvas, StoriesState } from "../../../../lib/story-types";
+
+async function prepareCanvasForEmail(
+  state: StoriesState,
+  origin: string
+): Promise<NewsletterCanvas> {
+  const prepared = await ensureCanvasPublicImageUrlsDetailed(state.newsletterCanvas, origin);
+  if (prepared.remainingDataUrls > 0) {
+    throw new Error(
+      `${prepared.remainingDataUrls} newsletter image(s) are still stored inline and could not be uploaded to Firebase or Vercel Blob. Check FIREBASE_* credentials or BLOB_READ_WRITE_TOKEN, then re-upload the images and try again.`
+    );
+  }
+  if (prepared.changed) {
+    await writeStoriesState({
+      ...state,
+      newsletterCanvas: prepared.canvas,
+    });
+  }
+  return prepared.canvas;
+}
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 300;
@@ -154,18 +174,26 @@ export async function POST(request: Request) {
       }
       const fakeId = "test-subscriber";
       const urls = buildTrackedNewsletterUrls(origin, fakeId, "test-campaign", trackingSecret);
-      const canvasForEmail = await ensureCanvasPublicImageUrls(state.newsletterCanvas, origin);
-        html = canvasToEmailHtml(
-          canvasForEmail,
-          canvasEmailOptionsFromState(state, {
-            subject,
-            previewText,
-            siteUrl: origin,
-            allowDataUrls: false,
-            storySpacingGaps,
-            tracking: {
-              pixelUrl: urls.pixelUrl,
-              unsubUrl: urls.unsubUrl,
+      let canvasForEmail: NewsletterCanvas;
+      try {
+        canvasForEmail = await prepareCanvasForEmail(state, origin);
+      } catch (err) {
+        return NextResponse.json(
+          { error: err instanceof Error ? err.message : "Could not prepare newsletter images." },
+          { status: 400 }
+        );
+      }
+      html = canvasToEmailHtml(
+        canvasForEmail,
+        canvasEmailOptionsFromState(state, {
+          subject,
+          previewText,
+          siteUrl: origin,
+          allowDataUrls: false,
+          storySpacingGaps,
+          tracking: {
+            pixelUrl: urls.pixelUrl,
+            unsubUrl: urls.unsubUrl,
             viewOnlineUrl: `${origin}/newsletter/view`,
           },
         })
@@ -234,7 +262,15 @@ export async function POST(request: Request) {
 
   const campaignId = crypto.randomUUID();
   const sentAt = new Date().toISOString();
-  const canvasForEmail = await ensureCanvasPublicImageUrls(state.newsletterCanvas, origin);
+  let canvasForEmail: NewsletterCanvas;
+  try {
+    canvasForEmail = await prepareCanvasForEmail(state, origin);
+  } catch (err) {
+    return NextResponse.json(
+      { error: err instanceof Error ? err.message : "Could not prepare newsletter images." },
+      { status: 400 }
+    );
+  }
   const archiveSlug = buildArchiveSlug(subject, sentAt, campaignId);
   const viewOnlineUrl = `${origin}/newsletter/archive/${archiveSlug}`;
 

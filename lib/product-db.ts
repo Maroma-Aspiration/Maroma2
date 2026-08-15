@@ -2,6 +2,8 @@ import { promises as fs } from "fs";
 import path from "path";
 import { hasDisplayImage } from "./product-image";
 import type { ProductRecord } from "./product-types";
+import { kv } from "@vercel/kv";
+import { normalizeProductInciFields } from "./product-inci-extract";
 
 export type { ProductRecord } from "./product-types";
 
@@ -17,6 +19,8 @@ type ProductOverrideStore = {
 
 const productDataPath = path.join(process.cwd(), "data", "maroma-products.json");
 const overrideDataPath = path.join(process.cwd(), "data", "product-overrides.json");
+const overrideKvKey = "maroma:product-image-overrides";
+const hasKvConfig = Boolean(process.env.KV_REST_API_URL && process.env.KV_REST_API_TOKEN);
 
 const readJson = async <T>(filePath: string, fallback: T): Promise<T> => {
   try {
@@ -38,18 +42,32 @@ const cleanText = (text: string | null | undefined): string => {
 
 export const readProducts = async (): Promise<ProductRecord[]> => {
   const products = await readJson<ProductRecord[]>(productDataPath, []);
-  return products.map(p => ({
-    ...p,
-    shortDescription: cleanText(p.shortDescription),
-    description: cleanText(p.description)
-  }));
+  return products.map((product) => {
+    // Promote INCI before description cleanup so formula text is not lost.
+    const normalized = normalizeProductInciFields(product).product;
+    return {
+      ...normalized,
+      shortDescription: cleanText(normalized.shortDescription),
+      description: cleanText(normalized.description),
+    };
+  });
 };
 
 export const readOverrides = async (): Promise<ProductOverrideStore> => {
+  if (hasKvConfig) {
+    try {
+      const stored = await kv.get<ProductOverrideStore>(overrideKvKey);
+      if (stored?.overrides) return stored;
+    } catch {}
+  }
   return readJson<ProductOverrideStore>(overrideDataPath, { overrides: {} });
 };
 
 export const writeOverrides = async (store: ProductOverrideStore): Promise<void> => {
+  if (hasKvConfig) {
+    await kv.set(overrideKvKey, store);
+    return;
+  }
   await fs.mkdir(path.dirname(overrideDataPath), { recursive: true });
   await fs.writeFile(overrideDataPath, JSON.stringify(store, null, 2), "utf8");
 };
@@ -89,6 +107,8 @@ export const filterProducts = (
   const category = normalize(query.category ?? "");
   const limit = query.limit && query.limit > 0 ? query.limit : undefined;
   const onlyWithImages = query.onlyWithImages === true;
+  const escapeRegExp = (value: string) => value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const tokenRe = q ? new RegExp(`(?:^|[^a-z0-9])${escapeRegExp(q)}(?:[^a-z0-9]|$)`) : null;
 
   const filtered = products.filter((product) => {
     if (onlyWithImages && !hasDisplayImage(product)) {
@@ -120,46 +140,32 @@ export const filterProducts = (
       return true;
     }
 
-    // High-priority fields: If it matches here, it's a strong result
-    const strongHaystack = [
-      product.name,
-      ...product.categories
-    ].join(" ").toLowerCase();
+    // Catalog fields only — skip descriptions/ingredients ("coconut oil" etc.).
+    // Whole-token match so "oil" does not hit "Olibanum".
+    const fields = [
+      normalize(product.name),
+      ...product.categories.map((entry) => normalize(entry)),
+      ...product.tags.map((entry) => normalize(entry)),
+      normalize(product.sku),
+      normalize(product.brand),
+    ];
 
-    if (strongHaystack.includes(q)) {
-      return true;
-    }
-
-    // Lower-priority fields: Check if it's a genuine match or just a mention
-    const weakHaystack = [
-      product.sku,
-      product.shortDescription,
-      product.description,
-      product.brand,
-      ...product.tags
-    ].join(" ").toLowerCase();
-
-    if (weakHaystack.includes(q)) {
-      // If we only matched in the description, ensure we aren't a conflicting product type.
-      // e.g. If searching for 'candle', and product is in 'Incense' category but not 'Candle' category, exclude it.
-      const isSearchForCandle = q.includes("candle");
-      const isSearchForIncense = q.includes("incense");
-      
-      const inCandleCategory = product.categories.some(c => normalize(c).includes("candle"));
-      const inIncenseCategory = product.categories.some(c => normalize(c).includes("incense"));
-
-      if (isSearchForCandle && !inCandleCategory && inIncenseCategory) {
-        return false; // It's an incense product mentioning candles
-      }
-      if (isSearchForIncense && !inIncenseCategory && inCandleCategory) {
-        return false; // It's a candle product mentioning incense
-      }
-
-      return true;
-    }
-
-    return false;
+    return fields.some((field) => (field ? tokenRe!.test(field) : false));
   });
+
+  if (q) {
+    filtered.sort((a, b) => {
+      const aName = normalize(a.name);
+      const bName = normalize(b.name);
+      const aNameHit = aName.includes(q);
+      const bNameHit = bName.includes(q);
+      if (aNameHit !== bNameHit) return aNameHit ? -1 : 1;
+      const aStarts = aName.startsWith(q) || aName.includes(` ${q}`);
+      const bStarts = bName.startsWith(q) || bName.includes(` ${q}`);
+      if (aStarts !== bStarts) return aStarts ? -1 : 1;
+      return aName.localeCompare(bName);
+    });
+  }
 
   if (limit) {
     return filtered.slice(0, limit);

@@ -4,10 +4,9 @@ import { useEffect, useState } from "react";
 
 type UserRow = {
   email: string;
-  role: "admin" | "user";
+  role: "admin" | "production" | "user";
   source: "env" | "stored";
-  password: string;
-  passwordSource: "env" | "stored";
+  credentialSource: "env" | "stored";
 };
 
 export default function AdminUsersPage() {
@@ -17,13 +16,14 @@ export default function AdminUsersPage() {
   const [savingEmail, setSavingEmail] = useState<string | null>(null);
   const [resetingEmail, setResetingEmail] = useState<string | null>(null);
   const [newPasswords, setNewPasswords] = useState<Record<string, string>>({});
-  const [visiblePasswords, setVisiblePasswords] = useState<Record<string, boolean>>({});
   const [rowFeedback, setRowFeedback] = useState<Record<string, { ok: boolean; msg: string }>>({});
+  const [deletingEmail, setDeletingEmail] = useState<string | null>(null);
+  const [editingEmail, setEditingEmail] = useState<string | null>(null);
+  const [currentEmail, setCurrentEmail] = useState("");
 
-  // New user form state
   const [newEmail, setNewEmail] = useState("");
   const [newPassword, setNewPassword] = useState("");
-  const [newRole, setNewRole] = useState<"admin" | "user">("admin");
+  const [newRole, setNewRole] = useState<UserRow["role"]>("admin");
   const [creating, setCreating] = useState(false);
 
   const loadUsers = async () => {
@@ -46,7 +46,61 @@ export default function AdminUsersPage() {
 
   useEffect(() => {
     void loadUsers();
+    void fetch("/api/auth/session", { cache: "no-store" })
+      .then((response) => response.json())
+      .then((data: { user?: { email?: string } }) => setCurrentEmail(data.user?.email?.toLowerCase() ?? ""));
   }, []);
+
+  const editUser = async (row: UserRow) => {
+    if (row.source !== "stored") {
+      setFeedback(row.email, false, "Environment-managed users must be edited in Vercel settings");
+      return;
+    }
+    const nextEmail = window.prompt("User email", row.email)?.trim().toLowerCase();
+    if (!nextEmail) return;
+    const password = window.prompt("New password (leave blank to keep the current password)", "");
+    if (password === null) return;
+    setEditingEmail(row.email);
+    try {
+      const response = await fetch("/api/auth/users", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: row.email, newEmail: nextEmail, role: row.role, password, action: "edit_user" }),
+      });
+      const data = (await response.json()) as { error?: string };
+      if (!response.ok) throw new Error(data.error || "Could not edit user.");
+      await loadUsers();
+      setStatus(`User ${nextEmail} updated.`);
+    } catch (error) {
+      setFeedback(row.email, false, error instanceof Error ? error.message : "Could not edit user");
+    } finally {
+      setEditingEmail(null);
+    }
+  };
+
+  const deleteUser = async (row: UserRow) => {
+    if (row.email.toLowerCase() === currentEmail) {
+      setFeedback(row.email, false, "You cannot delete the account you are currently using");
+      return;
+    }
+    if (!window.confirm(`Delete ${row.email}? This account will immediately lose access.`)) return;
+    setDeletingEmail(row.email);
+    try {
+      const response = await fetch("/api/auth/users", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: row.email }),
+      });
+      const data = (await response.json()) as { error?: string };
+      if (!response.ok) throw new Error(data.error || "Could not delete user.");
+      setUsers((current) => current.filter((user) => user.email !== row.email));
+      setStatus(`${row.email} deleted.`);
+    } catch (error) {
+      setFeedback(row.email, false, error instanceof Error ? error.message : "Could not delete user");
+    } finally {
+      setDeletingEmail(null);
+    }
+  };
 
   const setFeedback = (email: string, ok: boolean, msg: string) => {
     setRowFeedback((prev) => ({ ...prev, [email]: { ok, msg } }));
@@ -78,7 +132,7 @@ export default function AdminUsersPage() {
     }
   };
 
-  const updateRole = async (email: string, role: "admin" | "user") => {
+  const updateRole = async (email: string, role: UserRow["role"]) => {
     setSavingEmail(email);
     try {
       const response = await fetch("/api/auth/users", {
@@ -91,8 +145,8 @@ export default function AdminUsersPage() {
         setFeedback(email, false, data.error ?? "Role update failed.");
         return;
       }
-      setUsers((prev) => prev.map((row) => (row.email === email ? { ...row, role, source: "stored" } : row)));
-      setFeedback(email, true, role === "admin" ? "Admin granted" : "Admin revoked");
+      setUsers((prev) => prev.map((row) => (row.email === email ? { ...row, role, source: "stored", credentialSource: "stored" } : row)));
+      setFeedback(email, true, `Role changed to ${role === "admin" ? "Admin" : role === "production" ? "Production" : "Read-only"}`);
     } catch {
       setFeedback(email, false, "Network error");
     } finally {
@@ -139,23 +193,22 @@ export default function AdminUsersPage() {
       <header className="admin-header">
         <div>
           <h1>Manage Users</h1>
-          <p>Create accounts, view passwords, and assign roles. Admins can edit the newsletter.</p>
+          <p>Create accounts, reset passwords, and assign roles. Passwords are stored hashed and cannot be viewed.</p>
         </div>
       </header>
 
       {status ? <div className="admin-status">{status}</div> : null}
 
-      {/* ── Create new account ───────────────────────────────────────── */}
       <section className="admin-section" style={{ marginBottom: "2rem" }}>
         <h2 style={{ marginBottom: "1rem" }}>Create new account</h2>
         <form onSubmit={(e) => void createUser(e)} style={{ display: "grid", gridTemplateColumns: "1fr 1fr auto auto", gap: "6px 12px", alignItems: "end" }}>
           <label style={{ display: "flex", flexDirection: "column", gap: 4, fontSize: 13, opacity: 0.7 }}>
-            Email
+            Email / name
             <input
               type="email"
               value={newEmail}
               onChange={(e) => setNewEmail(e.target.value)}
-              placeholder="editor@example.com"
+              placeholder="name@example.com"
               required
               style={{ padding: "8px 12px", borderRadius: 6, border: "1px solid rgba(255,255,255,0.2)", background: "rgba(255,255,255,0.07)", color: "inherit", fontSize: 14 }}
             />
@@ -163,11 +216,12 @@ export default function AdminUsersPage() {
           <label style={{ display: "flex", flexDirection: "column", gap: 4, fontSize: 13, opacity: 0.7 }}>
             Password
             <input
-              type="text"
+              type="password"
               value={newPassword}
               onChange={(e) => setNewPassword(e.target.value)}
               placeholder="Choose a password"
               required
+              minLength={8}
               style={{ padding: "8px 12px", borderRadius: 6, border: "1px solid rgba(255,255,255,0.2)", background: "rgba(255,255,255,0.07)", color: "inherit", fontSize: 14 }}
             />
           </label>
@@ -175,10 +229,11 @@ export default function AdminUsersPage() {
             Role
             <select
               value={newRole}
-              onChange={(e) => setNewRole(e.target.value as "admin" | "user")}
+              onChange={(e) => setNewRole(e.target.value as UserRow["role"])}
               style={{ padding: "8px 12px", borderRadius: 6, border: "1px solid rgba(255,255,255,0.2)", background: "rgba(30,40,35,1)", color: "#e8f3f0", fontSize: 14, height: "38px" }}
             >
               <option value="admin" style={{ background: "#1e2823", color: "#e8f3f0" }}>Admin (can edit)</option>
+              <option value="production" style={{ background: "#1e2823", color: "#e8f3f0" }}>Production (fulfillment only)</option>
               <option value="user" style={{ background: "#1e2823", color: "#e8f3f0" }}>User (read-only)</option>
             </select>
           </label>
@@ -193,7 +248,6 @@ export default function AdminUsersPage() {
         </form>
       </section>
 
-      {/* ── Existing users ───────────────────────────────────────────── */}
       <section className="admin-section">
         <h2 style={{ marginBottom: "1rem" }}>Existing accounts</h2>
         {loading ? (
@@ -213,7 +267,6 @@ export default function AdminUsersPage() {
                 border: "1px solid rgba(255,255,255,0.08)",
                 background: "rgba(255,255,255,0.02)",
               }}>
-                {/* Email + role badge + password */}
                 <div style={{ display: "flex", flexDirection: "column", gap: 8, minWidth: 0 }}>
                   <div style={{ display: "flex", alignItems: "center", gap: 10, minWidth: 0, flexWrap: "wrap" }}>
                     <span style={{ fontWeight: 600, fontSize: 14, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
@@ -227,35 +280,14 @@ export default function AdminUsersPage() {
                       whiteSpace: "nowrap",
                       flexShrink: 0,
                     }}>
-                      {row.role === "admin" ? "Admin" : "Read-only"}
+                      {row.role === "admin" ? "Admin" : row.role === "production" ? "Production" : "Read-only"}
                     </span>
                     <span style={{ fontSize: 11, opacity: 0.55 }}>
-                      {row.passwordSource === "env" ? "env password" : "stored password"}
+                      {row.credentialSource === "env" ? "env credentials" : "stored (hashed)"}
                     </span>
-                  </div>
-                  <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
-                    <span style={{ fontSize: 12, opacity: 0.65 }}>Password:</span>
-                    <code style={{
-                      fontSize: 13, padding: "4px 8px", borderRadius: 4,
-                      background: "rgba(255,255,255,0.06)", letterSpacing: visiblePasswords[row.email] ? "normal" : "0.12em",
-                    }}>
-                      {visiblePasswords[row.email] ? row.password : "••••••••"}
-                    </code>
-                    <button
-                      type="button"
-                      onClick={() => setVisiblePasswords((prev) => ({ ...prev, [row.email]: !prev[row.email] }))}
-                      style={{
-                        padding: "4px 10px", borderRadius: 6, fontSize: 11, fontWeight: 600,
-                        border: "none", cursor: "pointer",
-                        background: "rgba(255,255,255,0.08)", color: "inherit",
-                      }}
-                    >
-                      {visiblePasswords[row.email] ? "Hide" : "Show"}
-                    </button>
                   </div>
                 </div>
 
-                {/* Inline feedback */}
                 {rowFeedback[row.email] && (
                   <span style={{
                     fontSize: 12, fontWeight: 600, padding: "3px 10px", borderRadius: 20,
@@ -269,26 +301,20 @@ export default function AdminUsersPage() {
                 )}
 
                 <div style={{ display: "flex", flexDirection: "column", gap: 8, alignItems: "flex-end" }}>
-                  {/* Toggle admin */}
-                  <button
-                    type="button"
-                    onClick={() => void updateRole(row.email, row.role === "admin" ? "user" : "admin")}
-                    disabled={savingEmail === row.email}
-                    style={{
-                      padding: "6px 14px", borderRadius: 6, fontSize: 12, fontWeight: 600,
-                      border: "none", cursor: "pointer", whiteSpace: "nowrap",
-                      background: row.role === "admin" ? "rgba(220,60,60,0.15)" : "rgba(30,180,120,0.15)",
-                      color: row.role === "admin" ? "#f07070" : "#3ecf8e",
-                      outline: `1px solid ${row.role === "admin" ? "rgba(220,60,60,0.3)" : "rgba(62,207,142,0.3)"}`,
-                    }}
-                  >
-                    {savingEmail === row.email ? "Saving…" : row.role === "admin" ? "Revoke admin" : "Grant admin"}
-                  </button>
+                  <select value={row.role} disabled={savingEmail === row.email} onChange={(event) => void updateRole(row.email, event.target.value as UserRow["role"])} style={{ padding: "6px 10px", borderRadius: 6, background: "#1e2823", color: "#e8f3f0" }}><option value="admin">Admin</option><option value="production">Production</option><option value="user">Read-only</option></select>
 
-                  {/* Reset password inline */}
+                  <div style={{ display: "flex", gap: 7 }}>
+                    <button type="button" onClick={() => void editUser(row)} disabled={editingEmail === row.email || deletingEmail === row.email} style={{ padding: "6px 12px", borderRadius: 7, border: "1px solid rgba(19,74,87,.24)", background: "rgba(255,255,255,.56)", color: "#134a57", fontWeight: 700, cursor: "pointer" }}>
+                      {editingEmail === row.email ? "Saving…" : "Edit user"}
+                    </button>
+                    <button type="button" onClick={() => void deleteUser(row)} disabled={deletingEmail === row.email || row.email.toLowerCase() === currentEmail} title={row.email.toLowerCase() === currentEmail ? "You cannot delete your current account" : "Delete user"} style={{ padding: "6px 12px", borderRadius: 7, border: "1px solid rgba(181,67,55,.3)", background: "rgba(181,67,55,.08)", color: "#a23d32", fontWeight: 700, cursor: "pointer", opacity: row.email.toLowerCase() === currentEmail ? .45 : 1 }}>
+                      {deletingEmail === row.email ? "Deleting…" : "Delete"}
+                    </button>
+                  </div>
+
                   <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
                     <input
-                      type="text"
+                      type="password"
                       placeholder="New password"
                       value={newPasswords[row.email] ?? ""}
                       onChange={(e) => setNewPasswords((prev) => ({ ...prev, [row.email]: e.target.value }))}

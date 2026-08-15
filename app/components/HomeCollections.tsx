@@ -73,7 +73,7 @@ export function HomeCollections({
             className="home-collection-card scroll-zoom"
           >
             <div
-              className="home-collection-card-media"
+              className={`home-collection-card-media home-collection-card-media--${collection.slug}`}
               style={
                 collection.bannerImage
                   ? { backgroundImage: `url(${collection.bannerImage})` }

@@ -6,7 +6,11 @@ import HomePageClient from "./home-page-client";
 
 export const dynamic = "force-dynamic";
 
-export default async function Home() {
+export default async function Home({
+  searchParams,
+}: {
+  searchParams?: { skipIntro?: string; q?: string };
+}) {
   const ua = (await headers()).get("user-agent") ?? "";
   const initialViewportIsMobile = isMaromaMobileUserAgent(ua);
   const [initialHeroVisual, initialSiteContent] = await Promise.all([
@@ -18,6 +22,8 @@ export default async function Home() {
       initialHeroVisual={initialHeroVisual}
       initialSiteContent={initialSiteContent}
       initialViewportIsMobile={initialViewportIsMobile}
+      initialSkipIntro={searchParams?.skipIntro === "1"}
+      initialProductSearch={searchParams?.q ?? ""}
     />
   );
 }

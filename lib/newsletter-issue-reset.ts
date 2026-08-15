@@ -1,4 +1,5 @@
 import { buildMigratedNewsletterBlocks } from "./newsletter-migrate-legacy-blocks";
+import { overlayMastheadFrom } from "./canvas-layout";
 import type { CanvasEl, NewsletterBlock, NewsletterCanvas, StoriesState } from "./story-types";
 
 export const NEWSLETTER_PREVIOUS_ISSUE_LS_KEY = "maroma-newsletter-previous-issue";
@@ -267,9 +268,10 @@ function resetBlocksForFreshIssue(
 }
 
 /**
- * Start a new issue while preserving the visual template unchanged:
- * masthead images, portrait, hero, mission copy, colours, typography, canvas layout, and dividers.
- * Only stories and issue-specific copy (title + CEO greeting) are reset to placeholders.
+ * Start a new issue while preserving the visual template:
+ * canvas chrome (masthead layout/positions) always comes from the live issue;
+ * mission copy, colours, and typography come from the saved default template when set.
+ * Stories and issue-specific copy reset to placeholders.
  */
 export function createFreshNewsletterIssueState(prev: StoriesState): StoriesState {
   const templateBase = prev.newsletterIssueTemplate ?? prev;
@@ -287,8 +289,19 @@ export function createFreshNewsletterIssueState(prev: StoriesState): StoriesStat
   next.newsletterElementStyles = applyInkToElementStyles(next.newsletterElementStyles, ink);
   next.executiveBriefStoryIds = next.executiveBriefStoryIds.map(() => "");
   next.executiveBriefImageOverrides = next.executiveBriefImageOverrides.map(() => "");
-  next.newsletterCanvas = resetCanvasForFreshIssue(templateBase.newsletterCanvas, placeholders, ink);
-  next.newsletterIssueTemplate = templateBase.newsletterIssueTemplate ?? captureFreshIssueTemplateState(templateBase);
+
+  // Always reset from the LIVE canvas so masthead geometry matches what you see now.
+  // Then re-apply live masthead overlays in case a saved template had stripped them.
+  const liveCanvasReset = resetCanvasForFreshIssue(prev.newsletterCanvas, placeholders, ink);
+  next.newsletterCanvas = overlayMastheadFrom(prev.newsletterCanvas, liveCanvasReset);
+
+  // Keep masthead asset URLs from the live issue in sync with canvas overlays.
+  next.newsletterTopImageUrl = prev.newsletterTopImageUrl;
+  next.newsletterLogoUrl = prev.newsletterLogoUrl;
+  next.newsletterPortraitUrl = prev.newsletterPortraitUrl;
+  next.newsletterHeroImageUrl = prev.newsletterHeroImageUrl;
+  next.newsletterIssueTemplate =
+    templateBase.newsletterIssueTemplate ?? captureFreshIssueTemplateState(templateBase);
 
   if ((templateBase.newsletterBlocksMigrationVersion ?? 0) >= 1) {
     next.newsletterBlocksMigrationVersion = 1;

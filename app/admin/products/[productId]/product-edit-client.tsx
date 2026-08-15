@@ -22,7 +22,9 @@ export default function ProductEditClient({ productId }: ProductEditClientProps)
   const [product, setProduct] = useState<AdminProductDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [saveSucceeded, setSaveSucceeded] = useState(false);
   const [uploadingSlot, setUploadingSlot] = useState<string | null>(null);
+  const [uploadedSlot, setUploadedSlot] = useState<string | null>(null);
   const [status, setStatus] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -77,6 +79,7 @@ export default function ProductEditClient({ productId }: ProductEditClientProps)
   const saveProduct = async () => {
     if (saving) return;
     setSaving(true);
+    setSaveSucceeded(false);
     setStatus(null);
     setError(null);
     try {
@@ -111,7 +114,9 @@ export default function ProductEditClient({ productId }: ProductEditClientProps)
       }
       setProduct(data.product);
       hydrateForm(data.product);
-      setStatus("Product saved.");
+      setStatus("Product Saved!");
+      setSaveSucceeded(true);
+      window.setTimeout(() => setSaveSucceeded(false), 3000);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not save product.");
     } finally {
@@ -121,6 +126,7 @@ export default function ProductEditClient({ productId }: ProductEditClientProps)
 
   const uploadImage = async (slot: string, file: File) => {
     setUploadingSlot(slot);
+    setUploadedSlot(null);
     setError(null);
     try {
       const formData = new FormData();
@@ -139,7 +145,9 @@ export default function ProductEditClient({ productId }: ProductEditClientProps)
           return next;
         });
       }
-      setStatus(`${slot === "main" ? "Main image" : "Gallery image"} updated.`);
+      setStatus(`${slot === "main" ? "Main Image" : "Gallery Image"} Uploaded!`);
+      setUploadedSlot(slot);
+      window.setTimeout(() => setUploadedSlot((current) => current === slot ? null : current), 3000);
       await loadProduct();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Upload failed.");
@@ -185,17 +193,20 @@ export default function ProductEditClient({ productId }: ProductEditClientProps)
             </p>
           </div>
           <div className="catalog-admin-header-actions">
+            <Link href="/" className="button secondary">
+              Home
+            </Link>
             <Link href={`/product/${productId}`} className="button secondary" target="_blank">
               View on store
             </Link>
             <SignOutButton />
             <button
               type="button"
-              className="button primary button-sage"
+              className={`button primary button-sage${saveSucceeded ? " process-success" : ""}`}
               disabled={saving}
               onClick={() => void saveProduct()}
             >
-              {saving ? "Saving…" : "Save"}
+              {saving ? "Saving…" : saveSucceeded ? "Product Saved!" : "Save"}
             </button>
           </div>
         </header>
@@ -248,8 +259,8 @@ export default function ProductEditClient({ productId }: ProductEditClientProps)
                       <div className="catalog-admin-media-preview">
                         {imageUrl ? <img src={imageUrl} alt="" /> : <span>No image</span>}
                       </div>
-                      <label className="button secondary catalog-admin-upload-btn">
-                        {uploadingSlot === slot.id ? "Uploading…" : "Upload"}
+                      <label className={`button secondary catalog-admin-upload-btn${uploadedSlot === slot.id ? " process-success" : ""}`}>
+                        {uploadingSlot === slot.id ? "Uploading…" : uploadedSlot === slot.id ? "Image Uploaded!" : "Upload"}
                         <input
                           type="file"
                           accept="image/*"
@@ -339,11 +350,11 @@ export default function ProductEditClient({ productId }: ProductEditClientProps)
 
             <button
               type="button"
-              className="button primary button-sage catalog-admin-save-side"
+              className={`button primary button-sage catalog-admin-save-side${saveSucceeded ? " process-success" : ""}`}
               disabled={saving}
               onClick={() => void saveProduct()}
             >
-              {saving ? "Saving…" : "Save product"}
+              {saving ? "Saving…" : saveSucceeded ? "Product Saved!" : "Save product"}
             </button>
           </aside>
         </div>

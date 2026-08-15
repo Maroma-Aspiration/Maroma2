@@ -166,6 +166,8 @@ type HomePageClientProps = {
   initialHeroVisual: HeroVisualState;
   initialSiteContent: SiteContent;
   initialViewportIsMobile?: boolean;
+  initialSkipIntro?: boolean;
+  initialProductSearch?: string;
 };
 
 const FLOATING_ADMIN_CHROME_KEY = "maroma-floating-admin-chrome";
@@ -212,7 +214,16 @@ export default function HomePageClient({
   initialHeroVisual,
   initialSiteContent,
   initialViewportIsMobile = false,
+  initialSkipIntro = false,
+  initialProductSearch = "",
 }: HomePageClientProps) {
+  const [introPhase, setIntroPhase] = useState<"playing" | "fading" | "done">(
+    initialSkipIntro ? "done" : "playing"
+  );
+  const [introVideoReady, setIntroVideoReady] = useState(false);
+  const introFinishTimerRef = useRef<number | null>(null);
+  const introScrollRevealRef = useRef(0);
+  const introScrollHoldRef = useRef(0);
   const [content, setContent] = useState<SiteContent>(initialSiteContent);
   const [heroLayout, setHeroLayout] = useState<HeroMediaLayout>(initialHeroVisual.heroLayout || { x: 0, y: 0, width: 100, height: 80 });
   const [headlinePos, setHeadlinePos] = useState(initialHeroVisual.headlinePos);
@@ -464,7 +475,7 @@ export default function HomePageClient({
   const canEditRitualBand = adminDragEnabled && adminEditLayer === "ritual-band" && (canEditLayout || canEditMobilePreview);
   const canEditHeroMediaLayout = canEditLayout || canEditMobilePreview;
 
-  const [productSearch, setProductSearch] = useState("");
+  const [productSearch, setProductSearch] = useState(initialProductSearch);
   const [products, setProducts] = useState<ProductRecord[]>([]);
   const [productStatus, setProductStatus] = useState("Loading products...");
   const heroSectionRef = useRef<HTMLElement | null>(null);
@@ -2160,11 +2171,161 @@ export default function HomePageClient({
     window.localStorage.setItem("maroma-floating-admin-pos", JSON.stringify(next));
   };
 
+  const finishHomepageIntro = useCallback(() => {
+    setIntroPhase((current) => {
+      if (current !== "playing") return current;
+      introFinishTimerRef.current = window.setTimeout(() => {
+        setIntroPhase("done");
+        introFinishTimerRef.current = null;
+      }, 2000);
+      return "fading";
+    });
+  }, []);
+
+  useLayoutEffect(() => {
+    const root = document.documentElement;
+    const body = document.body;
+    root.classList.add("homepage-intro-experience");
+    body.classList.add("homepage-intro-experience");
+    if (!initialSkipIntro) {
+      window.scrollTo({ top: 0, left: 0, behavior: "auto" });
+    }
+    return () => {
+      root.classList.remove("homepage-intro-experience");
+      body.classList.remove("homepage-intro-experience");
+    };
+  }, [initialSkipIntro]);
+
+  useLayoutEffect(() => {
+    const root = document.documentElement;
+    const body = document.body;
+    root.classList.toggle("homepage-intro-active", introPhase !== "done");
+    body.classList.toggle("homepage-intro-active", introPhase !== "done");
+    root.classList.toggle("homepage-intro-fading", introPhase === "fading");
+    body.classList.toggle("homepage-intro-fading", introPhase === "fading");
+    if (introPhase === "done") {
+      root.style.removeProperty("--homepage-intro-reveal");
+      return;
+    }
+
+    const setReveal = (reveal: number) => {
+      root.style.setProperty("--homepage-intro-reveal", reveal.toFixed(4));
+      root.classList.toggle("homepage-intro-scroll-revealed", reveal >= 0.9);
+      body.classList.toggle("homepage-intro-scroll-revealed", reveal >= 0.9);
+    };
+
+    setReveal(introPhase === "fading" ? 1 : introScrollRevealRef.current);
+    if (introPhase === "playing") {
+      const fadeDistance = Math.min(320, Math.max(220, window.innerHeight * 0.32));
+      const homepageHoldDistance = Math.min(480, Math.max(340, window.innerHeight * 0.5));
+      let touchY: number | null = null;
+
+      const applyScrollDelta = (deltaY: number) => {
+        let remainingDelta = deltaY;
+
+        if (remainingDelta > 0 && introScrollRevealRef.current < 1) {
+          const fadePixelsRemaining = (1 - introScrollRevealRef.current) * fadeDistance;
+          const fadePixels = Math.min(remainingDelta, fadePixelsRemaining);
+          introScrollRevealRef.current += fadePixels / fadeDistance;
+          remainingDelta -= fadePixels;
+        } else if (remainingDelta < 0 && introScrollHoldRef.current <= 0) {
+          introScrollRevealRef.current = Math.max(
+            0,
+            introScrollRevealRef.current + remainingDelta / fadeDistance
+          );
+          remainingDelta = 0;
+        }
+
+        if (introScrollRevealRef.current >= 1 && remainingDelta !== 0) {
+          introScrollHoldRef.current = Math.min(
+            homepageHoldDistance,
+            Math.max(0, introScrollHoldRef.current + remainingDelta)
+          );
+        }
+
+        setReveal(introScrollRevealRef.current);
+        if (introScrollHoldRef.current >= homepageHoldDistance) {
+          setIntroPhase("done");
+        }
+      };
+
+      const handleWheel = (event: WheelEvent) => {
+        event.preventDefault();
+        applyScrollDelta(event.deltaY);
+      };
+      const handleTouchStart = (event: TouchEvent) => {
+        touchY = event.touches[0]?.clientY ?? null;
+      };
+      const handleTouchMove = (event: TouchEvent) => {
+        if (touchY === null || !event.touches[0]) return;
+        event.preventDefault();
+        const nextY = event.touches[0].clientY;
+        applyScrollDelta(touchY - nextY);
+        touchY = nextY;
+      };
+
+      window.addEventListener("wheel", handleWheel, { passive: false });
+      window.addEventListener("touchstart", handleTouchStart, { passive: true });
+      window.addEventListener("touchmove", handleTouchMove, { passive: false });
+
+      return () => {
+        window.removeEventListener("wheel", handleWheel);
+        window.removeEventListener("touchstart", handleTouchStart);
+        window.removeEventListener("touchmove", handleTouchMove);
+        root.classList.remove(
+          "homepage-intro-active",
+          "homepage-intro-fading",
+          "homepage-intro-scroll-revealed"
+        );
+        body.classList.remove(
+          "homepage-intro-active",
+          "homepage-intro-fading",
+          "homepage-intro-scroll-revealed"
+        );
+      };
+    }
+
+    return () => {
+      root.classList.remove(
+        "homepage-intro-active",
+        "homepage-intro-fading",
+        "homepage-intro-scroll-revealed"
+      );
+      body.classList.remove(
+        "homepage-intro-active",
+        "homepage-intro-fading",
+        "homepage-intro-scroll-revealed"
+      );
+    };
+  }, [introPhase]);
+
+  useEffect(
+    () => () => {
+      if (introFinishTimerRef.current !== null) {
+        window.clearTimeout(introFinishTimerRef.current);
+      }
+    },
+    []
+  );
+
   const { hero, carousel, highlights, brand } = content;
   const heroVideoSrcForRender =
     showMobileLayout && hero.video.mobileSrc?.trim() ? hero.video.mobileSrc.trim() : hero.video.src.trim();
   const heroVideoIsBackground = isYouTubeUrl(heroVideoSrcForRender);
   const hasHeroMedia = Boolean(heroVideoSrcForRender || hero.video.poster);
+
+  useEffect(() => {
+    if (!heroVideoIsBackground || heroMediaLayout.y >= 0) return;
+
+    const restoredLayout = { x: 72, y: 50, width: 44, height: 78 };
+    const restoredSettings = { ...heroPrimarySettings, scale: 0.68, opacity: 1 };
+    setHeroMediaLayout(restoredLayout);
+    setHeroPrimarySettings(restoredSettings);
+    void persistHeroVisualPatch({
+      layout: restoredLayout,
+      primarySettings: restoredSettings,
+    });
+  }, [heroVideoIsBackground, heroMediaLayout.y]);
   const hasOverlayMedia = Boolean(heroOverlayLayer.visible && heroOverlayLayer.src);
   // `hero-bg` adds a full-section darkening overlay via CSS (`.hero-bg::before`).
   // Only enable `hero-bg` when there is actually visible hero media.
@@ -3596,20 +3757,28 @@ export default function HomePageClient({
                 ),
                 opacity: heroPrimarySettings.opacity,
                 zIndex: heroPrimarySettings.zIndex,
-                display: heroVideoIsBackground || !heroPrimarySettings.visible ? "none" : "block",
+                display: !heroPrimarySettings.visible ? "none" : "block",
                 pointerEvents: primaryMediaPointerEvents
               }}
               onPointerDown={(e) => handleMediaDragDown(e, "primary")}
               onPointerMove={handleMediaDragMove}
               onPointerUp={handleMediaDragUp}
             >
-              {!heroVideoIsBackground ? (
+              {heroVideoIsBackground ? (
+                <img
+                  className="hero-media-image"
+                  src="/Products%20on%20boxes.png"
+                  alt=""
+                  aria-hidden="true"
+                  style={{ objectFit: heroPrimarySettings.fit }}
+                />
+              ) : (
                 <HeroVideoMedia
                   src={heroVideoSrcForRender}
                   poster={hero.video.poster}
                   objectFit={heroPrimarySettings.fit}
                 />
-              ) : null}
+              )}
             </div>
           </div>
         ) : null}
@@ -3697,7 +3866,12 @@ export default function HomePageClient({
   const pageContent = (
     <div
       className={`page maroma${showMobileLayout ? " is-mobile-layout" : ""}${useMobileDocumentFlow ? " is-mobile-document-flow" : ""}${persistLayoutToMobile && useMobileDocumentFlow ? " is-mobile-edit-active" : ""}${adminMobilePreviewActive ? " is-admin-mobile-preview" : ""}`}
-      style={pageStackStyle}
+      style={{
+        ...pageStackStyle,
+        ...(introPhase !== "done"
+          ? { opacity: "var(--homepage-intro-reveal, 0)" }
+          : {}),
+      } as CSSProperties}
     >
       {pageHeroStack}
       {pageTail}
@@ -3706,6 +3880,35 @@ export default function HomePageClient({
 
   return (
     <>
+      {introPhase !== "done" ? (
+        <div
+          className={`homepage-video-intro${introVideoReady ? " is-video-ready" : ""}${introPhase === "fading" ? " is-fading" : ""}`}
+          role="dialog"
+          aria-label="Maroma introduction video"
+        >
+          <div className="homepage-video-intro__media">
+            <HeroVideoMedia
+              src={heroVideoSrcForRender}
+              poster={hero.video.poster}
+              variant="background"
+              loop={false}
+              onEnded={finishHomepageIntro}
+              onPlaying={() => setIntroVideoReady(true)}
+            />
+          </div>
+          <div className="homepage-video-intro__loading" aria-hidden="true">
+            <img src="/maroma-logo.png" alt="" />
+          </div>
+          <button
+            type="button"
+            className="homepage-video-intro__skip"
+            onClick={finishHomepageIntro}
+          >
+            Skip video
+          </button>
+        </div>
+      ) : null}
+
       {adminMobilePreviewActive ? (
         <MobilePreviewFrame
           frameRef={adminMobilePreviewFrameRef}

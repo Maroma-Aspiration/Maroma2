@@ -3,17 +3,9 @@ import {
   canvasPathFromFirebaseUrl,
   isCanvasFirebaseConfigured,
   isCanvasFirebaseUrl,
-  makeCanvasObjectPath,
-  uploadCanvasBuffer,
 } from "./canvas-firebase-storage";
+import { uploadCanvasPublicBuffer } from "./canvas-public-upload";
 import type { NewsletterCanvas, StoriesState } from "./story-types";
-
-function extForMime(mime: string): string {
-  if (mime.includes("png")) return "png";
-  if (mime.includes("webp")) return "webp";
-  if (mime.includes("gif")) return "gif";
-  return "jpg";
-}
 
 function parseDataUrl(src: string): { mime: string; buffer: Buffer } | null {
   const match = /^data:([^;,]+)?(?:;charset=[^;,]+)?;base64,(.+)$/i.exec(src);
@@ -50,8 +42,8 @@ function collectMigratableUrls(state: StoriesState): string[] {
   const urls = new Set<string>();
   const add = (raw: string | undefined) => {
     const url = (raw ?? "").trim();
-    if (!url || isCanvasFirebaseUrl(url)) return;
-    if (isCanvasBlobUrl(url) || url.startsWith("data:") || /^https?:\/\//i.test(url)) {
+    if (!url || isCanvasFirebaseUrl(url) || isCanvasBlobUrl(url)) return;
+    if (url.startsWith("data:") || /^https?:\/\//i.test(url)) {
       urls.add(url);
     }
   };
@@ -74,15 +66,6 @@ function collectMigratableUrls(state: StoriesState): string[] {
   return Array.from(urls);
 }
 
-function legacyBlobPath(url: string): string | null {
-  if (!isCanvasBlobUrl(url)) return null;
-  try {
-    return new URL(url).pathname.replace(/^\/+/, "") || null;
-  } catch {
-    return null;
-  }
-}
-
 export type CanvasMigrateToFirebaseResult = {
   state: StoriesState;
   configured: boolean;
@@ -92,11 +75,12 @@ export type CanvasMigrateToFirebaseResult = {
   failed: number;
 };
 
-/** Upload legacy blob / inline / remote URLs to Firebase Storage and rewrite newsletter state. */
+/** Upload legacy / inline / remote URLs to public storage (Firebase, else Vercel Blob) and rewrite newsletter state. */
 export async function migrateCanvasImagesToFirebase(
   state: StoriesState
 ): Promise<CanvasMigrateToFirebaseResult> {
-  if (!isCanvasFirebaseConfigured()) {
+  const canUpload = isCanvasFirebaseConfigured() || Boolean(process.env.BLOB_READ_WRITE_TOKEN?.trim());
+  if (!canUpload) {
     return {
       state,
       configured: false,
@@ -116,7 +100,7 @@ export async function migrateCanvasImagesToFirebase(
   const resolve = async (raw: string | undefined): Promise<string> => {
     const trimmed = (raw ?? "").trim();
     if (!trimmed) return "";
-    if (isCanvasFirebaseUrl(trimmed)) {
+    if (isCanvasFirebaseUrl(trimmed) || isCanvasBlobUrl(trimmed)) {
       skipped += 1;
       return trimmed;
     }
@@ -134,12 +118,12 @@ export async function migrateCanvasImagesToFirebase(
       return trimmed;
     }
 
-    const ext = extForMime(downloaded.contentType);
-    const preservedPath = legacyBlobPath(trimmed);
-    const path = preservedPath ?? makeCanvasObjectPath("canvas/migrated", ext);
-
     try {
-      const publicUrl = await uploadCanvasBuffer(path, downloaded.buffer, downloaded.contentType);
+      const { url: publicUrl } = await uploadCanvasPublicBuffer(
+        "canvas/migrated",
+        downloaded.buffer,
+        downloaded.contentType
+      );
       cache.set(trimmed, publicUrl);
       migrated += 1;
       return publicUrl;

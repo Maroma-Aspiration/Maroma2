@@ -7,6 +7,7 @@ import {
 import { resolveCommerceProducts } from "./commerce-product";
 import type { CommerceProduct } from "./commerce-types";
 import type { GiftElement } from "./gift-builder-types";
+import { readGiftPackingStore } from "./gift-packing-store";
 
 export { quantityDiscountRate, quantityTierRows } from "./gift-builder-pricing";
 
@@ -41,8 +42,18 @@ export async function validateGiftSet(
   }
 
   const elements: GiftElement[] = [];
+  const packing = await readGiftPackingStore();
+  const customProducts = new Map(packing.customProducts.map((item) => [item.id, item]));
   for (const id of unique) {
-    const element = getGiftElement(id);
+    let element = getGiftElement(id);
+    if (!element) {
+      const custom = customProducts.get(id);
+      const dims = packing.elementDimensions[id];
+      if (custom && dims) {
+        const product = (await resolveCommerceProducts([custom.productId])).get(custom.productId);
+        if (product) element = { id, productId: custom.productId, name: product.name, description: custom.description, category: custom.category, image: product.image, price: product.price, ...dims };
+      }
+    }
     if (!element) return { ok: false, error: `Unknown gift element: ${id}` };
     elements.push(element);
   }
@@ -124,6 +135,10 @@ export async function enrichGiftElements(): Promise<GiftElement[]> {
       category: def.category,
       image: product?.image || def.fallbackImage,
       price: product?.price ?? def.fallbackPrice,
+      lengthCm: def.lengthCm ?? (def.category === "candle" ? 8 : def.category === "soap" ? 10 : 5),
+      widthCm: def.widthCm ?? (def.category === "candle" ? 8 : def.category === "soap" ? 7 : 5),
+      heightCm: def.heightCm ?? (def.category === "candle" ? 7 : def.category === "soap" ? 4 : 14),
+      sizeGroup: def.sizeGroup ?? (def.category === "candle" ? "large" : def.category === "soap" ? "medium" : "small"),
     };
   });
 }

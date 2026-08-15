@@ -6,6 +6,13 @@ import { useEffect, useState } from "react";
 
 type SessionUser = { email: string; role: string };
 
+const LEGAL_LINKS = [
+  { href: "/privacy", label: "Privacy" },
+  { href: "/terms", label: "Terms" },
+  { href: "/shipping", label: "Shipping" },
+  { href: "/returns", label: "Returns" },
+] as const;
+
 export function SiteFooter() {
   const pathname = usePathname();
   const loginHref = `/login?next=${encodeURIComponent(pathname || "/")}`;
@@ -46,16 +53,25 @@ export function SiteFooter() {
 
   return (
     <footer className="site-footer" aria-label="Site">
-      <div className="site-footer-actions" aria-label="Account">
-        <Link href={accountLink.href} className="site-footer-login-link">
-          <svg viewBox="0 0 24 24" aria-hidden="true">
-            <path
-              d="M12 12.2c2.1 0 3.8-1.8 3.8-4s-1.7-4-3.8-4-3.8 1.8-3.8 4 1.7 4 3.8 4Zm0 2.2c-3 0-5.7 1.6-7 4.1-.3.6.1 1.3.8 1.3h12.3c.7 0 1.2-.7.8-1.3-1.3-2.5-4-4.1-7-4.1Z"
-              fill="currentColor"
-            />
-          </svg>
-          {accountLink.label}
-        </Link>
+      <div className="site-footer-inner">
+        <nav className="site-footer-legal" aria-label="Legal">
+          {LEGAL_LINKS.map((item) => (
+            <Link key={item.href} href={item.href}>
+              {item.label}
+            </Link>
+          ))}
+        </nav>
+        <div className="site-footer-actions" aria-label="Account">
+          <Link href={accountLink.href} className="site-footer-login-link">
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <path
+                d="M12 12.2c2.1 0 3.8-1.8 3.8-4s-1.7-4-3.8-4-3.8 1.8-3.8 4 1.7 4 3.8 4Zm0 2.2c-3 0-5.7 1.6-7 4.1-.3.6.1 1.3.8 1.3h12.3c.7 0 1.2-.7.8-1.3-1.3-2.5-4-4.1-7-4.1Z"
+                fill="currentColor"
+              />
+            </svg>
+            {accountLink.label}
+          </Link>
+        </div>
       </div>
     </footer>
   );

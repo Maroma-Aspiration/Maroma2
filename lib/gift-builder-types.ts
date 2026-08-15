@@ -9,7 +9,15 @@ export type GiftBox = {
   image: string;
   slotCount: number;
   basePrice: number;
+  /** Internal usable dimensions. */
+  lengthCm: number;
+  widthCm: number;
+  heightCm: number;
+  /** Optional photograph taken directly above the empty box. */
+  topImage?: string;
 };
+
+export type GiftSizeGroup = "small" | "medium" | "large";
 
 export type GiftElement = {
   id: string;
@@ -19,6 +27,20 @@ export type GiftElement = {
   category: GiftElementCategory;
   image: string;
   price: number;
+  lengthCm: number;
+  widthCm: number;
+  heightCm: number;
+  sizeGroup: GiftSizeGroup;
+};
+
+export type PackedGift = {
+  elementId: string;
+  x: number;
+  y: number;
+  lengthCm: number;
+  widthCm: number;
+  heightCm: number;
+  rotated: boolean;
 };
 
 export type GiftEventPreset = {

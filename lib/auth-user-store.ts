@@ -1,25 +1,15 @@
 import { promises as fs } from "fs";
 import path from "path";
-import { timingSafeEqual } from "crypto";
 import { kv } from "@vercel/kv";
 import type { AuthUserRow } from "./auth-users-config";
 import { normalizeAuthEmail, parseAuthUsersEnv } from "./auth-users-config";
+import { hashPassword, isPasswordHash, verifyPassword } from "./auth-password";
 import type { UserRole } from "./auth-types";
 
 const storageDir = path.join(process.cwd(), "data");
 const storagePath = path.join(storageDir, "auth-users.json");
 const authUsersKvKey = "maroma:auth-users";
 const hasKvConfig = Boolean(process.env.KV_REST_API_URL && process.env.KV_REST_API_TOKEN);
-
-function timingSafeStringEq(a: string, b: string, maxLen = 512): boolean {
-  const pa = a.slice(0, maxLen);
-  const pb = b.slice(0, maxLen);
-  const bufA = Buffer.alloc(maxLen, 0);
-  const bufB = Buffer.alloc(maxLen, 0);
-  Buffer.from(pa, "utf8").copy(bufA);
-  Buffer.from(pb, "utf8").copy(bufB);
-  return timingSafeEqual(bufA, bufB);
-}
 
 function parseRows(value: unknown): AuthUserRow[] {
   if (!Array.isArray(value)) {
@@ -32,7 +22,7 @@ function parseRows(value: unknown): AuthUserRow[] {
     const email = typeof raw.email === "string" ? normalizeAuthEmail(raw.email) : "";
     const password = typeof raw.password === "string" ? raw.password : "";
     const role = raw.role;
-    if (!email || !password || (role !== "admin" && role !== "user")) continue;
+    if (!email || !password || (role !== "admin" && role !== "production" && role !== "user")) continue;
     out.push({ email, password, role });
   }
   return out;
@@ -78,18 +68,36 @@ export async function readAllAuthUsers(): Promise<AuthUserRow[]> {
   return Array.from(byEmail.values());
 }
 
+async function persistHashedPassword(email: string, role: UserRole, plaintext: string): Promise<void> {
+  const hashed = await hashPassword(plaintext);
+  const storedUsers = await readStoredAuthUsers();
+  const others = storedUsers.filter((u) => u.email !== email);
+  await writeStoredAuthUsers([...others, { email, password: hashed, role }]);
+}
+
 export async function authenticateCredentialsAsync(email: string, password: string): Promise<AuthUserRow | null> {
   const users = await readAllAuthUsers();
   const want = normalizeAuthEmail(email);
   for (const u of users) {
     if (u.email !== want) continue;
-    if (timingSafeStringEq(password, u.password)) return u;
-    return null;
+    const ok = await verifyPassword(password, u.password);
+    if (!ok) return null;
+
+    // Upgrade legacy plaintext (or env plaintext) to a stored hash on successful login.
+    if (!isPasswordHash(u.password)) {
+      try {
+        await persistHashedPassword(u.email, u.role, password);
+      } catch {
+        // Login still succeeds even if upgrade write fails.
+      }
+    }
+
+    return { email: u.email, role: u.role, password: "" };
   }
   return null;
 }
 
-export async function createAuthUser(email: string, password: string, role: UserRole = "admin"): Promise<AuthUserRow> {
+export async function createAuthUser(email: string, password: string, role: UserRole = "user"): Promise<AuthUserRow> {
   const normalized = normalizeAuthEmail(email);
   const users = await readAllAuthUsers();
   const existing = users.find((u) => u.email === normalized);
@@ -97,9 +105,10 @@ export async function createAuthUser(email: string, password: string, role: User
     throw new Error("exists");
   }
   const stored = await readStoredAuthUsers();
-  const next: AuthUserRow = { email: normalized, password, role };
+  const hashed = await hashPassword(password);
+  const next: AuthUserRow = { email: normalized, password: hashed, role };
   await writeStoredAuthUsers([...stored, next]);
-  return next;
+  return { email: normalized, password: "", role };
 }
 
 export type AuthUserPublicRow = {
@@ -109,8 +118,8 @@ export type AuthUserPublicRow = {
 };
 
 export type AuthUserAdminRow = AuthUserPublicRow & {
-  password: string;
-  passwordSource: "env" | "stored";
+  /** Where credentials are managed — never expose the secret itself. */
+  credentialSource: "env" | "stored";
 };
 
 export async function listAuthUsersAdmin(): Promise<AuthUserAdminRow[]> {
@@ -129,8 +138,7 @@ export async function listAuthUsersAdmin(): Promise<AuthUserAdminRow[]> {
       email,
       role: active.role,
       source: stored ? "stored" : "env",
-      password: active.password,
-      passwordSource: stored ? "stored" : "env",
+      credentialSource: stored ? "stored" : "env",
     });
   }
   return rows.sort((a, b) => a.email.localeCompare(b.email));
@@ -157,12 +165,11 @@ export async function changeAuthUserPassword(
 export async function resetAuthUserPassword(email: string, newPassword: string): Promise<void> {
   const normalized = normalizeAuthEmail(email);
   if (!normalized) throw new Error("invalid_email");
+  if (!newPassword.trim()) throw new Error("invalid_password");
   const allUsers = await readAllAuthUsers();
   const existing = allUsers.find((u) => u.email === normalized);
   if (!existing) throw new Error("not_found");
-  const storedUsers = await readStoredAuthUsers();
-  const others = storedUsers.filter((u) => u.email !== normalized);
-  await writeStoredAuthUsers([...others, { email: normalized, password: newPassword, role: existing.role }]);
+  await persistHashedPassword(normalized, existing.role, newPassword);
 }
 
 export async function setAuthUserRole(email: string, role: UserRole): Promise<AuthUserPublicRow> {
@@ -177,8 +184,46 @@ export async function setAuthUserRole(email: string, role: UserRole): Promise<Au
   }
   const storedUsers = await readStoredAuthUsers();
   const others = storedUsers.filter((u) => u.email !== normalized);
+  // Keep existing hash/secret; only role changes. If user was env-only, copy credential into stored.
   const nextStored: AuthUserRow = { email: normalized, password: existing.password, role };
   await writeStoredAuthUsers([...others, nextStored]);
   return { email: normalized, role, source: "stored" };
 }
 
+export async function editStoredAuthUser(
+  email: string,
+  updates: { email?: string; role?: UserRole; password?: string }
+): Promise<AuthUserPublicRow> {
+  const currentEmail = normalizeAuthEmail(email);
+  const nextEmail = normalizeAuthEmail(updates.email ?? email);
+  if (!currentEmail || !nextEmail) throw new Error("invalid_email");
+
+  const storedUsers = await readStoredAuthUsers();
+  const existing = storedUsers.find((user) => user.email === currentEmail);
+  if (!existing) throw new Error("not_stored");
+
+  if (nextEmail !== currentEmail) {
+    const allUsers = await readAllAuthUsers();
+    if (allUsers.some((user) => user.email === nextEmail)) throw new Error("exists");
+  }
+
+  const nextPassword = updates.password?.trim()
+    ? await hashPassword(updates.password.trim())
+    : existing.password;
+
+  const next: AuthUserRow = {
+    email: nextEmail,
+    role: updates.role ?? existing.role,
+    password: nextPassword,
+  };
+  await writeStoredAuthUsers([...storedUsers.filter((user) => user.email !== currentEmail), next]);
+  return { email: next.email, role: next.role, source: "stored" };
+}
+
+export async function deleteStoredAuthUser(email: string): Promise<void> {
+  const normalized = normalizeAuthEmail(email);
+  if (!normalized) throw new Error("invalid_email");
+  const storedUsers = await readStoredAuthUsers();
+  if (!storedUsers.some((user) => user.email === normalized)) throw new Error("not_stored");
+  await writeStoredAuthUsers(storedUsers.filter((user) => user.email !== normalized));
+}

@@ -94,13 +94,18 @@ export const HomePageBelowFold = memo(function HomePageBelowFold({
         </div>
         <p className="product-status">{productStatus}</p>
         <div className="product-listing-section">
-          <ProductListingWithFilters products={products} />
+          <ProductListingWithFilters products={products} searchQuery={productSearch} />
         </div>
       </section>
 
       <footer className="footer">
         <strong>{brand}</strong>
-        <div>Preview only. Replace placeholders with real media.</div>
+        <div className="footer-legal-links">
+          <a href="/privacy">Privacy</a>
+          <a href="/terms">Terms</a>
+          <a href="/shipping">Shipping</a>
+          <a href="/returns">Returns</a>
+        </div>
       </footer>
     </>
   );

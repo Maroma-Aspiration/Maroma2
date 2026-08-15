@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { getDisplayImageUrl } from "../../lib/product-image";
 import { decodeBasicHtmlEntities } from "../../lib/decode-html-entities";
-import { formatInrPrice } from "../../lib/format-price";
+import { useCurrency } from "../../context/CurrencyContext";
 import type { ProductRecord } from "../../lib/product-types";
 import type { SiteContent } from "../content";
 import { useAdminSession } from "../../lib/use-admin-session";
@@ -17,6 +17,7 @@ type Props = {
 };
 
 export default function SearchPageClient({ query, ritualName, products, initialSiteContent }: Props) {
+  const { formatCatalogPrice, isEstimated } = useCurrency();
   const [isVisible, setIsVisible] = useState(false);
   const { adminModeEnabled: isAdmin } = useAdminSession();
 
@@ -97,7 +98,7 @@ export default function SearchPageClient({ query, ritualName, products, initialS
                       </div>
                       <div className="product-meta">
                         <h3 className="product-name">{decodeBasicHtmlEntities(product.name)}</h3>
-                        <p className="product-price">{formatInrPrice(product.price) ?? "Price on request"}</p>
+                        <p className="product-price">{formatCatalogPrice(product.price) ? `${isEstimated ? "≈ " : ""}${formatCatalogPrice(product.price)}` : "Price on request"}</p>
                       </div>
                     </Link>
                     {isAdmin && (

@@ -20,7 +20,7 @@ export async function POST() {
       return NextResponse.json(
         {
           error:
-            "Firebase Storage is not configured. Set FIREBASE_PROJECT_ID, FIREBASE_CLIENT_EMAIL, FIREBASE_PRIVATE_KEY, and FIREBASE_STORAGE_BUCKET (or FIREBASE_SERVICE_ACCOUNT_JSON).",
+            "No public image storage configured. Set FIREBASE_* env vars and/or BLOB_READ_WRITE_TOKEN.",
         },
         { status: 503 }
       );

@@ -32,6 +32,12 @@
   background-position: center;
 }
 
+/* This source banner contains blank strips above and below the photograph. */
+.home-collection-card-media--home-essentials {
+  background-size: auto 118%;
+  background-repeat: no-repeat;
+}
+
 .home-collection-card-veil {
   position: absolute;
   inset: 0;
@@ -48,11 +54,11 @@
   z-index: 1;
   margin: 0;
   max-width: calc(100% - 28px);
-  font-family: var(--font-serif), "Cormorant Garamond", Georgia, serif;
+  font-family: var(--font-sans), "Montserrat", "Helvetica", sans-serif;
   font-size: clamp(1.55rem, 2.8vw, 2.35rem);
   font-weight: 500;
   line-height: 1.05;
-  letter-spacing: 0.06em;
+  letter-spacing: 0.12em;
   text-transform: uppercase;
   color: #f8f6f1;
   text-shadow: 0 2px 18px rgba(8, 24, 28, 0.45);
@@ -167,7 +173,7 @@
   margin-top: 0;
   color: var(--ink, #134a57);
   opacity: 1 !important;
-  transform: none !important;
+  transform: translateY(-2mm) !important;
   filter: none !important;
   visibility: visible !important;
 }

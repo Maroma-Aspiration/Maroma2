@@ -7,8 +7,9 @@ import { resolveStoryThumbnailUrl } from "../../lib/story-thumbnail";
 export const dynamic = "force-dynamic";
 
 export const metadata = {
-  title: "The Maroma Journal",
-  description: "Stories and events from the world of Maroma."
+  title: "The Maroma Journal | Stories from Auroville",
+  description:
+    "Stories and events from Maroma — botanical fragrance, natural care, and community life from Auroville, India.",
 };
 
 export default async function BlogPage() {

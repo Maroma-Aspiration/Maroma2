@@ -7,7 +7,7 @@ export type AuthUserRow = {
 };
 
 function isUserRole(value: unknown): value is UserRole {
-  return value === "admin" || value === "user";
+  return value === "admin" || value === "production" || value === "user";
 }
 
 export function normalizeAuthEmail(email: string): string {

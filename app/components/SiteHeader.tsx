@@ -13,6 +13,7 @@ import {
   type MouseEventHandler,
 } from "react";
 import { useCart } from "../../context/CartContext";
+import { CurrencySelector } from "./CurrencySelector";
 import { contentStorageKey, siteContent, type SiteContent } from "../content";
 import { getNavHref } from "../../lib/catalog-categories";
 import {
@@ -30,6 +31,7 @@ type NavScrollItem =
   | { kind: "spa-logo"; key: "spa-logo" };
 
 const SPA_BOOKING_URL = "https://www.themaromaspa.com/register?next=/booking";
+const MAROMA_EXPERIENCES_URL = "https://www.maromaexperience.com";
 
 type SpaBookRollLinkProps = {
   className?: string;
@@ -86,7 +88,7 @@ export function SiteHeader({ initialNav, initialViewportIsMobile = false }: Site
   );
   const [activeNavIndex, setActiveNavIndex] = useState(0);
   const { brand, nav } = navContent;
-  const navItems = useMemo(() => [...nav, "Journal"], [nav]);
+  const navItems = useMemo(() => [...nav, "Journal", "Maroma Experiences"], [nav]);
   const lastScrollY = useRef(0);
   const navLinksRef = useRef<HTMLDivElement>(null);
   const scrollItemRefs = useRef<(HTMLElement | null)[]>([]);
@@ -106,7 +108,7 @@ export function SiteHeader({ initialNav, initialViewportIsMobile = false }: Site
       kind: "link",
       key: item,
       label: item,
-      href: item === "Journal" ? "/blog" : getNavHref(item),
+      href: item === "Journal" ? "/blog" : item === "Maroma Experiences" ? MAROMA_EXPERIENCES_URL : getNavHref(item),
     }));
     return [...links, { kind: "spa-logo", key: "spa-logo" }];
   }, [navItems]);
@@ -564,7 +566,18 @@ export function SiteHeader({ initialNav, initialViewportIsMobile = false }: Site
     </Link>
   );
 
-  const desktopNavLinks = navItems.map((item) => (
+  const desktopNavLinks = navItems.map((item) => item === "Maroma Experiences" ? (
+    <a
+      key={item}
+      href={MAROMA_EXPERIENCES_URL}
+      target="_blank"
+      rel="noopener noreferrer"
+      className="nav-experiences-link"
+      aria-label="Visit Maroma Experiences"
+    >
+      <img src="/maroma-experiences-logo.png" alt="Maroma Experiences" />
+    </a>
+  ) : (
     <Link key={item} href={item === "Journal" ? "/blog" : getNavHref(item)}>
       {item}
     </Link>
@@ -578,7 +591,7 @@ export function SiteHeader({ initialNav, initialViewportIsMobile = false }: Site
     >
       <div className="maroma-nav-shell maroma-nav-shell--desktop">
         <nav className={`nav ${navStateClass}`}>
-          <Link href="/" className="brand" aria-label={`${brand} home`}>
+          <Link href="/?skipIntro=1" className="brand" aria-label={`${brand} home`}>
             <img src="/maroma-logo.png" alt={brand} className="brand-logo" />
           </Link>
           <div className="nav-links">{desktopNavLinks}</div>
@@ -598,6 +611,7 @@ export function SiteHeader({ initialNav, initialViewportIsMobile = false }: Site
             <div className="nav-basket-slot nav-basket-slot--inline-desktop" aria-label="Basket">
               {basketLink}
             </div>
+            <CurrencySelector compact />
           </div>
         </nav>
       </div>
@@ -605,7 +619,7 @@ export function SiteHeader({ initialNav, initialViewportIsMobile = false }: Site
       <div className="maroma-nav-shell maroma-nav-shell--mobile">
         <nav className={`nav nav-mobile ${navStateClass}`}>
           <div className="nav-mobile-brand-row">
-            <Link href="/" className="brand" aria-label={`${brand} home`}>
+            <Link href="/?skipIntro=1" className="brand" aria-label={`${brand} home`}>
               <img src="/maroma-logo.png" alt={brand} className="brand-logo" />
             </Link>
             <div className="nav-basket-slot nav-basket-slot--inline" aria-label="Basket">
@@ -641,7 +655,9 @@ export function SiteHeader({ initialNav, initialViewportIsMobile = false }: Site
                     aria-hidden={loopPass > 0 ? true : undefined}
                     tabIndex={loopPass > 0 ? -1 : undefined}
                   >
-                    {item.label}
+                    {item.label === "Maroma Experiences" ? (
+                      <img src="/maroma-experiences-logo.png" alt="Maroma Experiences" className="nav-experiences-logo" />
+                    ) : item.label}
                   </Link>
                 );
               }

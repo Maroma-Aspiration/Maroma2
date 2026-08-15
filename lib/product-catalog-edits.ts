@@ -13,6 +13,8 @@ export type ProductCatalogEdit = {
   brand?: string;
   /** When false, product is hidden from storefront regardless of stock. */
   published?: boolean;
+  /** Admin deletion marker. The source catalogue remains untouched. */
+  deleted?: boolean;
   updatedAt: string;
 };
 
@@ -70,6 +72,7 @@ function parseStore(value: unknown): ProductCatalogEditStore {
     }
     if (typeof row.brand === "string") patch.brand = row.brand.trim().slice(0, 80);
     if (typeof row.published === "boolean") patch.published = row.published;
+    if (typeof row.deleted === "boolean") patch.deleted = row.deleted;
     edits[id] = patch;
   }
 

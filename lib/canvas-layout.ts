@@ -4,6 +4,7 @@ import type {
   CanvasImageEl,
   CanvasStoryGridEl,
   CanvasTextEl,
+  NewsletterCanvas,
 } from "./story-types";
 import {
   DEFAULT_STORY_SPACING_GAPS,
@@ -498,21 +499,76 @@ export function ensureMastheadLayout(elements: CanvasEl[]): CanvasEl[] {
   return ensureMastheadZOrder(els);
 }
 
-/** Portrait circle should paint above banner / hero in the canvas editor. */
+/**
+ * Masthead paint order: banner/hero under logo, logo under portrait.
+ * Portrait sits on the banner/logo seam (matches email masthead). Opaque logo
+ * assets must not cover the portrait circle.
+ */
 export function ensureMastheadZOrder(elements: CanvasEl[]): CanvasEl[] {
-  let maxZ = 0;
+  let baseZ = 0;
   for (const e of elements) {
-    if (MASTHEAD_OVERLAY_IDS.has(e.id) && isImage(e)) {
-      maxZ = Math.max(maxZ, e.zIndex ?? 1);
-    }
+    if (!isImage(e) || !MASTHEAD_OVERLAY_IDS.has(e.id)) continue;
+    if (e.id === "migrated-logo" || e.id === "migrated-portrait") continue;
+    baseZ = Math.max(baseZ, e.zIndex ?? 1);
   }
-  const portrait = elements.find((e) => e.id === "migrated-portrait");
-  if (!portrait || !isImage(portrait)) return elements;
-  const pz = portrait.zIndex ?? 1;
-  if (pz > maxZ) return elements;
-  return elements.map((e) =>
-    e.id === "migrated-portrait" ? ({ ...e, zIndex: maxZ + 2 } as CanvasEl) : e,
+
+  const hasPortrait = elements.some((e) => e.id === "migrated-portrait" && isImage(e));
+  const hasLogo = elements.some((e) => e.id === "migrated-logo" && isImage(e));
+  if (!hasPortrait && !hasLogo) return elements;
+
+  const logoZ = baseZ + 2;
+  const portraitZ = logoZ + 2;
+
+  return elements.map((e) => {
+    if (e.id === "migrated-logo" && isImage(e)) {
+      return e.zIndex === logoZ ? e : ({ ...e, zIndex: logoZ } as CanvasEl);
+    }
+    if (e.id === "migrated-portrait" && isImage(e)) {
+      return e.zIndex === portraitZ ? e : ({ ...e, zIndex: portraitZ } as CanvasEl);
+    }
+    return e;
+  });
+}
+
+/** Copy live masthead overlay images (banner/logo/portrait/hero) onto a fresh-issue canvas. */
+export function overlayMastheadFrom(
+  source: NewsletterCanvas | undefined,
+  target: NewsletterCanvas,
+): NewsletterCanvas {
+  if (!source?.elements?.length) return target;
+  const sourceById = new Map(
+    source.elements.filter((e) => MASTHEAD_OVERLAY_IDS.has(e.id)).map((e) => [e.id, e]),
   );
+  if (sourceById.size === 0) return target;
+
+  // If the target canvas was empty/disabled, still rebuild from live masthead overlays.
+  if (!target.enabled || (target.elements?.length ?? 0) === 0) {
+    return {
+      enabled: true,
+      elements: ensureMastheadZOrder(Array.from(sourceById.values()).map((e) => structuredClone(e))),
+      storySpacingGaps: target.storySpacingGaps ?? source.storySpacingGaps,
+      measuredHeights: target.measuredHeights,
+      dividerDefaults: target.dividerDefaults,
+    };
+  }
+
+  const used = new Set<string>();
+  const elements = target.elements.map((el) => {
+    const overlay = sourceById.get(el.id);
+    if (!overlay) return el;
+    used.add(el.id);
+    return structuredClone(overlay);
+  });
+
+  for (const [id, overlay] of sourceById) {
+    if (!used.has(id)) elements.push(structuredClone(overlay));
+  }
+
+  return {
+    ...target,
+    enabled: true,
+    elements: ensureMastheadZOrder(elements),
+  };
 }
 
 /** Issue title accidentally locked or dragged into the masthead band, or dropped below body content. */

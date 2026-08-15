@@ -20,8 +20,8 @@ async function loadCatalog(): Promise<ProductRecord[]> {
   if (catalogCache && now - catalogCache.at < CATALOG_TTL_MS) {
     return catalogCache.products;
   }
-  const { readMergedCatalog } = await import("./product-catalog-admin");
-  const { products } = await readMergedCatalog();
+  const { readLiveStorefrontCatalog } = await import("./product-catalog-admin");
+  const { products } = await readLiveStorefrontCatalog();
   catalogCache = { at: now, products };
   return products;
 }

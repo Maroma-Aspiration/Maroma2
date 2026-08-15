@@ -1,4 +1,4 @@
-import { readMergedCatalog } from "../../lib/product-catalog-admin";
+import { readLiveStorefrontCatalog } from "../../lib/product-catalog-admin";
 import { filterProducts } from "../../lib/product-db";
 import { readSiteContentFromDisk } from "../../lib/read-site-content";
 import SearchPageClient from "./search-page-client";
@@ -14,7 +14,7 @@ export default async function SearchPage({
   const ritualName = searchParams.ritual || "";
   
   const [{ products: allProducts }, siteContent] = await Promise.all([
-    readMergedCatalog(),
+    readLiveStorefrontCatalog(),
     readSiteContentFromDisk(),
   ]);
   const filteredProducts = filterProducts(allProducts, { 

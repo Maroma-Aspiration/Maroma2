@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import { useCart } from "../../context/CartContext";
+import { useCurrency } from "../../context/CurrencyContext";
 import { decodeBasicHtmlEntities } from "../../lib/decode-html-entities";
 import {
   loadCheckoutShippingDraft,
@@ -50,6 +51,7 @@ const COUNTRY_OPTIONS = [
 
 export default function CheckoutClient() {
   const { cart, subtotal, discount, discountAmount, shipping, total, formatItemPrice } = useCart();
+  const { currency, isEstimated } = useCurrency();
   const [step, setStep] = useState(1);
   const [formData, setFormData] = useState<CheckoutShippingDraft>(DEFAULT_FORM);
   const [submitting, setSubmitting] = useState(false);
@@ -193,6 +195,7 @@ export default function CheckoutClient() {
             pincode: normalizeIndianPincode(formData.pincode),
           },
           notifications: formData.notifications,
+          displayCurrency: currency,
         }),
       });
       const data = (await res.json()) as {
@@ -404,11 +407,11 @@ export default function CheckoutClient() {
                   <div className="maroma-payment-option is-active">
                     <div className="maroma-payment-option-head">
                       <input type="radio" checked readOnly aria-label="UPI" />
-                      <span>UPI (Google Pay, PhonePe, Paytm)</span>
+                      <span>Secure online payment</span>
                       <span className="maroma-payment-badge">Next step</span>
                     </div>
                     <p className="maroma-payment-copy">
-                      Your order will be saved. Payment via Razorpay will be enabled when keys are connected. You will not be charged until then.
+                      CCAvenue payment will be enabled when the merchant credentials and approved currencies are connected. You will not be charged until then.
                     </p>
                   </div>
                 </div>
@@ -496,6 +499,11 @@ export default function CheckoutClient() {
                 ))}
               </div>
               <div className="maroma-order-summary-rows">
+                {isEstimated ? (
+                  <p className="maroma-currency-estimate-note">
+                    Prices shown in {currency} are estimates. Your final payment currency and exchange rate will be confirmed securely by CCAvenue before payment.
+                  </p>
+                ) : null}
                 <div className="maroma-order-row">
                   <span>Subtotal</span>
                   <span>{formatItemPrice(subtotal)}</span>

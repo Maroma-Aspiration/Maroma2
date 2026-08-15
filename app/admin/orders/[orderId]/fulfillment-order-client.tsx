@@ -25,6 +25,11 @@ type FulfillmentOrderClientProps = {
   orderId: string;
 };
 
+type ShiprocketView = {
+  setup: { configured: boolean; pickupLocation?: string };
+  shipment: { orderId?: number; shipmentId?: number; awb?: string; courier?: string; status?: string; labelUrl?: string; pickupScheduled?: boolean };
+};
+
 function cardPresetFromProduction(
   card: NonNullable<ProductionGiftSetLine["card"]>
 ): GiftCardPreset {
@@ -85,6 +90,11 @@ export default function FulfillmentOrderClient({ orderId }: FulfillmentOrderClie
   const [syncedAt, setSyncedAt] = useState<string | null>(null);
   const [busyKey, setBusyKey] = useState<string | null>(null);
   const [markingFulfilled, setMarkingFulfilled] = useState(false);
+  const [shiprocket, setShiprocket] = useState<ShiprocketView | null>(null);
+  const [shiprocketBusy, setShiprocketBusy] = useState<string | null>(null);
+  const [courierId, setCourierId] = useState("");
+  const [parcel, setParcel] = useState({ weight: "0.5", length: "20", breadth: "15", height: "10" });
+  const [role, setRole] = useState<"admin" | "production" | "user" | null>(null);
 
   const loadDetail = useCallback(async () => {
     try {
@@ -99,6 +109,17 @@ export default function FulfillmentOrderClient({ orderId }: FulfillmentOrderClie
     }
   }, [orderId]);
 
+  const loadShiprocket = useCallback(async () => {
+    try {
+      const res = await fetch(`/api/admin/shiprocket/${orderId}`, { cache: "no-store" });
+      const data = (await res.json()) as ShiprocketView & { error?: string };
+      if (!res.ok) throw new Error(data.error || "Could not load Shiprocket.");
+      setShiprocket(data);
+    } catch (err) {
+      setStatus(err instanceof Error ? err.message : "Could not load Shiprocket.");
+    }
+  }, [orderId]);
+
   useEffect(() => {
     document.body.classList.add("fulfillment-board-active");
     return () => {
@@ -107,12 +128,35 @@ export default function FulfillmentOrderClient({ orderId }: FulfillmentOrderClie
   }, []);
 
   useEffect(() => {
+    void fetch("/api/auth/session", { cache: "no-store" }).then((res) => res.json()).then((data) => setRole(data.user?.role ?? null));
     void loadDetail();
+    void loadShiprocket();
     const timer = window.setInterval(() => {
       void loadDetail();
     }, POLL_MS);
     return () => window.clearInterval(timer);
-  }, [loadDetail]);
+  }, [loadDetail, loadShiprocket]);
+
+  const runShiprocket = async (action: "create" | "awb" | "pickup" | "label" | "track") => {
+    if (shiprocketBusy) return;
+    setShiprocketBusy(action);
+    setStatus("");
+    try {
+      const res = await fetch(`/api/admin/shiprocket/${orderId}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action, courierId: courierId ? Number(courierId) : undefined, ...Object.fromEntries(Object.entries(parcel).map(([key, value]) => [key, Number(value)])) }),
+      });
+      const data = (await res.json()) as ShiprocketView & { error?: string };
+      if (!res.ok) throw new Error(data.error || "Shiprocket action failed.");
+      setShiprocket(data);
+      setStatus(action === "track" ? "Tracking refreshed." : "Shiprocket updated successfully.");
+    } catch (err) {
+      setStatus(err instanceof Error ? err.message : "Shiprocket action failed.");
+    } finally {
+      setShiprocketBusy(null);
+    }
+  };
 
   const toggleItem = async (key: string, checked: boolean) => {
     if (busyKey) return;
@@ -164,6 +208,28 @@ export default function FulfillmentOrderClient({ orderId }: FulfillmentOrderClie
     } finally {
       setMarkingFulfilled(false);
     }
+  };
+
+  const editTask = async (item: FulfillmentChecklistItem) => {
+    const label = window.prompt("Task name", item.label)?.trim();
+    if (!label || label === item.label) return;
+    await changeTask(item.key, "edit_task", label);
+  };
+
+  const deleteTask = async (item: FulfillmentChecklistItem) => {
+    if (!window.confirm(`Delete production task “${item.label}”?`)) return;
+    await changeTask(item.key, "delete_task");
+  };
+
+  const changeTask = async (key: string, action: "edit_task" | "delete_task", label?: string) => {
+    setBusyKey(key);
+    try {
+      const res = await fetch(`/api/admin/fulfillment/${orderId}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ key, action, label }) });
+      const data = await res.json() as FulfillmentOrderDetail & { error?: string; syncedAt?: string };
+      if (!res.ok) throw new Error(data.error || "Task update failed.");
+      setDetail(data); setSyncedAt(data.syncedAt ?? new Date().toISOString());
+    } catch (error) { setStatus(error instanceof Error ? error.message : "Task update failed."); }
+    finally { setBusyKey(null); }
   };
 
   const groupedChecklist = useMemo(() => {
@@ -252,6 +318,46 @@ export default function FulfillmentOrderClient({ orderId }: FulfillmentOrderClie
         </div>
       </section>
 
+      <section className="fulfillment-shiprocket-card" aria-label="Shiprocket shipping">
+        <header className="fulfillment-shiprocket-head">
+          <div><p className="fulfillment-board-eyebrow">Delivery partner</p><h2>Shiprocket</h2></div>
+          <span className={`fulfillment-shiprocket-status${shiprocket?.setup.configured ? " is-ready" : ""}`}>
+            {shiprocket?.setup.configured ? shiprocket.shipment.status || "Ready" : "Setup required"}
+          </span>
+        </header>
+        {!shiprocket?.setup.configured ? (
+          <p className="fulfillment-shiprocket-note">Add the Shiprocket API email, password, and pickup-location name to the production environment to activate dispatch.</p>
+        ) : (
+          <>
+            <div className="fulfillment-parcel-grid">
+              {(["weight", "length", "breadth", "height"] as const).map((field) => (
+                <label key={field}>
+                  <span>{field === "weight" ? "Weight (kg)" : `${field[0].toUpperCase()}${field.slice(1)} (cm)`}</span>
+                  <input type="number" min="0.1" step="0.1" value={parcel[field]} onChange={(event) => setParcel((current) => ({ ...current, [field]: event.target.value }))} disabled={Boolean(shiprocket.shipment.shipmentId)} />
+                </label>
+              ))}
+              <label><span>Courier ID (optional)</span><input type="number" value={courierId} onChange={(event) => setCourierId(event.target.value)} placeholder="Auto-select" /></label>
+            </div>
+            {shiprocket.shipment.shipmentId ? (
+              <div className="fulfillment-shiprocket-facts">
+                <span>Shipment <strong>{shiprocket.shipment.shipmentId}</strong></span>
+                <span>AWB <strong>{shiprocket.shipment.awb || "Pending"}</strong></span>
+                <span>Courier <strong>{shiprocket.shipment.courier || "Pending"}</strong></span>
+                <span>Pickup <strong>{shiprocket.shipment.pickupScheduled ? "Scheduled" : "Pending"}</strong></span>
+              </div>
+            ) : null}
+            <div className="fulfillment-shiprocket-actions">
+              <button type="button" onClick={() => void runShiprocket("create")} disabled={Boolean(shiprocket.shipment.shipmentId) || Boolean(shiprocketBusy)}>{shiprocketBusy === "create" ? "Creating…" : shiprocket.shipment.shipmentId ? "Shipment created" : "1. Create shipment"}</button>
+              <button type="button" onClick={() => void runShiprocket("awb")} disabled={!shiprocket.shipment.shipmentId || Boolean(shiprocket.shipment.awb) || Boolean(shiprocketBusy)}>{shiprocketBusy === "awb" ? "Assigning…" : shiprocket.shipment.awb ? "AWB assigned" : "2. Assign courier + AWB"}</button>
+              <button type="button" onClick={() => void runShiprocket("pickup")} disabled={!shiprocket.shipment.awb || shiprocket.shipment.pickupScheduled || Boolean(shiprocketBusy)}>{shiprocketBusy === "pickup" ? "Scheduling…" : shiprocket.shipment.pickupScheduled ? "Pickup scheduled" : "3. Schedule pickup"}</button>
+              <button type="button" onClick={() => void runShiprocket("label")} disabled={!shiprocket.shipment.awb || Boolean(shiprocketBusy)}>{shiprocketBusy === "label" ? "Generating…" : "4. Generate label"}</button>
+              <button type="button" onClick={() => void runShiprocket("track")} disabled={!shiprocket.shipment.awb || Boolean(shiprocketBusy)}>{shiprocketBusy === "track" ? "Refreshing…" : "Refresh tracking"}</button>
+              {shiprocket.shipment.labelUrl ? <a href={shiprocket.shipment.labelUrl} target="_blank" rel="noreferrer">Download label</a> : null}
+            </div>
+          </>
+        )}
+      </section>
+
       {detail.giftSets.map((set) => (
         <section key={set.lineIndex} className="fulfillment-gift-set-panel">
           <header className="fulfillment-gift-set-head">
@@ -314,13 +420,7 @@ export default function FulfillmentOrderClient({ orderId }: FulfillmentOrderClie
             </header>
             <div className="fulfillment-checklist">
               {items.map((item) => (
-                <ChecklistButton
-                  key={item.key}
-                  item={item}
-                  checked={Boolean(detail.checked[item.key])}
-                  disabled={busyKey === item.key}
-                  onToggle={toggleItem}
-                />
+                <div className="fulfillment-task-row" key={item.key}><ChecklistButton item={item} checked={Boolean(detail.checked[item.key])} disabled={busyKey === item.key} onToggle={toggleItem} />{role === "admin" ? <div className="fulfillment-task-admin-actions"><button type="button" onClick={() => void editTask(item)} disabled={Boolean(busyKey)}>Edit</button><button type="button" className="is-danger" onClick={() => void deleteTask(item)} disabled={Boolean(busyKey)}>Delete</button></div> : null}</div>
               ))}
             </div>
           </section>

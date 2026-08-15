@@ -2,12 +2,32 @@ import type { NextRequest } from "next/server";
 import { NextResponse } from "next/server";
 import { getSessionSecret, SESSION_COOKIE, verifySessionPayload } from "./lib/auth-session";
 import type { SessionPayload } from "./lib/auth-session";
+import { PREVIEW_COOKIE, previewAccessToken } from "./lib/preview-access";
+
+function isPreviewExempt(pathname: string): boolean {
+  return pathname === "/preview-access" ||
+    pathname === "/admin/install" ||
+    pathname === "/api/preview-access" ||
+    pathname.startsWith("/_next/") ||
+    pathname === "/favicon.ico" ||
+    pathname === "/robots.txt" ||
+    pathname === "/api/webhooks/razorpay" ||
+    pathname.startsWith("/api/newsletter/track/");
+}
 
 function authFullyConfigured(): boolean {
   return Boolean(getSessionSecret());
 }
 
+function isMobileRequest(request: NextRequest): boolean {
+  const userAgent = request.headers.get("user-agent") ?? "";
+  return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini|Mobile/i.test(userAgent);
+}
+
 function requiresAdmin(pathname: string, method: string): boolean {
+  if (pathname === "/admin/install") {
+    return false;
+  }
   if (pathname.startsWith("/admin")) {
     return true;
   }
@@ -42,6 +62,15 @@ function requiresAdmin(pathname: string, method: string): boolean {
     return true;
   }
   return false;
+}
+
+function isProductionPath(pathname: string): boolean {
+  return pathname === "/admin/orders" ||
+    pathname.startsWith("/admin/orders/") ||
+    pathname === "/api/admin/fulfillment" ||
+    pathname.startsWith("/api/admin/fulfillment/") ||
+    pathname.startsWith("/api/admin/shiprocket/") ||
+    pathname === "/api/auth/pwa-install";
 }
 
 function isNewsletterPublicTrack(pathname: string): boolean {
@@ -83,6 +112,31 @@ export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
   const method = request.method.toUpperCase();
   const api = pathname.startsWith("/api/");
+
+  // Installation must always be reachable before either preview access or staff sign-in.
+  if (pathname === "/admin/install") {
+    return NextResponse.next();
+  }
+
+  if (pathname === "/admin" && isMobileRequest(request)) {
+    const url = request.nextUrl.clone();
+    url.pathname = "/admin/orders";
+    url.search = "";
+    return NextResponse.redirect(url);
+  }
+
+  const previewPassword = process.env.MAROMA_PREVIEW_PASSWORD;
+  if (previewPassword && !isPreviewExempt(pathname)) {
+    const expectedToken = await previewAccessToken(previewPassword);
+    if (request.cookies.get(PREVIEW_COOKIE)?.value !== expectedToken) {
+      if (api) return NextResponse.json({ error: "Preview password required." }, { status: 401 });
+      const url = request.nextUrl.clone();
+      url.pathname = "/preview-access";
+      url.search = "";
+      url.searchParams.set("next", `${pathname}${request.nextUrl.search}`);
+      return NextResponse.redirect(url);
+    }
+  }
 
   if (isPublicAuthPath(pathname)) {
     return NextResponse.next();
@@ -129,6 +183,12 @@ export async function middleware(request: NextRequest) {
         url.search = "";
         return NextResponse.redirect(url);
       }
+      if (session.role === "production") {
+        const url = request.nextUrl.clone();
+        url.pathname = safeNext && isProductionPath(safeNext) ? safeNext : "/admin/orders";
+        url.search = "";
+        return NextResponse.redirect(url);
+      }
       const url = request.nextUrl.clone();
       url.pathname = safeNext && safeNext !== "/" ? safeNext : "/account";
       url.search = "";
@@ -155,7 +215,7 @@ export async function middleware(request: NextRequest) {
     return redirectToLogin(request, `${pathname}${request.nextUrl.search}`, "sign_in_required");
   }
 
-  if (session.role !== "admin") {
+  if (session.role !== "admin" && !(session.role === "production" && isProductionPath(pathname))) {
     if (api) {
       return NextResponse.json({ error: "Forbidden", reason: "admin_role_required" }, { status: 403 });
     }
@@ -169,21 +229,5 @@ export async function middleware(request: NextRequest) {
 }
 
 export const config = {
-  matcher: [
-    "/admin/:path*",
-    "/account",
-    "/login",
-    "/signup",
-    "/forgot-password",
-    "/api/stories",
-    "/api/stories/:path*",
-    "/api/newsletter/:path*",
-    "/api/site-content",
-    "/api/hero-media-layout",
-    "/api/category-banners",
-    "/api/category-banners/upload",
-    "/api/products/upload",
-    "/api/auth/:path*",
-    "/api/admin/:path*"
-  ]
+  matcher: ["/((?!.*\\..*).*)"]
 };

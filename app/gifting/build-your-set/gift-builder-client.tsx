@@ -16,6 +16,7 @@ import type {
 } from "../../../lib/gift-builder-types";
 import { GiftSetCardAddon, GiftSetCardSummary } from "../../components/GiftSetCardSection";
 import { GiftSetThumbnail } from "../../components/GiftSetThumbnail";
+import { canAddGift, packGifts } from "../../../lib/gift-packing";
 
 type BuilderStep = "start" | "build" | "complete";
 
@@ -139,6 +140,17 @@ export default function GiftBuilderClient() {
   }, [catalog]);
 
   const filledSlots = slots.filter(Boolean);
+  const selectedElements = useMemo(
+    () => filledSlots.map((id) => elementMap.get(id)).filter((item): item is GiftElement => Boolean(item)),
+    [elementMap, filledSlots]
+  );
+  const packingResult = useMemo(
+    () => selectedBox ? packGifts(selectedBox, selectedElements) : { fits: false, packed: [] },
+    [selectedBox, selectedElements]
+  );
+  const usedAreaPercent = selectedBox
+    ? Math.round((selectedElements.reduce((sum, item) => sum + item.lengthCm * item.widthCm, 0) / (selectedBox.lengthCm * selectedBox.widthCm)) * 100)
+    : 0;
   const isBuildComplete =
     selectedBox !== null && filledSlots.length === selectedBox.slotCount;
 
@@ -506,6 +518,8 @@ export default function GiftBuilderClient() {
   const renderInventoryItem = (element: GiftElement) => {
     const isEquipped = slots.includes(element.id);
     const isActivePick = slots[activeSlot] === element.id;
+    const selectedWithoutActive = selectedElements.filter((item) => item.id !== slots[activeSlot]);
+    const fits = isEquipped || (selectedBox ? canAddGift(selectedBox, selectedWithoutActive, element) : false);
     return (
       <button
         key={element.id}
@@ -514,14 +528,17 @@ export default function GiftBuilderClient() {
           isEquipped && !isActivePick ? " is-equipped" : ""
         }`}
         onClick={() => selectElement(element.id)}
+        disabled={!fits}
         title={element.description}
       >
         <span className="gift-builder-inv-thumb" style={{ backgroundImage: `url(${element.image})` }} />
         <span className="gift-builder-inv-body">
           <strong>{element.name}</strong>
           <span>{formatItemPrice(element.price)}</span>
+          <small>{element.sizeGroup} · {element.lengthCm} × {element.widthCm} × {element.heightCm} cm</small>
         </span>
         {isEquipped ? <span className="gift-builder-inv-badge">In box</span> : null}
+        {!fits ? <span className="gift-builder-inv-badge gift-builder-inv-badge--no-fit">Won’t fit</span> : null}
       </button>
     );
   };
@@ -681,7 +698,7 @@ export default function GiftBuilderClient() {
               >
                 <span className="gift-builder-track-box-name">{box.name}</span>
                 <span className="gift-builder-track-box-meta">
-                  {box.slotCount} items · from {formatItemPrice(box.basePrice)}
+                  Up to {box.slotCount} items · {box.lengthCm} × {box.widthCm} × {box.heightCm} cm · from {formatItemPrice(box.basePrice)}
                 </span>
               </button>
             ))}
@@ -893,14 +910,22 @@ export default function GiftBuilderClient() {
                 </aside>
 
                 <div className="gift-builder-loadout-center">
+                  <div className="gift-builder-size-pickers" aria-label="Choose a gift by size">
+                    {(["small", "medium", "large"] as const).map((size) => {
+                      const options = catalog.elements.filter((element) => element.sizeGroup === size && (slots.includes(element.id) || canAddGift(selectedBox, selectedElements, element)));
+                      return <label key={size}><span>{size} gifts</span><select value="" onChange={(event) => { if (event.target.value) selectElement(event.target.value); }}><option value="">Choose {size}</option>{options.map((element) => <option key={element.id} value={element.id}>{element.name}</option>)}</select></label>;
+                    })}
+                  </div>
                   <div className="gift-builder-box-stage">
                     <div className="gift-builder-box-visual gift-builder-box-visual--hero">
                       <div className="gift-builder-box-lid" />
                       <div
-                        className={`gift-builder-box-cavity gift-builder-box-cavity--${selectedBox.slotCount}`}
+                        className="gift-builder-box-cavity gift-builder-box-cavity--packed"
+                        style={selectedBox.topImage ? { backgroundImage: `linear-gradient(rgba(247,248,244,.72), rgba(235,233,223,.72)), url(${selectedBox.topImage})` } : undefined}
                       >
-                        {slots.map((slotId, index) => {
-                          const element = slotId ? elementMap.get(slotId) : null;
+                        {packingResult.packed.map((packed) => {
+                          const index = slots.indexOf(packed.elementId);
+                          const element = elementMap.get(packed.elementId);
                           return (
                             <button
                               key={index}
@@ -910,21 +935,27 @@ export default function GiftBuilderClient() {
                               }`}
                               onClick={() => setActiveSlot(index)}
                               aria-label={`Slot ${index + 1}${element ? `: ${element.name}` : ""}`}
+                              style={{ left: `${packed.x / selectedBox.lengthCm * 100}%`, top: `${packed.y / selectedBox.widthCm * 100}%`, width: `${packed.lengthCm / selectedBox.lengthCm * 100}%`, height: `${packed.widthCm / selectedBox.widthCm * 100}%` }}
                             >
-                              <span className="gift-builder-slot-label">Slot {index + 1}</span>
                               {element ? (
                                 <>
                                   <img src={element.image} alt="" />
                                   <span>{element.name}</span>
                                 </>
-                              ) : (
-                                <span className="gift-builder-slot-empty">+</span>
-                              )}
+                              ) : null}
                             </button>
                           );
                         })}
+                        {packingResult.packed.length === 0 ? <span className="gift-builder-empty-box">Choose a gift size above to begin</span> : null}
                       </div>
                     </div>
+                  </div>
+
+                  <div className="gift-builder-capacity"><span><strong>{usedAreaPercent}%</strong> of the box floor used</span><span>{Math.max(0, selectedBox.slotCount - filledSlots.length)} selections remaining</span><progress max="100" value={usedAreaPercent} /></div>
+
+                  <div className="gift-builder-3d" aria-label="Angled preview of packed gift box">
+                    <span className="gift-builder-3d-label">3D review</span>
+                    <div className="gift-builder-3d-box">{packingResult.packed.map((packed) => { const element = elementMap.get(packed.elementId); return element ? <span key={packed.elementId} style={{ left: `${packed.x / selectedBox.lengthCm * 78 + 11}%`, top: `${packed.y / selectedBox.widthCm * 66 + 12}%`, width: `${packed.lengthCm / selectedBox.lengthCm * 78}%`, height: `${packed.widthCm / selectedBox.widthCm * 66}%`, backgroundImage: `url(${element.image})`, transform: `translateZ(${Math.min(34, packed.heightCm * 2)}px)` }} title={element.name} /> : null; })}</div>
                   </div>
 
                   <div className="gift-builder-slot-bar">

@@ -128,14 +128,14 @@ export function CategoryHeroWithAdmin({
       : objectPosition;
 
   const backLink = (
-    <Link href="/" className="category-back">
+    <Link href="/?skipIntro=1" className="category-back">
       Back to Home
     </Link>
   );
 
   const wideCoverTextPill = (
     <div className="category-hero-text-pill">
-      <Link href="/" className="category-hero-pill-home" aria-label="Home">
+      <Link href="/?skipIntro=1" className="category-hero-pill-home" aria-label="Home">
         <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
           <path
             d="M5.5 10.5 12 5l6.5 5.5V18a1.5 1.5 0 0 1-1.5 1.5H7A1.5 1.5 0 0 1 5.5 18v-7.5Z"
@@ -294,7 +294,7 @@ export function CategoryHeroWithAdmin({
             <img
               className="category-hero-wide-img"
               src={imageUrl}
-              alt="Category hero photograph"
+              alt={`${categoryLabel} collection — Maroma`}
               style={{ objectPosition: bannerObjectPosition }}
             />
             <div className="category-hero-copy category-hero-copy--overlay">{heroCopy}</div>

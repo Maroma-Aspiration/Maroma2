@@ -2,9 +2,11 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { unstable_noStore as noStore } from "next/cache";
 import { notFound } from "next/navigation";
+import { JsonLd } from "../../components/JsonLd";
 import { formatStoryDate, splitBodyToParagraphs } from "../../../lib/story-format";
 import { readStoriesState } from "../../../lib/story-storage";
 import { getStoryThumbnailUrl, resolveStoryThumbnailUrl } from "../../../lib/story-thumbnail";
+import { articleJsonLd, breadcrumbJsonLd, buildPageMetadata } from "../../../lib/site-seo";
 
 export const dynamic = "force-dynamic";
 
@@ -20,18 +22,16 @@ export async function generateMetadata({ params }: StoryPageProps): Promise<Meta
   const storyIndex = state.stories.findIndex((item) => item.slug === params.slug);
   const story = storyIndex >= 0 ? state.stories[storyIndex] : undefined;
   if (!story) {
-    return { title: "Story not found | Maroma Blog" };
+    return { title: "Story not found | Maroma" };
   }
   const image = getStoryThumbnailUrl(story, state, storyIndex) || undefined;
-  return {
-    title: `${story.title} | Maroma Blog`,
+  return buildPageMetadata({
+    title: `${story.title} | Maroma Journal`,
     description: story.excerpt || story.title,
-    openGraph: {
-      title: story.title,
-      description: story.excerpt || story.title,
-      images: image ? [image] : undefined,
-    },
-  };
+    path: `/blog/${story.slug}`,
+    image,
+    type: "article",
+  });
 }
 
 export default async function StoryPage({ params }: StoryPageProps) {
@@ -46,10 +46,27 @@ export default async function StoryPage({ params }: StoryPageProps) {
   const paragraphs = splitBodyToParagraphs(story.body);
   return (
     <main className="story-page">
+      <JsonLd
+        data={[
+          articleJsonLd({
+            title: story.title,
+            description: story.excerpt || story.title,
+            path: `/blog/${story.slug}`,
+            image: heroImage,
+            datePublished: story.publishedAt,
+            dateModified: story.updatedAt || story.publishedAt,
+          }),
+          breadcrumbJsonLd([
+            { name: "Home", path: "/" },
+            { name: "Journal", path: "/blog" },
+            { name: story.title, path: `/blog/${story.slug}` },
+          ]),
+        ]}
+      />
       <article className="story-article">
         <h1>{story.title}</h1>
         {story.publishedAt ? <p className="story-meta">{formatStoryDate(story.publishedAt)}</p> : null}
-        {heroImage ? <img src={heroImage} alt={story.title} className="story-hero-image" /> : null}
+        {heroImage ? <img src={heroImage} alt="" className="story-hero-image" /> : null}
         {paragraphs.length > 0 ? paragraphs.map((line) => <p key={line}>{line}</p>) : <p>{story.excerpt}</p>}
         <div className="story-actions">
           {story.ctaUrl ? (

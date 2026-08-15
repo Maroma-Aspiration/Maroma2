@@ -194,6 +194,7 @@
     max-width: min(165px, 43.5vw);
   }
 
+
   .site-header-responsive .nav-basket-slot--inline {
     position: absolute;
     right: calc(12px + 2mm);
@@ -326,6 +327,7 @@
     width: auto;
     max-width: min(165px, 43.5vw);
   }
+
 
   .admin-mobile-preview-frame .nav-links.nav-links-carousel .nav-scroll-item {
     font-size: calc(11pt * 0.8) !important;

@@ -129,6 +129,7 @@ export async function bindYouTubePlayer(
   handlers: {
     onEnded?: () => void;
     onReady?: (player: YTPlayerLike) => void;
+    onPlaying?: () => void;
   }
 ): Promise<YTPlayerLike | null> {
   try {
@@ -137,6 +138,9 @@ export async function bindYouTubePlayer(
       events: {
         onReady: (event) => handlers.onReady?.(event.target),
         onStateChange: (event) => {
+          if (event.data === YT.PlayerState.PLAYING) {
+            handlers.onPlaying?.();
+          }
           if (event.data === YT.PlayerState.ENDED) {
             handlers.onEnded?.();
           }

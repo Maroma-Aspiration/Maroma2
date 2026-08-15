@@ -32,10 +32,11 @@ export function layoutNewsletterCanvas(
   gapsOverride?: StorySpacingGaps,
 ): LaidOutNewsletterCanvas {
   const gaps = canvas.storySpacingGaps ?? gapsOverride ?? DEFAULT_STORY_SPACING_GAPS;
-  let els = canvas.elements;
+  let els = ensureMastheadZOrder(canvas.elements);
   els = applyAllMontageLayouts(els);
   const synced = syncCanvasStoryLayout(els, gaps, canvas.measuredHeights);
   els = applyAllMontageLayouts(synced.elements);
+  els = ensureMastheadZOrder(els);
   const measuredHeights = synced.measuredHeights;
   return {
     elements: els,

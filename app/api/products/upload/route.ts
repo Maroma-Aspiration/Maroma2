@@ -1,9 +1,7 @@
-import { promises as fs } from "fs";
-import path from "path";
 import { NextResponse } from "next/server";
-import { readOverrides, readProducts, writeOverrides } from "../../../../lib/product-db";
-
-const uploadDir = path.join(process.cwd(), "public", "staging-media", "admin-products");
+import { put } from "@vercel/blob";
+import { readOverrides, writeOverrides } from "../../../../lib/product-db";
+import { getAdminProduct } from "../../../../lib/product-catalog-admin";
 
 const extensionForMime = (mime: string): string => {
   if (mime === "image/jpeg") return ".jpg";
@@ -31,8 +29,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Only image uploads are supported." }, { status: 400 });
     }
 
-    const products = await readProducts();
-    const exists = products.some((product) => product.id === productId);
+    const exists = Boolean(await getAdminProduct(productId));
     if (!exists) {
       return NextResponse.json({ error: "Unknown product id." }, { status: 404 });
     }
@@ -40,14 +37,14 @@ export async function POST(request: Request) {
     const ext = extensionForMime(file.type);
     const safeId = productId.replace(/[^a-zA-Z0-9_-]/g, "");
     const slot = String(formData.get("slot") ?? "main").toLowerCase();
-    const fileName = `${safeId}-${slot}-${Date.now()}${ext}`;
-    const fullPath = path.join(uploadDir, fileName);
-
-    await fs.mkdir(uploadDir, { recursive: true });
-    const buffer = Buffer.from(await file.arrayBuffer());
-    await fs.writeFile(fullPath, buffer);
-
-    const publicPath = `/staging-media/admin-products/${fileName}`;
+    const fileName = `admin-products/${safeId}-${slot}-${Date.now()}${ext}`;
+    const uploaded = await put(fileName, file, {
+      access: "public",
+      addRandomSuffix: true,
+      contentType: file.type,
+      cacheControlMaxAge: 31536000,
+    });
+    const publicPath = uploaded.url;
     const store = await readOverrides();
     const existing = store.overrides[productId] || { images: [], updatedAt: "" };
     

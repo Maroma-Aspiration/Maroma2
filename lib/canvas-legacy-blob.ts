@@ -84,22 +84,32 @@ export async function downloadLegacyBlobUrl(
   }
 }
 
-/** Upload a canvas image to the legacy Vercel Blob store when still configured. */
-export async function uploadLegacyBlobFile(file: File, prefix = "canvas"): Promise<string> {
+/** Upload raw bytes to the legacy Vercel Blob store when still configured. */
+export async function uploadLegacyBlobBuffer(
+  body: Buffer | Uint8Array,
+  contentType: string,
+  prefix = "canvas"
+): Promise<string> {
   if (!isCanvasBlobConfigured()) {
     throw new Error("Legacy Vercel Blob is not configured.");
   }
 
   const { put } = await import("@vercel/blob");
-  const ext = file.name.split(".").pop()?.toLowerCase() || extForMime(file.type || "image/jpeg");
-  const path = makeLegacyBlobPath(prefix, ext);
-  const result = await put(path, file, {
+  const mime = contentType || "image/jpeg";
+  const path = makeLegacyBlobPath(prefix, extForMime(mime));
+  const result = await put(path, body, {
     access: "public",
     addRandomSuffix: false,
     cacheControlMaxAge: 31536000,
-    contentType: file.type || "image/jpeg",
+    contentType: mime,
   });
   return result.url;
+}
+
+/** Upload a canvas image to the legacy Vercel Blob store when still configured. */
+export async function uploadLegacyBlobFile(file: File, prefix = "canvas"): Promise<string> {
+  const buffer = Buffer.from(await file.arrayBuffer());
+  return uploadLegacyBlobBuffer(buffer, file.type || "image/jpeg", prefix);
 }
 
 export async function probeCanvasBlobReadable(url: string): Promise<boolean> {

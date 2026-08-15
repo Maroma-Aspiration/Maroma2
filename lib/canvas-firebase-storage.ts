@@ -1,3 +1,4 @@
+import { randomUUID } from "crypto";
 import { cert, getApps, initializeApp, type App } from "firebase-admin/app";
 import { getStorage } from "firebase-admin/storage";
 
@@ -11,7 +12,14 @@ export type CanvasFirebaseConfig = {
 let app: App | null = null;
 
 function normalizePrivateKey(raw: string): string {
-  return raw.replace(/\\n/g, "\n");
+  let key = raw.trim();
+  if (
+    (key.startsWith('"') && key.endsWith('"')) ||
+    (key.startsWith("'") && key.endsWith("'"))
+  ) {
+    key = key.slice(1, -1);
+  }
+  return key.replace(/\\n/g, "\n");
 }
 
 export function getCanvasFirebaseConfig(): CanvasFirebaseConfig | null {
@@ -25,7 +33,7 @@ export function getCanvasFirebaseConfig(): CanvasFirebaseConfig | null {
       };
       const projectId = parsed.project_id?.trim();
       const clientEmail = parsed.client_email?.trim();
-      const privateKey = parsed.private_key?.trim();
+      const privateKey = parsed.private_key ? normalizePrivateKey(parsed.private_key) : "";
       const storageBucket =
         process.env.FIREBASE_STORAGE_BUCKET?.trim() ||
         (projectId ? `${projectId}.appspot.com` : "");
@@ -129,15 +137,24 @@ export async function uploadCanvasBuffer(
 
   const normalized = path.replace(/^\/+/, "");
   const file = getBucket(config).file(normalized);
+  const downloadToken = randomUUID();
   await file.save(body, {
     metadata: {
       contentType,
       cacheControl: "public, max-age=31536000, immutable",
+      metadata: {
+        firebaseStorageDownloadTokens: downloadToken,
+      },
     },
     resumable: false,
   });
-  await file.makePublic();
-  return publicUrlForCanvasPath(normalized, config);
+  // Uniform bucket-level access rejects object ACLs; token URL still works.
+  try {
+    await file.makePublic();
+  } catch {
+    /* ignore */
+  }
+  return `${publicUrlForCanvasPath(normalized, config)}&token=${downloadToken}`;
 }
 
 export async function uploadCanvasFile(file: File, prefix = "canvas"): Promise<string> {

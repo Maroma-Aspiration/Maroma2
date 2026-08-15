@@ -15,6 +15,9 @@ export const GIFT_BOXES: GiftBox[] = [
     image: "/staging-media/wp-content/uploads/2023/08/EA35-D21_Perfume-Mats-Lavender-001-copy.jpg",
     slotCount: 3,
     basePrice: 150,
+    lengthCm: 20,
+    widthCm: 15,
+    heightCm: 8,
   },
   {
     id: "classic",
@@ -23,6 +26,9 @@ export const GIFT_BOXES: GiftBox[] = [
     image: "/staging-media/wp-content/uploads/2021/06/Asian-Delights-01.jpg",
     slotCount: 4,
     basePrice: 250,
+    lengthCm: 26,
+    widthCm: 20,
+    heightCm: 10,
   },
   {
     id: "grand",
@@ -31,12 +37,22 @@ export const GIFT_BOXES: GiftBox[] = [
     image: "/staging-media/wp-content/uploads/2023/08/Aromatic-Candle-Jasmine-Sambac-75gm-001-copy.jpg",
     slotCount: 5,
     basePrice: 400,
+    lengthCm: 34,
+    widthCm: 25,
+    heightCm: 12,
   },
 ];
 
 /** Curated element IDs map to catalogue product IDs — prices/images enriched at runtime. */
 export const GIFT_ELEMENT_DEFS: Array<
-  Omit<GiftElement, "price" | "image"> & { fallbackPrice: number; fallbackImage: string }
+  Omit<GiftElement, "price" | "image" | "lengthCm" | "widthCm" | "heightCm" | "sizeGroup"> & {
+    fallbackPrice: number;
+    fallbackImage: string;
+    lengthCm?: number;
+    widthCm?: number;
+    heightCm?: number;
+    sizeGroup?: GiftElement["sizeGroup"];
+  }
 > = [
   {
     id: "incense-lemongrass",
@@ -295,6 +311,10 @@ export function getStaticGiftBuilderCatalog(): GiftBuilderCatalog {
     category: def.category,
     image: def.fallbackImage,
     price: def.fallbackPrice,
+    lengthCm: def.lengthCm ?? (def.category === "candle" ? 8 : def.category === "soap" ? 10 : 5),
+    widthCm: def.widthCm ?? (def.category === "candle" ? 8 : def.category === "soap" ? 7 : 5),
+    heightCm: def.heightCm ?? (def.category === "candle" ? 7 : def.category === "soap" ? 4 : 14),
+    sizeGroup: def.sizeGroup ?? (def.category === "candle" ? "large" : def.category === "soap" ? "medium" : "small"),
   }));
 
   return {
@@ -321,5 +341,9 @@ export function getGiftElement(elementId: string): GiftElement | null {
     category: def.category,
     image: def.fallbackImage,
     price: def.fallbackPrice,
+    lengthCm: def.lengthCm ?? (def.category === "candle" ? 8 : def.category === "soap" ? 10 : 5),
+    widthCm: def.widthCm ?? (def.category === "candle" ? 8 : def.category === "soap" ? 7 : 5),
+    heightCm: def.heightCm ?? (def.category === "candle" ? 7 : def.category === "soap" ? 4 : 14),
+    sizeGroup: def.sizeGroup ?? (def.category === "candle" ? "large" : def.category === "soap" ? "medium" : "small"),
   };
 }

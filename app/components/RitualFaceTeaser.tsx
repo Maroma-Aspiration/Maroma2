@@ -12,7 +12,7 @@ import {
 } from "react";
 import Link from "next/link";
 import { decodeBasicHtmlEntities } from "../../lib/decode-html-entities";
-import { formatInrPrice } from "../../lib/format-price";
+import { useCurrency } from "../../context/CurrencyContext";
 import { getRitualCaptionWord } from "../../lib/ritual-caption-benefits";
 import { selectFaceCareProducts, selectLuxuryProducts } from "../../lib/face-products";
 import { getDisplayImageUrl, hasDisplayImage } from "../../lib/product-image";
@@ -106,6 +106,7 @@ export function RitualFaceTeaser({
   onLuxuryInteractionRelease,
   bandBehind,
 }: Props) {
+  const { formatCatalogPrice, isEstimated } = useCurrency();
   const pool = useMemo(() => {
     if (range === "luxury") {
       const luxury = selectLuxuryProducts(products);
@@ -403,7 +404,8 @@ export function RitualFaceTeaser({
     }
     const label = decodeBasicHtmlEntities(product.name);
     const captionWord = getRitualCaptionWord(product);
-    const priceLabel = formatInrPrice(product.price) ?? "Price on request";
+    const convertedPrice = formatCatalogPrice(product.price);
+    const priceLabel = convertedPrice ? `${isEstimated ? "≈ " : ""}${convertedPrice}` : "Price on request";
     const detailLine = ritualSpotlightDetailLine(product);
     const tileKey = `${product.id}-${index}`;
 

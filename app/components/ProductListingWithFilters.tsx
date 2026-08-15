@@ -1,9 +1,10 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { decodeBasicHtmlEntities } from "../../lib/decode-html-entities";
-import { formatInrPrice, parseInrPriceNumber } from "../../lib/format-price";
+import { parseInrPriceNumber } from "../../lib/format-price";
+import { useCurrency } from "../../context/CurrencyContext";
 import {
   buildFacetGroups,
   countForFacetValue,
@@ -12,6 +13,7 @@ import {
 } from "../../lib/product-facets";
 import {
   buildPerfumeGenderNav,
+  getPerfumeGender,
   perfumeSelectionLabel,
   productMatchesPerfumeNavSelection,
   type PerfumeGender,
@@ -24,6 +26,85 @@ import { useAdminSession } from "../../lib/use-admin-session";
 type Props = {
   products: ProductRecord[];
   categorySlug?: string;
+  searchQuery?: string;
+};
+
+type ShopType = { id: string; label: string; tokens: string[] };
+type ProductSort = "featured" | "price-low" | "price-high" | "newest";
+
+const SHOP_TYPES: Record<string, ShopType[]> = {
+  "face-care": [
+    { id: "cleanser", label: "Cleansers", tokens: ["cleanser", "face wash", "cleansing"] },
+    { id: "cream", label: "Creams", tokens: ["face cream", "day cream", "night cream", "moistur"] },
+    { id: "serum", label: "Serums", tokens: ["serum"] },
+    { id: "scrub-mask", label: "Scrubs & Masks", tokens: ["face scrub", "facial scrub", "mask", "pack"] },
+    { id: "mist", label: "Mists & Toners", tokens: ["mist", "toner", "rose water"] },
+    { id: "lip-eye", label: "Lip & Eye Care", tokens: ["lip", "under eye", "eye cream"] },
+  ],
+  "body-care": [
+    { id: "lotion", label: "Lotions", tokens: ["lotion", "body milk"] },
+    { id: "gel", label: "Shower Gels", tokens: ["shower gel", "body wash"] },
+    { id: "soap", label: "Soaps", tokens: ["soap"] },
+    { id: "deodorant", label: "Deodorants", tokens: ["deodorant", "body spray"] },
+    { id: "butter", label: "Body Butters", tokens: ["body butter"] },
+    { id: "oil", label: "Body Oils", tokens: ["body oil", "massage oil"] },
+    { id: "bath", label: "Bath & Scrub", tokens: ["bath salt", "foot soak", "body scrub"] },
+  ],
+  "hair-care": [
+    { id: "shampoo", label: "Shampoo", tokens: ["shampoo"] },
+    { id: "conditioner", label: "Conditioner", tokens: ["conditioner"] },
+    { id: "hair-oil", label: "Hair Oil", tokens: ["hair oil"] },
+    { id: "hair-care", label: "Treatments", tokens: ["hair mask", "hair serum", "scalp", "hair mist"] },
+  ],
+  baby: [
+    { id: "baby-bath", label: "Bath Time", tokens: ["baby shampoo", "baby wash", "baby soap", "bubble bath"] },
+    { id: "baby-skin", label: "Skin Care", tokens: ["baby lotion", "baby cream", "baby oil"] },
+    { id: "baby-powder", label: "Powder", tokens: ["baby powder", "talcom"] },
+    { id: "baby-gift", label: "Gift Sets", tokens: ["gift", "set", "kit"] },
+  ],
+  man: [
+    { id: "shave", label: "Shaving", tokens: ["shave", "shaving"] },
+    { id: "beard", label: "Beard Care", tokens: ["beard"] },
+    { id: "man-bath", label: "Bath & Body", tokens: ["soap", "shower gel", "body wash"] },
+    { id: "man-hair", label: "Hair Care", tokens: ["shampoo", "conditioner", "hair"] },
+    { id: "man-fragrance", label: "Fragrance", tokens: ["perfume", "eau de", "fragrance", "roll on"] },
+    { id: "man-sets", label: "Sets", tokens: ["set", "kit", "pack"] },
+  ],
+  perfumes: [
+    { id: "eau-de-toilette", label: "Eau de Toilette", tokens: ["eau de toilette"] },
+    { id: "solid-perfume", label: "Solid Perfume", tokens: ["solid perfume"] },
+    { id: "roll-on", label: "Roll-On", tokens: ["roll on", "roll-on"] },
+    { id: "mist-perfume", label: "Mists", tokens: ["mist"] },
+    { id: "perfume-sets", label: "Perfume Sets", tokens: ["set", "collection"] },
+  ],
+  "home-essentials": [
+    { id: "incense", label: "Incense", tokens: ["incense", "smudge"] },
+    { id: "candles", label: "Candles", tokens: ["candle", "votive"] },
+    { id: "diffusers", label: "Diffusers", tokens: ["diffuser", "perfume mat"] },
+    { id: "sachets", label: "Sachets", tokens: ["sachet"] },
+    { id: "home-care", label: "Everyday Care", tokens: ["dish wash", "hand wash"] },
+  ],
+  colibri: [
+    { id: "colibri-incense", label: "Incense", tokens: ["incense", "leaf", "leaves", "cone"] },
+    { id: "colibri-body", label: "Body Protection", tokens: ["body spray", "roll-on", "roll on"] },
+    { id: "colibri-candle", label: "Candles", tokens: ["candle", "votive"] },
+    { id: "colibri-set", label: "Sets", tokens: ["set", "kit"] },
+  ],
+  gifting: [
+    { id: "gift-women", label: "Women", tokens: ["women", "woman", "her", "female", "face care", "skin care"] },
+    { id: "gift-men", label: "Men", tokens: ["man", "men", "him", "male", "shave", "beard"] },
+    { id: "gift-corporate", label: "Corporate", tokens: ["corporate", "office", "business", "client", "team", "employee"] },
+    { id: "gift-skincare", label: "Skin & Body Sets", tokens: ["skin", "body", "wellness", "nurture", "soap gift"] },
+    { id: "gift-fragrance", label: "Fragrance Sets", tokens: ["perfume", "fragrance", "eau de"] },
+    { id: "gift-home", label: "Home Fragrance", tokens: ["incense", "candle", "votive", "diffuser", "home fragrance"] },
+    { id: "gift-baby", label: "Baby Gifts", tokens: ["baby"] },
+    { id: "gift-festive", label: "Festive Gifts", tokens: ["festive", "diwali", "christmas", "valentine"] },
+  ],
+};
+
+const matchesShopType = (product: ProductRecord, tokens: string[]): boolean => {
+  const text = [product.name, ...product.categories, ...product.tags].join(" ").toLowerCase();
+  return tokens.some((token) => text.includes(token));
 };
 
 const cloneSelection = (selected: Record<string, string[]>): Record<string, string[]> => {
@@ -141,8 +222,13 @@ const matchesGiftPriceBand = (product: ProductRecord, band: GiftPriceBand): bool
   return n > 5000;
 };
 
-export function ProductListingWithFilters({ products, categorySlug }: Props) {
+export function ProductListingWithFilters({ products, categorySlug, searchQuery = "" }: Props) {
+  const { formatMoney, formatCatalogPrice, isEstimated } = useCurrency();
   const [selected, setSelected] = useState<Record<string, string[]>>({});
+  const [shopTypeId, setShopTypeId] = useState<string | null>(null);
+  const [sortBy, setSortBy] = useState<ProductSort>("featured");
+  const [filtersOpen, setFiltersOpen] = useState(false);
+  const [isGridLoading, setIsGridLoading] = useState(false);
   const [priceMinInput, setPriceMinInput] = useState("");
   const [priceMaxInput, setPriceMaxInput] = useState("");
   const [giftFor, setGiftFor] = useState<(typeof giftingAudienceOptions)[number]["value"]>("any");
@@ -154,6 +240,33 @@ export function ProductListingWithFilters({ products, categorySlug }: Props) {
     lineKey: null,
   });
   const { adminModeEnabled: isAdmin } = useAdminSession();
+
+  const availableShopTypes = useMemo(() => {
+    const configured = SHOP_TYPES[categorySlug ?? ""] ?? [];
+    return configured
+      .map((type) => ({ ...type, count: products.filter((product) => matchesShopType(product, type.tokens)).length }))
+      .filter((type) => type.count > 0 || (categorySlug === "gifting" && ["gift-women", "gift-men", "gift-corporate"].includes(type.id)));
+  }, [categorySlug, products]);
+
+  useEffect(() => {
+    if (!categorySlug || availableShopTypes.length === 0) return;
+    const saved = window.sessionStorage.getItem(`maroma-shop-type:${categorySlug}`);
+    if (saved === "all" || (saved && availableShopTypes.some((type) => type.id === saved))) {
+      setShopTypeId(saved);
+    }
+  }, [availableShopTypes, categorySlug]);
+
+  useEffect(() => {
+    if (!categorySlug || !shopTypeId) return;
+    window.sessionStorage.setItem(`maroma-shop-type:${categorySlug}`, shopTypeId);
+  }, [categorySlug, shopTypeId]);
+
+  const shopTypeProducts = useMemo(() => {
+    if (!shopTypeId) return categorySlug ? [] : products;
+    if (shopTypeId === "all") return products;
+    const type = availableShopTypes.find((entry) => entry.id === shopTypeId);
+    return type ? products.filter((product) => matchesShopType(product, type.tokens)) : [];
+  }, [availableShopTypes, categorySlug, products, shopTypeId]);
 
   const showPerfumeGenderNav = categorySlug === "perfumes";
   const perfumeGenderNav = useMemo(
@@ -184,9 +297,9 @@ export function ProductListingWithFilters({ products, categorySlug }: Props) {
 
   const giftingFilteredProducts = useMemo(() => {
     if (!showGiftingSelector) {
-      return products;
+      return shopTypeProducts;
     }
-    return products.filter((product) => {
+    return shopTypeProducts.filter((product) => {
       const audiencePass =
         giftFor === "any" ? true : containsAnyToken(product, giftingAudienceTokens[giftFor] ?? []);
       const eventPass =
@@ -194,7 +307,7 @@ export function ProductListingWithFilters({ products, categorySlug }: Props) {
       const bandPass = matchesGiftPriceBand(product, giftPriceBand);
       return audiencePass && eventPass && bandPass;
     });
-  }, [giftEvent, giftFor, giftPriceBand, products, showGiftingSelector]);
+  }, [giftEvent, giftFor, giftPriceBand, shopTypeProducts, showGiftingSelector]);
 
   const perfumeNavFilteredProducts = useMemo(() => {
     if (!showPerfumeGenderNav || !perfumeNavSelection.gender) {
@@ -235,6 +348,33 @@ export function ProductListingWithFilters({ products, categorySlug }: Props) {
     () => filterProductsByFacetSelections(productsInPriceRange, selected),
     [productsInPriceRange, selected]
   );
+
+  const sortedProducts = useMemo(() => {
+    const result = [...filtered];
+    if (sortBy === "price-low" || sortBy === "price-high") {
+      const direction = sortBy === "price-low" ? 1 : -1;
+      result.sort((a, b) => {
+        const aPrice = parseInrPriceNumber(a.price);
+        const bPrice = parseInrPriceNumber(b.price);
+        if (aPrice === null) return 1;
+        if (bPrice === null) return -1;
+        return (aPrice - bPrice) * direction;
+      });
+    } else if (sortBy === "newest") {
+      result.sort((a, b) => {
+        const aId = Number(a.id);
+        const bId = Number(b.id);
+        if (Number.isFinite(aId) && Number.isFinite(bId)) return bId - aId;
+        return b.id.localeCompare(a.id, undefined, { numeric: true });
+      });
+    }
+    return result;
+  }, [filtered, sortBy]);
+
+  const revealLoadingState = useCallback(() => {
+    setIsGridLoading(true);
+    window.setTimeout(() => setIsGridLoading(false), 420);
+  }, []);
 
   const optionCounts = useMemo(() => {
     const map = new Map<string, number>();
@@ -320,12 +460,178 @@ export function ProductListingWithFilters({ products, categorySlug }: Props) {
 
   const chips = useMemo(() => selectionChipEntries(selected), [selected]);
 
-  const showFilterAside = giftingFilteredProducts.length > 0 || products.length > 0;
+  // Collection pages wait for a product-type choice before showing their
+  // detailed filters. The homepage search has no type chooser, so its filters
+  // must be available immediately; otherwise the results occupy the narrow
+  // first column reserved for the filter panel on desktop.
+  const showFilterAside = shopTypeProducts.length > 0 && (!categorySlug || shopTypeId !== null);
+
+  const recommendedProducts = useMemo(() => {
+    const picked: ProductRecord[] = [];
+    for (const type of availableShopTypes) {
+      const product = products.find((entry) =>
+        !picked.some((pickedProduct) => pickedProduct.id === entry.id) &&
+        matchesShopType(entry, type.tokens) &&
+        Boolean(getDisplayImageUrl(entry))
+      );
+      if (product) picked.push(product);
+      if (picked.length === 4) break;
+    }
+    if (picked.length < 4) {
+      for (const product of products) {
+        if (getDisplayImageUrl(product) && !picked.some((entry) => entry.id === product.id)) {
+          picked.push(product);
+        }
+        if (picked.length === 4) break;
+      }
+    }
+    return picked;
+  }, [availableShopTypes, products]);
+
+  const recommendedSection = recommendedProducts.length > 0 ? (
+    <section className="collection-recommended" aria-labelledby="collection-recommended-title">
+      <div className="collection-recommended-heading">
+        <p>Selected from this collection</p>
+        <h2 id="collection-recommended-title">Recommended for you</h2>
+      </div>
+      <div className="collection-recommended-grid">
+        {recommendedProducts.map((product) => {
+          const imageSrc = getDisplayImageUrl(product);
+          const convertedPrice = formatCatalogPrice(product.price);
+          const priceLabel = convertedPrice ? `${isEstimated ? "≈ " : ""}${convertedPrice}` : "Price on request";
+          return (
+            <Link key={product.id} href={`/product/${product.id}`} className="collection-recommended-card">
+              <div className="collection-recommended-image">
+                {imageSrc ? <img src={imageSrc} alt={`${decodeBasicHtmlEntities(product.name)} — Maroma`} /> : null}
+              </div>
+              <div className="collection-recommended-copy">
+                <h3>{decodeBasicHtmlEntities(product.name)}</h3>
+                <p>{priceLabel}</p>
+                <span>View product <span aria-hidden="true">→</span></span>
+              </div>
+            </Link>
+          );
+        })}
+      </div>
+    </section>
+  ) : null;
 
   return (
-    <div className="product-listing-layout">
+    <div className={`product-listing-experience${shopTypeId ? " has-selection" : ""}`}>
+      {categorySlug ? <section className="collection-shop-types" aria-label="Shop by product type">
+        <div className="collection-shop-types-heading">
+          <div>
+            <p>Shop by type</p>
+            <h2>What are you looking for?</h2>
+          </div>
+          {shopTypeId ? <span>{shopTypeProducts.length} products</span> : null}
+        </div>
+        {showPerfumeGenderNav && perfumeGenderNav.length > 0 ? (
+          <div className="collection-perfume-gender-row" aria-label="Shop perfume by gender">
+            {perfumeGenderNav.map((section) => {
+              const representative = products.find(
+                (product) => getPerfumeGender(product) === section.gender && Boolean(getDisplayImageUrl(product))
+              );
+              const image = representative ? getDisplayImageUrl(representative) : "";
+              const active = perfumeNavSelection.gender === section.gender;
+              return (
+                <button
+                  key={section.gender}
+                  type="button"
+                  className={`collection-shop-type-button collection-perfume-gender-button${active ? " is-complete" : ""}`}
+                  aria-pressed={active}
+                  onClick={() => {
+                    if (!shopTypeId) setShopTypeId("all");
+                    selectPerfumeGender(section.gender);
+                    revealLoadingState();
+                  }}
+                >
+                  <span className="collection-shop-type-photo" aria-hidden="true">
+                    {image ? <img src={image} alt="" /> : <span>✦</span>}
+                  </span>
+                  <span>{section.label}</span>
+                  <small>{section.productCount}</small>
+                </button>
+              );
+            })}
+          </div>
+        ) : null}
+        <div className="collection-shop-types-row">
+          {showGiftingSelector ? (
+            <Link href="/gifting/build-your-set" className="collection-gift-builder-magic">
+              <span className="collection-gift-builder-sparkles" aria-hidden="true">
+                <i>✦</i><i>✧</i><i>✦</i>
+              </span>
+              <span className="collection-gift-builder-copy">
+                <small>Create something magical</small>
+                <strong>Build your own gift set</strong>
+              </span>
+              <span className="collection-gift-builder-arrow" aria-hidden="true">→</span>
+            </Link>
+          ) : null}
+          <button
+            type="button"
+            className={`collection-shop-type-button collection-browse-all-button${shopTypeId === "all" ? " is-complete" : ""}`}
+            aria-pressed={shopTypeId === "all"}
+            onClick={() => {
+              setShopTypeId("all");
+              clearAll();
+              revealLoadingState();
+            }}
+          >
+            <span className="collection-shop-type-photo collection-browse-all-icon" aria-hidden="true">✦</span>
+            <span>Browse all</span>
+            <small>{products.length}</small>
+          </button>
+          {availableShopTypes.map((type) => (
+            <button
+              key={type.id}
+              type="button"
+              className={`collection-shop-type-button${shopTypeId === type.id ? " is-complete" : ""}`}
+              aria-pressed={shopTypeId === type.id}
+              onClick={() => {
+                const selectedGender = perfumeNavSelection.gender;
+                setShopTypeId(type.id);
+                clearAll();
+                if (showPerfumeGenderNav && selectedGender) {
+                  setPerfumeNavSelection({ gender: selectedGender, typeKey: null, lineKey: null });
+                }
+                revealLoadingState();
+              }}
+            >
+              <span className="collection-shop-type-photo" aria-hidden="true">
+                {(() => {
+                  const representative = products.find((product) =>
+                    matchesShopType(product, type.tokens) && Boolean(getDisplayImageUrl(product))
+                  );
+                  const image = representative ? getDisplayImageUrl(representative) : "";
+                  return image ? <img src={image} alt="" /> : <span>✦</span>;
+                })()}
+              </span>
+              <span>{type.label}</span><small>{type.count}</small>
+            </button>
+          ))}
+        </div>
+      </section> : null}
+
+      {categorySlug && !shopTypeId ? (
+        recommendedSection
+      ) : (
+      <div className="product-listing-layout">
+      <button
+        type="button"
+        className="product-refine-trigger"
+        aria-expanded={filtersOpen}
+        onClick={() => setFiltersOpen(true)}
+      >
+        Refine results <span>{hasActiveFilters ? chips.length + Number(priceFilterActive) + Number(hasPerfumeNavFilter) : ""}</span>
+      </button>
       {showFilterAside ? (
-        <aside className="product-filters-aside" aria-label="Product filters">
+        <aside className={`product-filters-aside${filtersOpen ? " is-open" : ""}`} aria-label="Product filters">
+          <div className="product-refine-mobile-head">
+            <strong>Refine results</strong>
+            <button type="button" onClick={() => setFiltersOpen(false)} aria-label="Close filters">×</button>
+          </div>
           {showGiftingSelector ? (
             <section className="gifting-selector" aria-label="Gifting selector">
               <p className="gifting-selector-title">Gifting selector</p>
@@ -364,9 +670,6 @@ export function ProductListingWithFilters({ products, categorySlug }: Props) {
                 </select>
               </label>
               <div className="gifting-builder-links">
-                <Link href="/gifting/build-your-set" className="gifting-builder-cta maroma-btn maroma-btn-primary">
-                  Build your own gift set
-                </Link>
                 <Link
                   href="/gifting/build-your-set?corporate=1"
                   className="gifting-corporate-link"
@@ -468,12 +771,12 @@ export function ProductListingWithFilters({ products, categorySlug }: Props) {
                     type="button"
                     className="product-filter-chip"
                     onClick={() => setPriceMinInput("")}
-                    aria-label={`Remove minimum price ${formatInrPrice(String(priceBounds.min))}`}
+                    aria-label={`Remove minimum price ${formatMoney(priceBounds.min)}`}
                     role="listitem"
                   >
                     <span className="product-filter-chip-facet">Price</span>
                     <span className="product-filter-chip-sep">·</span>
-                    <span>Min {formatInrPrice(String(priceBounds.min))}</span>
+                    <span>Min {formatMoney(priceBounds.min)}</span>
                     <span className="product-filter-chip-x" aria-hidden="true">
                       ×
                     </span>
@@ -485,12 +788,12 @@ export function ProductListingWithFilters({ products, categorySlug }: Props) {
                     type="button"
                     className="product-filter-chip"
                     onClick={() => setPriceMaxInput("")}
-                    aria-label={`Remove maximum price ${formatInrPrice(String(priceBounds.max))}`}
+                    aria-label={`Remove maximum price ${formatMoney(priceBounds.max)}`}
                     role="listitem"
                   >
                     <span className="product-filter-chip-facet">Price</span>
                     <span className="product-filter-chip-sep">·</span>
-                    <span>Max {formatInrPrice(String(priceBounds.max))}</span>
+                    <span>Max {formatMoney(priceBounds.max)}</span>
                     <span className="product-filter-chip-x" aria-hidden="true">
                       ×
                     </span>
@@ -601,18 +904,42 @@ export function ProductListingWithFilters({ products, categorySlug }: Props) {
       ) : null}
 
       <div className="product-listing-main">
-        <div className="product-grid">
-          {filtered.map((product) => {
+        <div className="product-listing-toolbar">
+          <span>{filtered.length} {filtered.length === 1 ? "product" : "products"}</span>
+          <label>
+            <span>Sort by</span>
+            <select value={sortBy} onChange={(event) => { setSortBy(event.target.value as ProductSort); revealLoadingState(); }}>
+              <option value="featured">Featured</option>
+              <option value="price-low">Price: low to high</option>
+              <option value="price-high">Price: high to low</option>
+              <option value="newest">Newest</option>
+            </select>
+          </label>
+        </div>
+        <div className={`product-grid${isGridLoading ? " is-loading" : ""}`} aria-busy={isGridLoading}>
+          {isGridLoading ? Array.from({ length: 8 }, (_, index) => (
+            <div key={index} className="product-grid-skeleton" aria-hidden="true">
+              <span className="product-grid-skeleton-image" />
+              <span className="product-grid-skeleton-line is-wide" />
+              <span className="product-grid-skeleton-line" />
+            </div>
+          )) : sortedProducts.map((product) => {
             const imageSrc = getDisplayImageUrl(product);
-            const priceLabel = formatInrPrice(product.price) ?? "Price on request";
+            const convertedPrice = formatCatalogPrice(product.price);
+            const priceLabel = convertedPrice ? `${isEstimated ? "≈ " : ""}${convertedPrice}` : "Price on request";
             return (
               <div key={product.id} className="product-card-wrap">
-                <Link href={`/product/${product.id}`} className="product-card-link">
+                <Link
+                  href={searchQuery.trim()
+                    ? `/product/${product.id}?search=${encodeURIComponent(searchQuery.trim())}`
+                    : `/product/${product.id}`}
+                  className="product-card-link"
+                >
                   <article className="product-card">
                     <div className="product-card-media">
                       <div className="product-image">
                         {imageSrc ? (
-                          <img src={imageSrc} alt={decodeBasicHtmlEntities(product.name)} />
+                          <img src={imageSrc} alt={`${decodeBasicHtmlEntities(product.name)} — Maroma`} />
                         ) : (
                           <span>No image</span>
                         )}
@@ -662,6 +989,9 @@ export function ProductListingWithFilters({ products, categorySlug }: Props) {
           </p>
         ) : null}
       </div>
+    </div>
+      )}
+      {shopTypeId ? recommendedSection : null}
     </div>
   );
 }
