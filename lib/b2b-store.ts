@@ -4,13 +4,15 @@ import type {
   B2bCommerceMode,
   B2bCompany,
   B2bCompanyStatus,
+  B2bDeliveryAddress,
+  B2bOrder,
   B2bQuoteRequest,
   B2bStore,
 } from "./b2b-types";
 
 const B2B_KV_KEY = "maroma:b2b";
 
-const emptyStore = (): B2bStore => ({ companies: [], quotes: [] });
+const emptyStore = (): B2bStore => ({ companies: [], quotes: [], orders: [] });
 
 function slugify(input: string): string {
   return input
@@ -42,6 +44,60 @@ function normalizeAssortment(raw: unknown): B2bAssortmentItem[] {
   return out;
 }
 
+export function normalizeDeliveryAddresses(raw: unknown): B2bDeliveryAddress[] {
+  if (!Array.isArray(raw)) return [];
+  const out: B2bDeliveryAddress[] = [];
+  const seen = new Set<string>();
+  for (const item of raw) {
+    if (!item || typeof item !== "object") continue;
+    const row = item as Record<string, unknown>;
+    const id =
+      typeof row.id === "string" && row.id.trim()
+        ? row.id.trim()
+        : crypto.randomUUID();
+    if (seen.has(id)) continue;
+    const label = typeof row.label === "string" ? row.label.trim().slice(0, 80) : "";
+    const contactName =
+      typeof row.contactName === "string" ? row.contactName.trim().slice(0, 120) : "";
+    const phone = typeof row.phone === "string" ? row.phone.trim().slice(0, 40) : "";
+    const address = typeof row.address === "string" ? row.address.trim().slice(0, 300) : "";
+    const city = typeof row.city === "string" ? row.city.trim().slice(0, 80) : "";
+    const state = typeof row.state === "string" ? row.state.trim().slice(0, 80) : "";
+    const pincode = typeof row.pincode === "string" ? row.pincode.trim().slice(0, 20) : "";
+    const country =
+      typeof row.country === "string" && row.country.trim()
+        ? row.country.trim().slice(0, 80)
+        : "India";
+    if (!label || !contactName || !phone || !address || !city || !pincode) continue;
+    seen.add(id);
+    out.push({
+      id,
+      label,
+      contactName,
+      phone,
+      address,
+      city,
+      state,
+      pincode,
+      country,
+      isDefault: row.isDefault === true,
+    });
+  }
+  if (out.length > 0 && !out.some((a) => a.isDefault)) {
+    out[0] = { ...out[0], isDefault: true };
+  }
+  if (out.filter((a) => a.isDefault).length > 1) {
+    let kept = false;
+    for (let i = 0; i < out.length; i++) {
+      if (out[i].isDefault) {
+        if (kept) out[i] = { ...out[i], isDefault: false };
+        else kept = true;
+      }
+    }
+  }
+  return out.slice(0, 20);
+}
+
 function normalizeCompany(raw: unknown): B2bCompany | null {
   if (!raw || typeof raw !== "object") return null;
   const row = raw as Record<string, unknown>;
@@ -68,6 +124,7 @@ function normalizeCompany(raw: unknown): B2bCompany | null {
     status,
     notes: typeof row.notes === "string" ? row.notes : undefined,
     assortment: normalizeAssortment(row.assortment),
+    deliveryAddresses: normalizeDeliveryAddresses(row.deliveryAddresses),
     createdAt: typeof row.createdAt === "string" ? row.createdAt : new Date().toISOString(),
     updatedAt: typeof row.updatedAt === "string" ? row.updatedAt : new Date().toISOString(),
   };
@@ -80,7 +137,8 @@ function normalizeStore(raw: unknown): B2bStore {
     ? row.companies.map(normalizeCompany).filter((c): c is B2bCompany => Boolean(c))
     : [];
   const quotes = Array.isArray(row.quotes) ? (row.quotes as B2bQuoteRequest[]) : [];
-  return { companies, quotes };
+  const orders = Array.isArray(row.orders) ? (row.orders as B2bOrder[]) : [];
+  return { companies, quotes, orders };
 }
 
 export async function readB2bStore(): Promise<B2bStore> {
@@ -133,6 +191,7 @@ export type UpsertB2bCompanyInput = {
   status?: B2bCompanyStatus;
   notes?: string;
   assortment?: B2bAssortmentItem[];
+  deliveryAddresses?: B2bDeliveryAddress[];
 };
 
 export async function upsertB2bCompany(input: UpsertB2bCompanyInput): Promise<B2bCompany> {
@@ -169,6 +228,9 @@ export async function upsertB2bCompany(input: UpsertB2bCompanyInput): Promise<B2
       status: input.status ?? existingById.status,
       notes: input.notes ?? existingById.notes,
       assortment: input.assortment ? normalizeAssortment(input.assortment) : existingById.assortment,
+      deliveryAddresses: input.deliveryAddresses
+        ? normalizeDeliveryAddresses(input.deliveryAddresses)
+        : existingById.deliveryAddresses,
       updatedAt: now,
     };
     store.companies = store.companies.map((c) => (c.id === updated.id ? updated : c));
@@ -185,12 +247,30 @@ export async function upsertB2bCompany(input: UpsertB2bCompanyInput): Promise<B2
     status: input.status ?? "active",
     notes: input.notes,
     assortment: normalizeAssortment(input.assortment ?? []),
+    deliveryAddresses: normalizeDeliveryAddresses(input.deliveryAddresses ?? []),
     createdAt: now,
     updatedAt: now,
   };
   store.companies.push(created);
   await writeB2bStore(store);
   return created;
+}
+
+export async function setB2bCompanyDeliveryAddresses(
+  companyId: string,
+  addresses: B2bDeliveryAddress[]
+): Promise<B2bCompany> {
+  const store = await readB2bStore();
+  const existing = store.companies.find((c) => c.id === companyId);
+  if (!existing) throw new Error("Company not found.");
+  const updated: B2bCompany = {
+    ...existing,
+    deliveryAddresses: normalizeDeliveryAddresses(addresses),
+    updatedAt: new Date().toISOString(),
+  };
+  store.companies = store.companies.map((c) => (c.id === updated.id ? updated : c));
+  await writeB2bStore(store);
+  return updated;
 }
 
 export async function deleteB2bCompany(id: string): Promise<boolean> {
@@ -209,9 +289,43 @@ export async function appendB2bQuote(quote: B2bQuoteRequest): Promise<B2bQuoteRe
   return quote;
 }
 
+export async function appendB2bOrder(order: B2bOrder): Promise<B2bOrder> {
+  const store = await readB2bStore();
+  store.orders = [order, ...store.orders].slice(0, 500);
+  await writeB2bStore(store);
+  return order;
+}
+
+export async function getB2bOrderById(id: string): Promise<B2bOrder | null> {
+  const store = await readB2bStore();
+  return store.orders.find((o) => o.id === id) ?? null;
+}
+
+export async function updateB2bOrder(
+  id: string,
+  patch: Partial<Pick<B2bOrder, "status" | "payment" | "paymentMode">>
+): Promise<B2bOrder | null> {
+  const store = await readB2bStore();
+  const existing = store.orders.find((o) => o.id === id);
+  if (!existing) return null;
+  const updated: B2bOrder = {
+    ...existing,
+    ...patch,
+    payment: patch.payment ? { ...existing.payment, ...patch.payment } : existing.payment,
+  };
+  store.orders = store.orders.map((o) => (o.id === id ? updated : o));
+  await writeB2bStore(store);
+  return updated;
+}
+
 export async function listB2bQuotes(limit = 50): Promise<B2bQuoteRequest[]> {
   const store = await readB2bStore();
   return store.quotes.slice(0, Math.max(1, Math.min(limit, 200)));
+}
+
+export async function listB2bOrders(limit = 50): Promise<B2bOrder[]> {
+  const store = await readB2bStore();
+  return store.orders.slice(0, Math.max(1, Math.min(limit, 200)));
 }
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/i;

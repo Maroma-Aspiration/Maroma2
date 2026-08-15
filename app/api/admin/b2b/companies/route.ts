@@ -5,11 +5,14 @@ import {
   deleteB2bCompany,
   getB2bCompanyById,
   listB2bCompanies,
+  listB2bOrders,
   listB2bQuotes,
   suggestB2bSlug,
   upsertB2bCompany,
 } from "../../../../../lib/b2b-store";
 import type { B2bAssortmentItem, B2bCommerceMode, B2bCompanyStatus } from "../../../../../lib/b2b-types";
+import { provisionAndEmailB2bCompanyWelcome } from "../../../../../lib/b2b-welcome-email";
+import { siteOriginFromRequest } from "../../../../../lib/newsletter-send";
 
 async function requireAdmin() {
   const secret = getSessionSecret();
@@ -24,8 +27,12 @@ async function requireAdmin() {
 export async function GET() {
   const auth = await requireAdmin();
   if ("error" in auth && auth.error) return auth.error;
-  const [companies, quotes] = await Promise.all([listB2bCompanies(), listB2bQuotes(40)]);
-  return NextResponse.json({ companies, quotes });
+  const [companies, quotes, orders] = await Promise.all([
+    listB2bCompanies(),
+    listB2bQuotes(40),
+    listB2bOrders(40),
+  ]);
+  return NextResponse.json({ companies, quotes, orders });
 }
 
 export async function POST(request: Request) {
@@ -48,6 +55,9 @@ export async function POST(request: Request) {
     body.status === "pending" || body.status === "paused" || body.status === "active"
       ? (body.status as B2bCompanyStatus)
       : "active";
+  const isUpdate = typeof body.id === "string" && Boolean(body.id.trim());
+  const sendWelcome =
+    body.sendWelcomeEmail === true || (!isUpdate && body.sendWelcomeEmail !== false);
 
   try {
     const company = await upsertB2bCompany({
@@ -60,7 +70,16 @@ export async function POST(request: Request) {
       notes: typeof body.notes === "string" ? body.notes : undefined,
       assortment: Array.isArray(body.assortment) ? (body.assortment as B2bAssortmentItem[]) : undefined,
     });
-    return NextResponse.json({ company });
+
+    let welcomeEmail: Awaited<ReturnType<typeof provisionAndEmailB2bCompanyWelcome>> | undefined;
+    if (sendWelcome) {
+      welcomeEmail = await provisionAndEmailB2bCompanyWelcome(
+        company,
+        siteOriginFromRequest(request)
+      );
+    }
+
+    return NextResponse.json({ company, welcomeEmail });
   } catch (err) {
     return NextResponse.json(
       { error: err instanceof Error ? err.message : "Could not save company." },

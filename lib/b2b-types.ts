@@ -9,6 +9,19 @@ export type B2bAssortmentItem = {
   moq: number;
 };
 
+export type B2bDeliveryAddress = {
+  id: string;
+  label: string;
+  contactName: string;
+  phone: string;
+  address: string;
+  city: string;
+  state: string;
+  pincode: string;
+  country: string;
+  isDefault: boolean;
+};
+
 export type B2bCompany = {
   id: string;
   /** Bookmarkable path segment: /b2b/[slug] */
@@ -20,6 +33,7 @@ export type B2bCompany = {
   status: B2bCompanyStatus;
   notes?: string;
   assortment: B2bAssortmentItem[];
+  deliveryAddresses: B2bDeliveryAddress[];
   createdAt: string;
   updatedAt: string;
 };
@@ -46,7 +60,29 @@ export type B2bQuoteRequest = {
   status: "received" | "reviewed" | "closed";
 };
 
+export type B2bOrder = {
+  id: string;
+  companyId: string;
+  companySlug: string;
+  companyName: string;
+  userEmail: string;
+  lines: B2bQuoteLine[];
+  message: string;
+  subtotalInr: number;
+  deliveryAddress: B2bDeliveryAddress;
+  createdAt: string;
+  status: "received" | "awaiting_payment" | "paid" | "confirmed" | "fulfilled" | "cancelled";
+  paymentMode?: "invoice" | "pay_now";
+  payment?: {
+    provider: "razorpay";
+    razorpayOrderId?: string;
+    razorpayPaymentId?: string;
+    paidAt?: string;
+  };
+};
+
 export type B2bStore = {
   companies: B2bCompany[];
   quotes: B2bQuoteRequest[];
+  orders: B2bOrder[];
 };

@@ -77,6 +77,7 @@ const SpaBookRollLink = forwardRef<HTMLAnchorElement, SpaBookRollLinkProps>(func
 
 export function SiteHeader({ initialNav, initialViewportIsMobile = false }: SiteHeaderProps) {
   const pathname = usePathname();
+  const isB2bRoute = pathname === "/b2b" || pathname.startsWith("/b2b/");
   const { totalItems } = useCart();
   const [navContent, setNavContent] = useState<Pick<SiteContent, "brand" | "nav">>(initialNav);
   const [scrolled, setScrolled] = useState(false);
@@ -268,6 +269,13 @@ export function SiteHeader({ initialNav, initialViewportIsMobile = false }: Site
     window.addEventListener("scroll", onScroll, { passive: true });
     return () => window.removeEventListener("scroll", onScroll);
   }, []);
+
+  useEffect(() => {
+    document.body.classList.toggle("b2b-route-active", isB2bRoute);
+    return () => {
+      document.body.classList.remove("b2b-route-active");
+    };
+  }, [isB2bRoute]);
 
   useEffect(() => {
     if (!isMobileNav || scrollItems.length <= 1) {
@@ -584,6 +592,27 @@ export function SiteHeader({ initialNav, initialViewportIsMobile = false }: Site
   ));
 
   const navStateClass = `${scrolled ? "nav-solid" : "nav-overlay"}${navLiftUp ? " nav-lift" : ""}`;
+
+  if (isB2bRoute) {
+    return (
+      <header
+        className={`site-header site-header-responsive site-header-b2b${scrolled ? " site-header-solid" : ""}${navLiftUp ? " site-header-lift" : ""}`}
+      >
+        <nav className={`nav nav-b2b ${navStateClass}`}>
+          <Link href="/?skipIntro=1" className="brand" aria-label={`${brand} home`}>
+            <img src="/maroma-logo.png" alt={brand} className="brand-logo" />
+          </Link>
+          <p className="nav-b2b-label">Wholesale</p>
+          <div className="nav-end nav-end--b2b">
+            <Link href="/account" className="nav-b2b-account">
+              Account
+            </Link>
+            <CurrencySelector compact />
+          </div>
+        </nav>
+      </header>
+    );
+  }
 
   return (
     <header

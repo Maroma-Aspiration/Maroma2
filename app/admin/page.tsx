@@ -511,7 +511,7 @@ export default function AdminPage() {
         <a href="/newsletter?edit=1">Newsletter editor</a>
         <a href="/admin/users">Manage Users</a>
         <a href="/admin/products">Products</a>
-        <a href="/admin/b2b">B2B clients</a>
+        <a href="/admin/b2b">B2B overview</a>
         <a href="/admin/gift-packing">Gift packing</a>
         <a href="/admin/orders">Production board</a>
         <a href="/blog">Blog</a>

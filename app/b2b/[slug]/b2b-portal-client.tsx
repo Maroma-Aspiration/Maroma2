@@ -3,6 +3,9 @@
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { formatInrPrice } from "../../../lib/format-price";
+import { decodeBasicHtmlEntities } from "../../../lib/decode-html-entities";
+import type { B2bDeliveryAddress } from "../../../lib/b2b-types";
+import "./b2b-portal.css";
 
 type AssortmentRow = {
   productId: string;
@@ -22,11 +25,83 @@ type PortalPayload = {
     commerceMode: "quote" | "checkout";
     status: string;
     userEmail: string;
+    deliveryAddresses: B2bDeliveryAddress[];
   };
   assortment: AssortmentRow[];
   viewer: { email: string; role: string; isAdmin: boolean };
+  payments?: { payNowAvailable?: boolean };
   error?: string;
 };
+
+type RazorpayCheckoutSession = {
+  keyId: string;
+  orderId: string;
+  amount: number;
+  currency: string;
+  name: string;
+  description: string;
+  prefill: { email: string; contact: string; name: string };
+};
+
+type RazorpaySuccessResponse = {
+  razorpay_payment_id: string;
+  razorpay_order_id: string;
+  razorpay_signature: string;
+};
+
+declare global {
+  interface Window {
+    Razorpay?: new (options: Record<string, unknown>) => {
+      open: () => void;
+      on: (event: string, handler: (response: { error?: { description?: string } }) => void) => void;
+    };
+  }
+}
+
+function loadRazorpayScript(): Promise<boolean> {
+  if (typeof window === "undefined") return Promise.resolve(false);
+  if (window.Razorpay) return Promise.resolve(true);
+  return new Promise((resolve) => {
+    const existing = document.querySelector<HTMLScriptElement>('script[data-razorpay="1"]');
+    if (existing) {
+      existing.addEventListener("load", () => resolve(Boolean(window.Razorpay)));
+      existing.addEventListener("error", () => resolve(false));
+      return;
+    }
+    const script = document.createElement("script");
+    script.src = "https://checkout.razorpay.com/v1/checkout.js";
+    script.async = true;
+    script.dataset.razorpay = "1";
+    script.onload = () => resolve(Boolean(window.Razorpay));
+    script.onerror = () => resolve(false);
+    document.body.appendChild(script);
+  });
+}
+
+type AddressDraft = {
+  id?: string;
+  label: string;
+  contactName: string;
+  phone: string;
+  address: string;
+  city: string;
+  state: string;
+  pincode: string;
+  country: string;
+  isDefault: boolean;
+};
+
+const emptyAddress = (): AddressDraft => ({
+  label: "",
+  contactName: "",
+  phone: "",
+  address: "",
+  city: "",
+  state: "",
+  pincode: "",
+  country: "India",
+  isDefault: false,
+});
 
 export default function B2bPortalClient({ slug }: { slug: string }) {
   const [data, setData] = useState<PortalPayload | null>(null);
@@ -35,6 +110,15 @@ export default function B2bPortalClient({ slug }: { slug: string }) {
   const [message, setMessage] = useState("");
   const [busy, setBusy] = useState(false);
   const [status, setStatus] = useState("");
+  const [checkoutFeedback, setCheckoutFeedback] = useState("");
+  const [orderComplete, setOrderComplete] = useState<"invoice" | "paid" | null>(null);
+  const [payNowAvailable, setPayNowAvailable] = useState(false);
+  const [addresses, setAddresses] = useState<B2bDeliveryAddress[]>([]);
+  const [selectedAddressId, setSelectedAddressId] = useState("");
+  const [addressDraft, setAddressDraft] = useState<AddressDraft>(emptyAddress());
+  const [editingAddressId, setEditingAddressId] = useState<string | null>(null);
+  const [showAddressForm, setShowAddressForm] = useState(false);
+  const [savingAddress, setSavingAddress] = useState(false);
 
   const load = useCallback(async () => {
     setError("");
@@ -45,6 +129,14 @@ export default function B2bPortalClient({ slug }: { slug: string }) {
       return;
     }
     setData(payload);
+    setPayNowAvailable(Boolean(payload.payments?.payNowAvailable));
+    const nextAddresses = payload.company.deliveryAddresses ?? [];
+    setAddresses(nextAddresses);
+    const preferred =
+      nextAddresses.find((a) => a.isDefault)?.id || nextAddresses[0]?.id || "";
+    setSelectedAddressId((current) =>
+      current && nextAddresses.some((a) => a.id === current) ? current : preferred
+    );
     const initial: Record<string, number> = {};
     for (const row of payload.assortment) {
       initial[row.productId] = row.moq;
@@ -76,6 +168,107 @@ export default function B2bPortalClient({ slug }: { slug: string }) {
     [lines]
   );
 
+  const persistAddresses = async (next: B2bDeliveryAddress[]) => {
+    setSavingAddress(true);
+    setStatus("");
+    const res = await fetch(`/api/b2b/${encodeURIComponent(slug)}/addresses`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ addresses: next }),
+    });
+    const payload = (await res.json()) as {
+      error?: string;
+      deliveryAddresses?: B2bDeliveryAddress[];
+    };
+    setSavingAddress(false);
+    if (!res.ok) {
+      setStatus(payload.error || "Could not save delivery addresses.");
+      return false;
+    }
+    const saved = payload.deliveryAddresses ?? next;
+    setAddresses(saved);
+    if (data) {
+      setData({ ...data, company: { ...data.company, deliveryAddresses: saved } });
+    }
+    const preferred = saved.find((a) => a.isDefault)?.id || saved[0]?.id || "";
+    setSelectedAddressId((current) =>
+      current && saved.some((a) => a.id === current) ? current : preferred
+    );
+    return true;
+  };
+
+  const startAddAddress = () => {
+    setEditingAddressId(null);
+    setAddressDraft({ ...emptyAddress(), isDefault: addresses.length === 0 });
+    setShowAddressForm(true);
+  };
+
+  const startEditAddress = (address: B2bDeliveryAddress) => {
+    setEditingAddressId(address.id);
+    setAddressDraft({ ...address });
+    setShowAddressForm(true);
+  };
+
+  const saveAddressForm = async () => {
+    const draft: B2bDeliveryAddress = {
+      id: editingAddressId || crypto.randomUUID(),
+      label: addressDraft.label.trim(),
+      contactName: addressDraft.contactName.trim(),
+      phone: addressDraft.phone.trim(),
+      address: addressDraft.address.trim(),
+      city: addressDraft.city.trim(),
+      state: addressDraft.state.trim(),
+      pincode: addressDraft.pincode.trim(),
+      country: addressDraft.country.trim() || "India",
+      isDefault: addressDraft.isDefault || addresses.length === 0,
+    };
+    if (
+      !draft.label ||
+      !draft.contactName ||
+      !draft.phone ||
+      !draft.address ||
+      !draft.city ||
+      !draft.pincode
+    ) {
+      setStatus("Fill label, contact, phone, address, city, and pincode.");
+      return;
+    }
+    let next = editingAddressId
+      ? addresses.map((a) => (a.id === editingAddressId ? draft : a))
+      : [...addresses, draft];
+    if (draft.isDefault) {
+      next = next.map((a) => ({ ...a, isDefault: a.id === draft.id }));
+    }
+    const ok = await persistAddresses(next);
+    if (ok) {
+      setShowAddressForm(false);
+      setAddressDraft(emptyAddress());
+      setEditingAddressId(null);
+      setSelectedAddressId(draft.id);
+      setCheckoutFeedback("");
+      setStatus(editingAddressId ? "Delivery address updated." : "Delivery address saved.");
+    }
+  };
+
+  const removeAddress = async (id: string) => {
+    if (!window.confirm("Remove this delivery address?")) return;
+    const next = addresses.filter((a) => a.id !== id);
+    if (next.length > 0 && !next.some((a) => a.isDefault)) {
+      next[0] = { ...next[0], isDefault: true };
+    }
+    const ok = await persistAddresses(next);
+    if (ok) setStatus("Delivery address removed.");
+  };
+
+  const setDefaultAddress = async (id: string) => {
+    const next = addresses.map((a) => ({ ...a, isDefault: a.id === id }));
+    const ok = await persistAddresses(next);
+    if (ok) {
+      setSelectedAddressId(id);
+      setStatus("Default delivery address updated.");
+    }
+  };
+
   const submitQuote = async () => {
     if (!data) return;
     setBusy(true);
@@ -94,8 +287,153 @@ export default function B2bPortalClient({ slug }: { slug: string }) {
       setBusy(false);
       return;
     }
-    setStatus(`Quote request sent (₹${(payload.subtotalInr ?? subtotal).toFixed(2)}). Maroma will follow up.`);
+    setStatus(
+      `Quote request sent (₹${(payload.subtotalInr ?? subtotal).toFixed(2)}). Maroma will follow up.`
+    );
     setBusy(false);
+  };
+
+  const ensureCheckoutReady = () => {
+    if (lines.length === 0) {
+      setCheckoutFeedback("Add quantities for at least one product.");
+      return false;
+    }
+    if (addresses.length === 0 || !selectedAddressId) {
+      setCheckoutFeedback("Add and select a delivery address above, then continue.");
+      setShowAddressForm(true);
+      if (addresses.length === 0) {
+        setEditingAddressId(null);
+        setAddressDraft({ ...emptyAddress(), isDefault: true });
+      }
+      document.getElementById("b2b-delivery-addresses")?.scrollIntoView({
+        behavior: "smooth",
+        block: "start",
+      });
+      return false;
+    }
+    return true;
+  };
+
+  const confirmRazorpayPayment = async (
+    orderId: string,
+    response: RazorpaySuccessResponse
+  ) => {
+    const res = await fetch(`/api/b2b/${encodeURIComponent(slug)}/pay/confirm`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        orderId,
+        razorpayOrderId: response.razorpay_order_id,
+        razorpayPaymentId: response.razorpay_payment_id,
+        razorpaySignature: response.razorpay_signature,
+      }),
+    });
+    const payload = (await res.json()) as { error?: string; subtotalInr?: number };
+    if (!res.ok) {
+      throw new Error(payload.error || "Payment received but confirmation failed. Contact Maroma.");
+    }
+    const ok = `Payment received (₹${(payload.subtotalInr ?? subtotal).toFixed(2)}). Thank you — Maroma will fulfil your order.`;
+    setCheckoutFeedback(ok);
+    setStatus(ok);
+    setOrderComplete("paid");
+    setMessage("");
+  };
+
+  const openRazorpayCheckout = async (orderId: string, session: RazorpayCheckoutSession) => {
+    const loaded = await loadRazorpayScript();
+    if (!loaded || !window.Razorpay) {
+      throw new Error("Could not load Razorpay checkout. Please try again.");
+    }
+    await new Promise<void>((resolve, reject) => {
+      const rzp = new window.Razorpay!({
+        key: session.keyId,
+        amount: session.amount,
+        currency: session.currency,
+        name: session.name,
+        description: session.description,
+        order_id: session.orderId,
+        prefill: session.prefill,
+        theme: { color: "#134a57" },
+        handler: (response: RazorpaySuccessResponse) => {
+          void confirmRazorpayPayment(orderId, response)
+            .then(() => resolve())
+            .catch((err) =>
+              reject(err instanceof Error ? err : new Error("Payment confirm failed."))
+            );
+        },
+        modal: {
+          ondismiss: () => {
+            reject(
+              new Error(
+                "Payment cancelled. Try Pay now again, or place an invoice order."
+              )
+            );
+          },
+        },
+      });
+      rzp.on("payment.failed", (response) => {
+        reject(new Error(response.error?.description || "Payment failed."));
+      });
+      rzp.open();
+    });
+  };
+
+  const submitOrder = async (paymentMode: "invoice" | "pay_now") => {
+    if (!data) return;
+    if (!ensureCheckoutReady()) return;
+    setBusy(true);
+    setCheckoutFeedback("");
+    setStatus("");
+    try {
+      const res = await fetch(`/api/b2b/${encodeURIComponent(slug)}/order`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          message,
+          deliveryAddressId: selectedAddressId,
+          paymentMode,
+          lines: lines.map((l) => ({ productId: l.productId, quantity: l.quantity })),
+        }),
+      });
+      let payload: {
+        error?: string;
+        subtotalInr?: number;
+        orderId?: string;
+        razorpay?: RazorpayCheckoutSession;
+      } = {};
+      try {
+        payload = (await res.json()) as typeof payload;
+      } catch {
+        payload = { error: "Could not read the server response." };
+      }
+      if (!res.ok) {
+        const msg = payload.error || "Could not place order.";
+        setCheckoutFeedback(msg);
+        setStatus(msg);
+        return;
+      }
+
+      if (paymentMode === "pay_now") {
+        if (!payload.orderId || !payload.razorpay) {
+          throw new Error("Payment session was not created.");
+        }
+        setCheckoutFeedback("Opening secure payment…");
+        await openRazorpayCheckout(payload.orderId, payload.razorpay);
+        return;
+      }
+
+      const ok = `Order placed (₹${(payload.subtotalInr ?? subtotal).toFixed(2)}). Maroma will confirm and invoice.`;
+      setCheckoutFeedback(ok);
+      setStatus(ok);
+      setOrderComplete("invoice");
+      setMessage("");
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "Network error placing order.";
+      setCheckoutFeedback(msg);
+      setStatus(msg);
+    } finally {
+      setBusy(false);
+    }
   };
 
   if (error) {
@@ -114,16 +452,17 @@ export default function B2bPortalClient({ slug }: { slug: string }) {
 
   if (!data) {
     return (
-      <main className="catalog-admin-page">
+      <main className="catalog-admin-page b2b-portal-page">
         <p className="catalog-admin-empty">Loading private catalogue…</p>
       </main>
     );
   }
 
   const isQuote = data.company.commerceMode === "quote";
+  const selectedAddress = addresses.find((a) => a.id === selectedAddressId) ?? null;
 
   return (
-    <main className="catalog-admin-page">
+    <main className="catalog-admin-page b2b-portal-page">
       <div className="catalog-admin-shell catalog-admin-shell--edit">
         <header className="catalog-admin-header">
           <div>
@@ -135,13 +474,13 @@ export default function B2bPortalClient({ slug }: { slug: string }) {
               Restricted assortment with your negotiated rates.
               {isQuote
                 ? " Submit a quote request — Maroma will confirm availability and invoicing."
-                : " Checkout mode is enabled for negotiated rates."}
+                : " Checkout with negotiated rates — pay now or request an invoice."}
               {data.viewer.isAdmin ? " (Admin preview)" : null}
             </p>
           </div>
           <div className="catalog-admin-header-actions">
-            <Link href="/account" className="button secondary">
-              Account
+            <Link href="/" className="button secondary">
+              Shop
             </Link>
           </div>
         </header>
@@ -184,7 +523,7 @@ export default function B2bPortalClient({ slug }: { slug: string }) {
                     ) : null}
                   </div>
                   <div>
-                    <strong>{row.name}</strong>
+                    <strong>{decodeBasicHtmlEntities(row.name)}</strong>
                     <div className="catalog-admin-card-copy">
                       {row.sku} · MOQ {row.moq}
                       <br />
@@ -212,16 +551,251 @@ export default function B2bPortalClient({ slug }: { slug: string }) {
           </section>
         )}
 
-        <section className="catalog-admin-card">
-          <h2>{isQuote ? "Request quote" : "Order"}</h2>
-          <p className="catalog-admin-card-copy">
-            {lines.length} line{lines.length === 1 ? "" : "s"} · Subtotal{" "}
-            {formatInrPrice(String(subtotal)) ?? `₹${subtotal}`}
-          </p>
+        <section className="catalog-admin-card" id="b2b-delivery-addresses">
+          <div className="b2b-section-head">
+            <h2>Delivery addresses</h2>
+            <button type="button" className="button secondary" onClick={startAddAddress}>
+              Add address
+            </button>
+          </div>
+          {addresses.length === 0 ? (
+            <p className="catalog-admin-card-copy">
+              Save at least one delivery location before placing an order.
+            </p>
+          ) : (
+            <div className="b2b-address-list">
+              {addresses.map((address) => (
+                <article
+                  key={address.id}
+                  className={`b2b-address-card${selectedAddressId === address.id ? " is-selected" : ""}`}
+                >
+                  <label className="b2b-address-select">
+                    <input
+                      type="radio"
+                      name="delivery-address"
+                      checked={selectedAddressId === address.id}
+                      onChange={() => setSelectedAddressId(address.id)}
+                    />
+                    <div>
+                      <strong>
+                        {address.label}
+                        {address.isDefault ? " · Default" : ""}
+                      </strong>
+                      <small>
+                        {address.contactName} · {address.phone}
+                        <br />
+                        {address.address}, {address.city}
+                        {address.state ? `, ${address.state}` : ""} {address.pincode},{" "}
+                        {address.country}
+                      </small>
+                    </div>
+                  </label>
+                  <div className="b2b-address-actions">
+                    {!address.isDefault ? (
+                      <button
+                        type="button"
+                        className="button secondary"
+                        disabled={savingAddress}
+                        onClick={() => void setDefaultAddress(address.id)}
+                      >
+                        Set default
+                      </button>
+                    ) : null}
+                    <button
+                      type="button"
+                      className="button secondary"
+                      onClick={() => startEditAddress(address)}
+                    >
+                      Edit
+                    </button>
+                    <button
+                      type="button"
+                      className="button secondary"
+                      disabled={savingAddress}
+                      onClick={() => void removeAddress(address.id)}
+                    >
+                      Remove
+                    </button>
+                  </div>
+                </article>
+              ))}
+            </div>
+          )}
+
+          {showAddressForm ? (
+            <div className="b2b-address-form">
+              <h3>{editingAddressId ? "Edit address" : "New address"}</h3>
+              <div className="b2b-address-form-grid">
+                <label className="catalog-admin-field">
+                  <span>Label</span>
+                  <input
+                    value={addressDraft.label}
+                    onChange={(e) => setAddressDraft((d) => ({ ...d, label: e.target.value }))}
+                    placeholder="Warehouse · Mumbai"
+                  />
+                </label>
+                <label className="catalog-admin-field">
+                  <span>Contact name</span>
+                  <input
+                    value={addressDraft.contactName}
+                    onChange={(e) =>
+                      setAddressDraft((d) => ({ ...d, contactName: e.target.value }))
+                    }
+                  />
+                </label>
+                <label className="catalog-admin-field">
+                  <span>Phone</span>
+                  <input
+                    value={addressDraft.phone}
+                    onChange={(e) => setAddressDraft((d) => ({ ...d, phone: e.target.value }))}
+                  />
+                </label>
+                <label className="catalog-admin-field b2b-address-span">
+                  <span>Street address</span>
+                  <input
+                    value={addressDraft.address}
+                    onChange={(e) => setAddressDraft((d) => ({ ...d, address: e.target.value }))}
+                  />
+                </label>
+                <label className="catalog-admin-field">
+                  <span>City</span>
+                  <input
+                    value={addressDraft.city}
+                    onChange={(e) => setAddressDraft((d) => ({ ...d, city: e.target.value }))}
+                  />
+                </label>
+                <label className="catalog-admin-field">
+                  <span>State</span>
+                  <input
+                    value={addressDraft.state}
+                    onChange={(e) => setAddressDraft((d) => ({ ...d, state: e.target.value }))}
+                  />
+                </label>
+                <label className="catalog-admin-field">
+                  <span>Pincode</span>
+                  <input
+                    value={addressDraft.pincode}
+                    onChange={(e) => setAddressDraft((d) => ({ ...d, pincode: e.target.value }))}
+                  />
+                </label>
+                <label className="catalog-admin-field">
+                  <span>Country</span>
+                  <input
+                    value={addressDraft.country}
+                    onChange={(e) => setAddressDraft((d) => ({ ...d, country: e.target.value }))}
+                  />
+                </label>
+              </div>
+              <label
+                className="catalog-admin-field"
+                style={{ display: "flex", flexDirection: "row", alignItems: "center", gap: 10 }}
+              >
+                <input
+                  type="checkbox"
+                  checked={addressDraft.isDefault}
+                  onChange={(e) =>
+                    setAddressDraft((d) => ({ ...d, isDefault: e.target.checked }))
+                  }
+                />
+                <span>Default delivery address</span>
+              </label>
+              <div style={{ display: "flex", gap: 10, marginTop: 8 }}>
+                <button
+                  type="button"
+                  className="button primary button-sage"
+                  disabled={savingAddress}
+                  onClick={() => void saveAddressForm()}
+                >
+                  {savingAddress ? "Saving…" : "Save address"}
+                </button>
+                <button
+                  type="button"
+                  className="button secondary"
+                  onClick={() => {
+                    setShowAddressForm(false);
+                    setEditingAddressId(null);
+                    setAddressDraft(emptyAddress());
+                  }}
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          ) : null}
+        </section>
+
+        <section className="catalog-admin-card" id="b2b-order-review">
+          <h2>{isQuote ? "Review quote" : "Review order"}</h2>
+          {lines.length === 0 ? (
+            <p className="catalog-admin-card-copy">
+              Set quantities above to build your {isQuote ? "quote" : "order"} summary.
+            </p>
+          ) : (
+            <>
+              <div className="b2b-summary-table-wrap">
+                <table className="b2b-summary-table">
+                  <thead>
+                    <tr>
+                      <th>Product</th>
+                      <th>Qty</th>
+                      <th>Unit</th>
+                      <th>Total</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {lines.map((line) => (
+                      <tr key={line.productId}>
+                        <td>
+                          <strong>{decodeBasicHtmlEntities(line.name)}</strong>
+                          <small>{line.sku}</small>
+                        </td>
+                        <td>{line.quantity}</td>
+                        <td>{formatInrPrice(String(line.priceInr)) ?? `₹${line.priceInr}`}</td>
+                        <td>
+                          {formatInrPrice(String(line.lineTotal)) ?? `₹${line.lineTotal}`}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+
+              <div className="b2b-summary-meta">
+                {!isQuote ? (
+                  <div>
+                    <span>Delivery</span>
+                    {selectedAddress ? (
+                      <p>
+                        <strong>{selectedAddress.label}</strong>
+                        <br />
+                        {selectedAddress.contactName} · {selectedAddress.phone}
+                        <br />
+                        {selectedAddress.address}, {selectedAddress.city}
+                        {selectedAddress.state ? `, ${selectedAddress.state}` : ""}{" "}
+                        {selectedAddress.pincode}, {selectedAddress.country}
+                      </p>
+                    ) : (
+                      <p className="catalog-admin-card-copy">Select a delivery address above.</p>
+                    )}
+                  </div>
+                ) : null}
+                <div className="b2b-summary-total">
+                  <span>
+                    {lines.length} line{lines.length === 1 ? "" : "s"}
+                  </span>
+                  <strong>
+                    Subtotal {formatInrPrice(String(subtotal)) ?? `₹${subtotal}`}
+                  </strong>
+                </div>
+              </div>
+            </>
+          )}
+
           <label className="catalog-admin-field">
             <span>Message (optional)</span>
             <textarea rows={3} value={message} onChange={(e) => setMessage(e.target.value)} />
           </label>
+
           {isQuote ? (
             <button
               type="button"
@@ -232,11 +806,65 @@ export default function B2bPortalClient({ slug }: { slug: string }) {
               {busy ? "Sending…" : "Submit quote request"}
             </button>
           ) : (
-            <p className="catalog-admin-card-copy">
-              Checkout with negotiated rates is configured for this page. Live wholesale checkout will
-              connect once payment capture is enabled — for now, submit quantities via quote or contact
-              Maroma to place the order.
-            </p>
+            <>
+              <p className="catalog-admin-card-copy">
+                Review the summary above, then pay now with Razorpay or place an order for invoice.
+              </p>
+              {checkoutFeedback ? (
+                <p
+                  className={`catalog-admin-status${
+                    orderComplete ||
+                    checkoutFeedback.startsWith("Order placed") ||
+                    checkoutFeedback.startsWith("Payment received")
+                      ? " catalog-admin-status--ok"
+                      : " catalog-admin-status--error"
+                  }`}
+                  style={{ marginBottom: 12 }}
+                >
+                  {checkoutFeedback}
+                </p>
+              ) : null}
+              {orderComplete ? (
+                <div className="b2b-checkout-actions">
+                  <button
+                    type="button"
+                    className="button secondary"
+                    onClick={() => {
+                      setOrderComplete(null);
+                      setCheckoutFeedback("");
+                      setStatus("");
+                    }}
+                  >
+                    Place another order
+                  </button>
+                </div>
+              ) : (
+                <div className="b2b-checkout-actions">
+                  <button
+                    type="button"
+                    className="button primary button-sage"
+                    disabled={busy || lines.length === 0}
+                    onClick={() => void submitOrder("pay_now")}
+                  >
+                    {busy ? "Working…" : "Pay now"}
+                  </button>
+                  <button
+                    type="button"
+                    className="button secondary"
+                    disabled={busy || lines.length === 0}
+                    onClick={() => void submitOrder("invoice")}
+                  >
+                    {busy ? "Working…" : "Place order (invoice)"}
+                  </button>
+                </div>
+              )}
+              {!payNowAvailable && !orderComplete ? (
+                <p className="catalog-admin-card-copy" style={{ marginTop: 10 }}>
+                  Online Pay now needs Razorpay keys on the server. Until then, use Place order
+                  (invoice).
+                </p>
+              ) : null}
+            </>
           )}
         </section>
       </div>

@@ -1,4 +1,5 @@
 import { DEFAULT_STOCK } from "./commerce-config";
+import { decodeBasicHtmlEntities } from "./decode-html-entities";
 import { parseInrPriceNumber } from "./format-price";
 import { getDisplayImageUrl, hasDisplayImage } from "./product-image";
 import { readCatalogEdits, isProductPublished, type ProductCatalogEdit } from "./product-catalog-edits";
@@ -138,7 +139,7 @@ export function toAdminProductSummary(
   const primaryCategory = product.categories[0] ?? "Uncategorised";
   return {
     id: product.id,
-    name: product.name,
+    name: decodeBasicHtmlEntities(product.name),
     sku: product.sku || product.id,
     price: product.price,
     priceNumber: parseInrPriceNumber(product.price),

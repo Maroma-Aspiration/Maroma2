@@ -10,6 +10,7 @@ import { isYouTubeUrl } from "../lib/youtube-embed";
 import { MobilePreviewFrame } from "./components/MobilePreviewFrame";
 import { RitualFaceTeaser } from "./components/RitualFaceTeaser";
 import { SiteHeader } from "./components/SiteHeader";
+import { SignOutButton } from "./components/SignOutButton";
 import type { ProductRecord } from "../lib/product-types";
 import { isAdminUiHidden } from "../lib/admin-ui-visible";
 import {
@@ -4026,6 +4027,9 @@ export default function HomePageClient({
                     ? "Save failed. Sign in as admin"
                     : "SAVE ALL CHANGES"}
             </button>
+            <div className="floating-admin-signout">
+              <SignOutButton />
+            </div>
 
             {adminDragEnabled ? (
               <>

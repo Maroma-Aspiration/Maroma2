@@ -2,6 +2,7 @@ import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
 import { getSessionSecret, SESSION_COOKIE, verifySessionPayload } from "../../../../lib/auth-session";
 import { getB2bCompanyBySlug } from "../../../../lib/b2b-store";
+import { decodeBasicHtmlEntities } from "../../../../lib/decode-html-entities";
 import { getDisplayImageUrl } from "../../../../lib/product-image";
 import { readMergedCatalog } from "../../../../lib/product-catalog-admin";
 import { parseInrPriceNumber } from "../../../../lib/format-price";
@@ -44,7 +45,7 @@ export async function GET(_request: Request, ctx: Ctx) {
       return {
         productId: product.id,
         sku: product.sku,
-        name: product.name,
+        name: decodeBasicHtmlEntities(product.name),
         imageUrl: getDisplayImageUrl(product) || product.imageUrl || "",
         priceInr: item.priceInr,
         moq: item.moq,
@@ -61,8 +62,14 @@ export async function GET(_request: Request, ctx: Ctx) {
       commerceMode: company.commerceMode,
       status: company.status,
       userEmail: company.userEmail,
+      deliveryAddresses: company.deliveryAddresses,
     },
     assortment,
     viewer: { email: session.email, role: session.role, isAdmin },
+    payments: {
+      payNowAvailable: Boolean(
+        process.env.RAZORPAY_KEY_ID?.trim() && process.env.RAZORPAY_KEY_SECRET?.trim()
+      ),
+    },
   });
 }

@@ -7,10 +7,15 @@ export function decodeBasicHtmlEntities(text: string): string {
     .replace(/\\n/g, "\n")
     .replace(/\\r/g, "")
     .replace(/\\t/g, " ")
-    .replace(/&amp;/g, "&")
-    .replace(/&lt;/g, "<")
-    .replace(/&gt;/g, ">")
-    .replace(/&quot;/g, '"')
+    .replace(/&amp;/gi, "&")
+    .replace(/&lt;/gi, "<")
+    .replace(/&gt;/gi, ">")
+    .replace(/&quot;/gi, '"')
+    .replace(/&nbsp;/gi, " ")
     .replace(/&#0*39;/g, "'")
-    .replace(/&#x27;/gi, "'");
+    .replace(/&#x27;/gi, "'")
+    .replace(/&#(\d+);/g, (_, code) => {
+      const n = Number(code);
+      return Number.isFinite(n) ? String.fromCodePoint(n) : _;
+    });
 }
