@@ -35,7 +35,7 @@ export default async function NewsletterArchivePage() {
 
         <section className="stories-grid newsletter-archive-grid" aria-label="Newsletter issues">
           {currentIssue ? (
-            <Link href="/newsletter" className="story-card newsletter-archive-card newsletter-archive-card-current">
+            <Link href="/newsletter/view" className="story-card newsletter-archive-card newsletter-archive-card-current">
               <div className="story-card-media">
                 {currentIssue.thumbnailUrl ? (
                   <img src={currentIssue.thumbnailUrl} alt="" loading="eager" />

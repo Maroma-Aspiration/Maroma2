@@ -144,7 +144,6 @@ export default async function NewsletterPage({
   searchParams?: Promise<Record<string, string | string[] | undefined>>;
 }) {
   noStore();
-  const state = await loadNewsletterState();
   const secret = getSessionSecret();
   const token = cookies().get(SESSION_COOKIE)?.value;
   const session = secret && token ? await verifySessionPayload(token, secret) : null;
@@ -154,26 +153,23 @@ export default async function NewsletterPage({
   const editParam = Array.isArray(rawEdit) ? rawEdit[0] : rawEdit;
   const requestedEdit = editParam === "1" || editParam === "true";
 
-  // If edit is requested but the user isn't a newsletter editor, redirect to login
   if (requestedEdit && !canEdit) {
     redirect("/login?next=/newsletter%3Fedit%3D1");
   }
 
   const editMode = requestedEdit && canEdit;
-  const jsonLd = buildJsonLd(state);
+  if (!editMode) {
+    redirect("/blog");
+  }
+
+  const state = await loadNewsletterState();
 
   return (
-    <>
-      <script
-        type="application/ld+json"
-        dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
-      />
-      <NewsletterPageClient
-        initialState={state}
-        editMode={editMode}
-        isAdmin={session?.role === "admin"}
-        canEditNewsletter={canEdit}
-      />
-    </>
+    <NewsletterPageClient
+      initialState={state}
+      editMode={editMode}
+      isAdmin={session?.role === "admin"}
+      canEditNewsletter={canEdit}
+    />
   );
 }

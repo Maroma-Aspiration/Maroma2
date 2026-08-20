@@ -32,7 +32,7 @@ export async function GET(request: Request) {
   }
 
   if (!target) {
-    target = "/newsletter";
+    target = "/blog";
   }
 
   return NextResponse.redirect(target, 302);

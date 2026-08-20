@@ -21,8 +21,8 @@ export default async function NewsletterUnsubscribePage({
         <section className="newsletter-shell newsletter-unsub-shell">
           <h1 className="newsletter-issue-heading">Invalid link</h1>
           <p className="newsletter-intro">This unsubscribe link is missing a token. Use the link from your email.</p>
-          <Link href="/newsletter" className="button secondary">
-            Back to newsletter
+          <Link href="/blog" className="button secondary">
+            Back to journal
           </Link>
         </section>
       </main>
@@ -37,8 +37,8 @@ export default async function NewsletterUnsubscribePage({
         <section className="newsletter-shell newsletter-unsub-shell">
           <h1 className="newsletter-issue-heading">Unsubscribe unavailable</h1>
           <p className="newsletter-intro">This site is not configured for email unsubscribe yet.</p>
-          <Link href="/newsletter" className="button secondary">
-            Newsletter
+          <Link href="/blog" className="button secondary">
+            Journal
           </Link>
         </section>
       </main>
@@ -51,8 +51,8 @@ export default async function NewsletterUnsubscribePage({
         <section className="newsletter-shell newsletter-unsub-shell">
           <h1 className="newsletter-issue-heading">Link expired or invalid</h1>
           <p className="newsletter-intro">Ask us to remove your email directly if you still receive messages.</p>
-          <Link href="/newsletter" className="button secondary">
-            Back to newsletter
+          <Link href="/blog" className="button secondary">
+            Back to journal
           </Link>
         </section>
       </main>
@@ -66,8 +66,8 @@ export default async function NewsletterUnsubscribePage({
         <p className="newsletter-intro">
           We removed this address from future newsletter sends. You can still read issues anytime on the site.
         </p>
-        <Link href="/newsletter" className="button primary button-sage">
-          Open newsletter
+        <Link href="/blog" className="button primary button-sage">
+          Open journal
         </Link>
       </section>
     </main>

@@ -34,8 +34,7 @@ export default async function BlogPage() {
         <h1 className="stories-hero-title">Welcome to The Maroma Journal</h1>
         <p className="stories-hero-subhead">Stories and Events from the World of Maroma</p>
         <p className="stories-hero-cta">
-          <Link href="/newsletter" className="button primary button-sage">Read the current issue</Link>
-          <Link href="#past-newsletters" className="button secondary">Past newsletters</Link>
+          <Link href="#past-newsletters" className="button primary button-sage">Newsletter</Link>
         </p>
         <JournalSubscribeForm />
       </section>
@@ -76,7 +75,7 @@ export default async function BlogPage() {
         </div>
         <div className="stories-grid newsletter-archive-grid">
         {currentIssue ? (
-          <Link href="/newsletter" className="story-card newsletter-archive-card newsletter-archive-card-current">
+          <Link href="/newsletter/view" className="story-card newsletter-archive-card newsletter-archive-card-current">
             <div className="story-card-media">
               {currentIssue.thumbnailUrl ? (
                 <img src={currentIssue.thumbnailUrl} alt="" loading="lazy" />
