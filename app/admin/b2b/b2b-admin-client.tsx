@@ -8,8 +8,10 @@ import type {
   B2bCompany,
   B2bCompanyStatus,
   B2bOrder,
+  B2bProgram,
   B2bQuoteRequest,
 } from "../../../lib/b2b-types";
+import type { B2bApplication } from "../../../lib/b2b-applications-store";
 import { decodeBasicHtmlEntities } from "../../../lib/decode-html-entities";
 import type { AdminProductSummary } from "../../../lib/product-catalog-admin";
 import "./b2b-admin.css";
@@ -21,6 +23,9 @@ type Draft = {
   userEmail: string;
   commerceMode: B2bCommerceMode;
   status: B2bCompanyStatus;
+  program: B2bProgram;
+  whiteLabelDiscountPercent: number;
+  whiteLabelMinSpendInr: number;
   notes: string;
   assortment: B2bAssortmentItem[];
 };
@@ -33,6 +38,9 @@ const emptyDraft = (): Draft => ({
   userEmail: "",
   commerceMode: "quote",
   status: "active",
+  program: "custom",
+  whiteLabelDiscountPercent: 35,
+  whiteLabelMinSpendInr: 15000,
   notes: "",
   assortment: [],
 });
@@ -57,6 +65,7 @@ export default function B2bAdminClient() {
   const [companies, setCompanies] = useState<B2bCompany[]>([]);
   const [quotes, setQuotes] = useState<B2bQuoteRequest[]>([]);
   const [orders, setOrders] = useState<B2bOrder[]>([]);
+  const [applications, setApplications] = useState<B2bApplication[]>([]);
   const [draft, setDraft] = useState<Draft>(emptyDraft());
   const [status, setStatus] = useState("");
   const [saving, setSaving] = useState(false);
@@ -75,13 +84,17 @@ export default function B2bAdminClient() {
 
   const load = useCallback(async () => {
     setLoading(true);
-    const res = await fetch("/api/admin/b2b/companies", { cache: "no-store" });
+    const [res, appsRes] = await Promise.all([
+      fetch("/api/admin/b2b/companies", { cache: "no-store" }),
+      fetch("/api/admin/b2b/applications", { cache: "no-store" }),
+    ]);
     const data = (await res.json()) as {
       companies?: B2bCompany[];
       quotes?: B2bQuoteRequest[];
       orders?: B2bOrder[];
       error?: string;
     };
+    const appsData = (await appsRes.json()) as { applications?: B2bApplication[] };
     if (!res.ok) {
       setStatus(data.error || "Could not load B2B companies.");
       setLoading(false);
@@ -90,6 +103,7 @@ export default function B2bAdminClient() {
     setCompanies(data.companies ?? []);
     setQuotes(data.quotes ?? []);
     setOrders(data.orders ?? []);
+    setApplications(appsData.applications ?? []);
     setLoading(false);
   }, []);
 
@@ -149,6 +163,9 @@ export default function B2bAdminClient() {
       userEmail: company.userEmail,
       commerceMode: company.commerceMode,
       status: company.status,
+      program: company.program ?? "custom",
+      whiteLabelDiscountPercent: company.whiteLabelDiscountPercent ?? 35,
+      whiteLabelMinSpendInr: company.whiteLabelMinSpendInr ?? 15000,
       notes: company.notes ?? "",
       assortment: company.assortment.map((a) => ({ ...a })),
     });
@@ -270,8 +287,8 @@ export default function B2bAdminClient() {
       <div className="catalog-admin-shell catalog-admin-shell--edit">
         <header className="catalog-admin-header">
           <div>
-            <Link href="/admin" className="catalog-admin-back">
-              ← Admin
+            <Link href="/?skipIntro=1" className="catalog-admin-back">
+              ← Site editor
             </Link>
             <h1>B2B overview</h1>
             <p className="catalog-admin-lede">
@@ -335,6 +352,50 @@ export default function B2bAdminClient() {
                 </small>
               </article>
             </section>
+
+            {applications.some((a) => a.status === "pending") ? (
+              <section className="catalog-admin-card" style={{ marginBottom: 20 }}>
+                <h2>White-label applications</h2>
+                {applications
+                  .filter((a) => a.status === "pending")
+                  .map((application) => (
+                    <article key={application.id} style={{ marginTop: 12 }}>
+                      <strong>{application.companyName}</strong> · {application.email}
+                      <p>{application.message}</p>
+                      <button
+                        type="button"
+                        className="button primary button-sage"
+                        onClick={async () => {
+                          const res = await fetch("/api/admin/b2b/applications", {
+                            method: "POST",
+                            headers: { "Content-Type": "application/json" },
+                            body: JSON.stringify({ id: application.id, action: "approve" }),
+                          });
+                          const data = (await res.json()) as { error?: string };
+                          setStatus(data.error || `Approved ${application.companyName}.`);
+                          await load();
+                        }}
+                      >
+                        Approve (35% / ₹15,000)
+                      </button>
+                      <button
+                        type="button"
+                        className="button secondary"
+                        onClick={async () => {
+                          await fetch("/api/admin/b2b/applications", {
+                            method: "POST",
+                            headers: { "Content-Type": "application/json" },
+                            body: JSON.stringify({ id: application.id, action: "decline" }),
+                          });
+                          await load();
+                        }}
+                      >
+                        Decline
+                      </button>
+                    </article>
+                  ))}
+              </section>
+            ) : null}
 
             {loading ? <p className="catalog-admin-empty">Loading B2B overview…</p> : null}
 
@@ -511,6 +572,55 @@ export default function B2bAdminClient() {
                   placeholder="buyer@anandaspa.com"
                 />
               </label>
+              <label className="catalog-admin-field">
+                <span>Programme</span>
+                <select
+                  value={draft.program}
+                  onChange={(e) =>
+                    setDraft((d) => ({
+                      ...d,
+                      program: e.target.value as B2bProgram,
+                      commerceMode: e.target.value === "white_label" ? "checkout" : d.commerceMode,
+                    }))
+                  }
+                >
+                  <option value="custom">Custom assortment</option>
+                  <option value="white_label">White label (full catalogue, 35% off)</option>
+                </select>
+              </label>
+              {draft.program === "white_label" ? (
+                <div className="catalog-admin-grid">
+                  <label className="catalog-admin-field">
+                    <span>Discount %</span>
+                    <input
+                      type="number"
+                      min={1}
+                      max={90}
+                      value={draft.whiteLabelDiscountPercent}
+                      onChange={(e) =>
+                        setDraft((d) => ({
+                          ...d,
+                          whiteLabelDiscountPercent: Number(e.target.value) || 35,
+                        }))
+                      }
+                    />
+                  </label>
+                  <label className="catalog-admin-field">
+                    <span>Minimum spend ₹</span>
+                    <input
+                      type="number"
+                      min={0}
+                      value={draft.whiteLabelMinSpendInr}
+                      onChange={(e) =>
+                        setDraft((d) => ({
+                          ...d,
+                          whiteLabelMinSpendInr: Number(e.target.value) || 15000,
+                        }))
+                      }
+                    />
+                  </label>
+                </div>
+              ) : null}
               <label className="catalog-admin-field">
                 <span>Commerce mode</span>
                 <select

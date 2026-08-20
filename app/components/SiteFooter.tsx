@@ -6,13 +6,6 @@ import { useEffect, useState } from "react";
 
 type SessionUser = { email: string; role: string };
 
-const LEGAL_LINKS = [
-  { href: "/privacy", label: "Privacy" },
-  { href: "/terms", label: "Terms" },
-  { href: "/shipping", label: "Shipping" },
-  { href: "/returns", label: "Returns" },
-] as const;
-
 export function SiteFooter() {
   const pathname = usePathname();
   const loginHref = `/login?next=${encodeURIComponent(pathname || "/")}`;
@@ -23,14 +16,10 @@ export function SiteFooter() {
     fetch("/api/auth/session", { cache: "no-store", credentials: "same-origin" })
       .then((res) => res.json())
       .then((data: { user?: SessionUser | null }) => {
-        if (!cancelled) {
-          setUser(data.user ?? null);
-        }
+        if (!cancelled) setUser(data.user ?? null);
       })
       .catch(() => {
-        if (!cancelled) {
-          setUser(null);
-        }
+        if (!cancelled) setUser(null);
       });
     return () => {
       cancelled = true;
@@ -46,32 +35,60 @@ export function SiteFooter() {
 
   const accountLink =
     user?.role === "admin"
-      ? { href: "/admin", label: "Site editor" }
-      : user
-        ? { href: "/account", label: "Account" }
-        : { href: loginHref, label: "Login" };
+      ? { href: "/?skipIntro=1", label: "Site editor" }
+      : user?.role === "newsletter"
+        ? { href: "/newsletter?edit=1", label: "Newsletter" }
+        : user
+          ? { href: "/account", label: "Account" }
+          : { href: loginHref, label: "Login" };
 
   return (
     <footer className="site-footer" aria-label="Site">
-      <div className="site-footer-inner">
-        <nav className="site-footer-legal" aria-label="Legal">
-          {LEGAL_LINKS.map((item) => (
-            <Link key={item.href} href={item.href}>
-              {item.label}
-            </Link>
-          ))}
-        </nav>
-        <div className="site-footer-actions" aria-label="Account">
-          <Link href={accountLink.href} className="site-footer-login-link">
-            <svg viewBox="0 0 24 24" aria-hidden="true">
-              <path
-                d="M12 12.2c2.1 0 3.8-1.8 3.8-4s-1.7-4-3.8-4-3.8 1.8-3.8 4 1.7 4 3.8 4Zm0 2.2c-3 0-5.7 1.6-7 4.1-.3.6.1 1.3.8 1.3h12.3c.7 0 1.2-.7.8-1.3-1.3-2.5-4-4.1-7-4.1Z"
-                fill="currentColor"
-              />
-            </svg>
-            {accountLink.label}
-          </Link>
+      <div className="site-footer-grid">
+        <div>
+          <strong>Maroma</strong>
+          <p>
+            Kuilapalayam, Auroville
+            <br />
+            Tamil Nadu 605101, India
+          </p>
+          <p>
+            <a href="mailto:info@maroma.com">info@maroma.com</a>
+          </p>
         </div>
+        <nav aria-label="Shop">
+          <h2>Shop</h2>
+          <Link href="/#shop">All products</Link>
+          <Link href="/gifting/build-your-set">Gifting</Link>
+          <Link href="/stores">Store locator</Link>
+          <Link href="/b2b/apply">Wholesale</Link>
+        </nav>
+        <nav aria-label="Company">
+          <h2>Company</h2>
+          <Link href="/#about">About</Link>
+          <Link href="/blog">Journal</Link>
+          <Link href="/newsletter/archive">Past newsletters</Link>
+          <Link href={accountLink.href}>{accountLink.label}</Link>
+        </nav>
+        <nav aria-label="Social">
+          <h2>Follow</h2>
+          <a href="https://www.instagram.com/maromaindia/" target="_blank" rel="noopener noreferrer">
+            Instagram
+          </a>
+          <a href="https://www.facebook.com/maromaindia" target="_blank" rel="noopener noreferrer">
+            Facebook
+          </a>
+          <a href="https://www.youtube.com/@maroma" target="_blank" rel="noopener noreferrer">
+            YouTube
+          </a>
+        </nav>
+        <nav className="site-footer-legal" aria-label="Legal">
+          <h2>Legal</h2>
+          <Link href="/privacy">Privacy</Link>
+          <Link href="/terms">Terms</Link>
+          <Link href="/shipping">Shipping</Link>
+          <Link href="/returns">Returns</Link>
+        </nav>
       </div>
     </footer>
   );

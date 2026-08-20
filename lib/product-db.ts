@@ -91,6 +91,67 @@ export const withOverrides = (
   });
 };
 
+/** Common shopper typos → catalog spelling. Applied per search token. */
+const SEARCH_TOKEN_ALIASES: Record<string, string> = {
+  lavendar: "lavender",
+  lavander: "lavender",
+  lavendarer: "lavender",
+  cedre: "cedar",
+  cedarwoord: "cedarwood",
+  shampo: "shampoo",
+  shampoe: "shampoo",
+  incence: "incense",
+  inscense: "incense",
+  deoderant: "deodorant",
+  deoderent: "deodorant",
+  moisturiser: "moisturizer",
+  fragrancee: "fragrance",
+};
+
+const escapeRegExp = (value: string) => value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+
+/** Whole-token match so short queries like "oil" do not hit "Olibanum". */
+function fieldHasExactToken(field: string, token: string): boolean {
+  if (!field || !token) return false;
+  return new RegExp(`(?:^|[^a-z0-9])${escapeRegExp(token)}(?:[^a-z0-9]|$)`).test(field);
+}
+
+/** Word-prefix match for progressive typing ("lave" → "lavender"). */
+function fieldHasPrefixToken(field: string, token: string): boolean {
+  if (!field || !token) return false;
+  return new RegExp(`(?:^|[^a-z0-9])${escapeRegExp(token)}[a-z0-9]*`).test(field);
+}
+
+function fieldHasToken(field: string, token: string, allowPrefix: boolean): boolean {
+  if (allowPrefix && token.length >= 3) {
+    return fieldHasPrefixToken(field, token);
+  }
+  return fieldHasExactToken(field, token);
+}
+
+function searchTokensFromQuery(raw: string): string[] {
+  const q = normalize(raw);
+  if (!q) return [];
+  return q
+    .split(/[^a-z0-9]+/)
+    .map((token) => token.trim())
+    .filter(Boolean)
+    .map((token) => SEARCH_TOKEN_ALIASES[token] ?? token);
+}
+
+function productMatchesSearchTokens(
+  fields: string[],
+  tokens: string[]
+): boolean {
+  if (tokens.length === 0) return true;
+  return tokens.every((token, index) => {
+    // Allow prefix on the last token so typing "cedar lave" still finds lavender.
+    // Single short tokens stay exact ("oil" must not match "olibanum").
+    const allowPrefix = tokens.length > 1 ? index === tokens.length - 1 : token.length >= 4;
+    return fields.some((field) => fieldHasToken(field, token, allowPrefix));
+  });
+}
+
 type ProductQuery = {
   q?: string;
   category?: string;
@@ -104,11 +165,10 @@ export const filterProducts = (
   query: ProductQuery
 ): ProductRecord[] => {
   const q = normalize(query.q ?? "");
+  const tokens = searchTokensFromQuery(q);
   const category = normalize(query.category ?? "");
   const limit = query.limit && query.limit > 0 ? query.limit : undefined;
   const onlyWithImages = query.onlyWithImages === true;
-  const escapeRegExp = (value: string) => value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-  const tokenRe = q ? new RegExp(`(?:^|[^a-z0-9])${escapeRegExp(q)}(?:[^a-z0-9]|$)`) : null;
 
   const filtered = products.filter((product) => {
     if (onlyWithImages && !hasDisplayImage(product)) {
@@ -117,12 +177,12 @@ export const filterProducts = (
 
     if (query.excludeGiftSets) {
       const nameLower = product.name.toLowerCase();
-      const isGiftSet = 
-        product.categories.some(c => normalize(c).includes("gifting")) ||
+      const isGiftSet =
+        product.categories.some((c) => normalize(c).includes("gifting")) ||
         nameLower.includes("gift set") ||
         nameLower.includes("giftset") ||
-        nameLower.includes("nurture set"); // Specifically seen in screenshot
-      
+        nameLower.includes("nurture set");
+
       if (isGiftSet) {
         return false;
       }
@@ -136,32 +196,42 @@ export const filterProducts = (
       return false;
     }
 
-    if (!q) {
+    if (tokens.length === 0) {
       return true;
     }
 
-    // Catalog fields only — skip descriptions/ingredients ("coconut oil" etc.).
-    // Whole-token match so "oil" does not hit "Olibanum".
+    const attributeText = Object.entries(product.attributes ?? {}).flatMap(([key, values]) => [
+      key,
+      ...(Array.isArray(values) ? values : []),
+    ]);
     const fields = [
       normalize(product.name),
+      normalize(product.shortDescription),
+      normalize(product.description),
       ...product.categories.map((entry) => normalize(entry)),
       ...product.tags.map((entry) => normalize(entry)),
+      ...attributeText.map((entry) => normalize(String(entry))),
       normalize(product.sku),
       normalize(product.brand),
     ];
 
-    return fields.some((field) => (field ? tokenRe!.test(field) : false));
+    // Every search word must appear (order-independent). Last word may be a prefix while typing.
+    return productMatchesSearchTokens(fields, tokens);
   });
 
-  if (q) {
+  if (tokens.length > 0) {
+    const phrase = tokens.join(" ");
     filtered.sort((a, b) => {
       const aName = normalize(a.name);
       const bName = normalize(b.name);
-      const aNameHit = aName.includes(q);
-      const bNameHit = bName.includes(q);
+      const aNameHit = tokens.every((token) => fieldHasExactToken(aName, token));
+      const bNameHit = tokens.every((token) => fieldHasExactToken(bName, token));
       if (aNameHit !== bNameHit) return aNameHit ? -1 : 1;
-      const aStarts = aName.startsWith(q) || aName.includes(` ${q}`);
-      const bStarts = bName.startsWith(q) || bName.includes(` ${q}`);
+      const aPhrase = aName.includes(phrase);
+      const bPhrase = bName.includes(phrase);
+      if (aPhrase !== bPhrase) return aPhrase ? -1 : 1;
+      const aStarts = aName.startsWith(tokens[0]) || aName.includes(` ${tokens[0]}`);
+      const bStarts = bName.startsWith(tokens[0]) || bName.includes(` ${tokens[0]}`);
       if (aStarts !== bStarts) return aStarts ? -1 : 1;
       return aName.localeCompare(bName);
     });

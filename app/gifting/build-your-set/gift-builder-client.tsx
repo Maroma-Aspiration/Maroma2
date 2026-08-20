@@ -5,6 +5,7 @@ import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } fr
 import { useCart } from "../../../context/CartContext";
 import { addToGiftCollection, GIFT_BUILDER_COLLECTION_KEY, readGiftCollection, updateGiftCollectionItem } from "../../../lib/gift-builder-collection";
 import { quantityDiscountRate, quantityTierRows } from "../../../lib/gift-builder-pricing";
+import type { Gift3dPublicAsset } from "../../../lib/gift-3d-assets-store";
 import type {
   GiftBox,
   GiftBuilderCatalog,
@@ -17,6 +18,7 @@ import type {
 import { GiftSetCardAddon, GiftSetCardSummary } from "../../components/GiftSetCardSection";
 import { GiftSetThumbnail } from "../../components/GiftSetThumbnail";
 import { canAddGift, packGifts } from "../../../lib/gift-packing";
+import { GiftBox3dReview } from "./GiftBox3dReview";
 
 type BuilderStep = "start" | "build" | "complete";
 
@@ -92,6 +94,7 @@ export default function GiftBuilderClient() {
   const [categoryFilter, setCategoryFilter] = useState<GiftElement["category"] | "all">("all");
   const [cardId, setCardId] = useState<string | null>(null);
   const [cardMessage, setCardMessage] = useState("");
+  const [assetsByProductId, setAssetsByProductId] = useState<Record<string, Gift3dPublicAsset>>({});
   const corporateAutoStarted = useRef(false);
 
   useLayoutEffect(() => {
@@ -110,6 +113,12 @@ export default function GiftBuilderClient() {
       .then((data: GiftBuilderCatalog) => setCatalog(data))
       .catch(() => setStatus("Could not load the gift builder. Please refresh."))
       .finally(() => setLoading(false));
+    void fetch("/api/gift-3d-assets", { cache: "no-store" })
+      .then((res) => res.json())
+      .then((data: { assets?: Record<string, Gift3dPublicAsset> }) => {
+        setAssetsByProductId(data.assets ?? {});
+      })
+      .catch(() => setAssetsByProductId({}));
   }, []);
 
   useLayoutEffect(() => {
@@ -520,6 +529,8 @@ export default function GiftBuilderClient() {
     const isActivePick = slots[activeSlot] === element.id;
     const selectedWithoutActive = selectedElements.filter((item) => item.id !== slots[activeSlot]);
     const fits = isEquipped || (selectedBox ? canAddGift(selectedBox, selectedWithoutActive, element) : false);
+    const hasMesh = Boolean(assetsByProductId[element.productId]?.glbUrl);
+    const show3dBadge = Boolean(element.image);
     return (
       <button
         key={element.id}
@@ -529,9 +540,13 @@ export default function GiftBuilderClient() {
         }`}
         onClick={() => selectElement(element.id)}
         disabled={!fits}
-        title={element.description}
+        title={hasMesh ? `${element.description} · 3D mesh ready` : `${element.description} · 3D preview`}
       >
-        <span className="gift-builder-inv-thumb" style={{ backgroundImage: `url(${element.image})` }} />
+        <span className="gift-builder-inv-thumb" style={{ backgroundImage: `url(${element.image})` }}>
+          {show3dBadge ? (
+            <span className={`gift-builder-inv-3d${hasMesh ? " is-mesh" : ""}`}>{hasMesh ? "3D ready" : "3D"}</span>
+          ) : null}
+        </span>
         <span className="gift-builder-inv-body">
           <strong>{element.name}</strong>
           <span>{formatItemPrice(element.price)}</span>
@@ -910,6 +925,18 @@ export default function GiftBuilderClient() {
                 </aside>
 
                 <div className="gift-builder-loadout-center">
+                  <GiftBox3dReview
+                    box={selectedBox}
+                    elements={selectedElements}
+                    packed={packingResult.packed}
+                    activeElementId={slots[activeSlot] || null}
+                    assetsByProductId={assetsByProductId}
+                    onSelectElement={(elementId) => {
+                      const index = slots.indexOf(elementId);
+                      if (index >= 0) setActiveSlot(index);
+                    }}
+                  />
+
                   <div className="gift-builder-size-pickers" aria-label="Choose a gift by size">
                     {(["small", "medium", "large"] as const).map((size) => {
                       const options = catalog.elements.filter((element) => element.sizeGroup === size && (slots.includes(element.id) || canAddGift(selectedBox, selectedElements, element)));
@@ -953,11 +980,6 @@ export default function GiftBuilderClient() {
 
                   <div className="gift-builder-capacity"><span><strong>{usedAreaPercent}%</strong> of the box floor used</span><span>{Math.max(0, selectedBox.slotCount - filledSlots.length)} selections remaining</span><progress max="100" value={usedAreaPercent} /></div>
 
-                  <div className="gift-builder-3d" aria-label="Angled preview of packed gift box">
-                    <span className="gift-builder-3d-label">3D review</span>
-                    <div className="gift-builder-3d-box">{packingResult.packed.map((packed) => { const element = elementMap.get(packed.elementId); return element ? <span key={packed.elementId} style={{ left: `${packed.x / selectedBox.lengthCm * 78 + 11}%`, top: `${packed.y / selectedBox.widthCm * 66 + 12}%`, width: `${packed.lengthCm / selectedBox.lengthCm * 78}%`, height: `${packed.widthCm / selectedBox.widthCm * 66}%`, backgroundImage: `url(${element.image})`, transform: `translateZ(${Math.min(34, packed.heightCm * 2)}px)` }} title={element.name} /> : null; })}</div>
-                  </div>
-
                   <div className="gift-builder-slot-bar">
                     <span>
                       Active slot: <strong>{activeSlot + 1}</strong> of {selectedBox.slotCount}
@@ -968,7 +990,7 @@ export default function GiftBuilderClient() {
                         className="gift-builder-link-btn"
                         onClick={() => clearSlot(activeSlot)}
                       >
-                        Unequip slot
+                        Remove item
                       </button>
                     ) : (
                       <span className="gift-builder-slot-hint">Choose a component from the sides</span>
@@ -982,6 +1004,13 @@ export default function GiftBuilderClient() {
                         <h4>{activeElement.name}</h4>
                         <p>{activeElement.description}</p>
                         <span>{formatItemPrice(activeElement.price)}</span>
+                        {assetsByProductId[activeElement.productId]?.glbUrl ? (
+                          <small className="gift-builder-inspect-3d">3D mesh ready</small>
+                        ) : (
+                          <small className="gift-builder-inspect-3d gift-builder-inspect-3d--plain">
+                            Photo wrap in 3D
+                          </small>
+                        )}
                       </div>
                     </div>
                   ) : null}

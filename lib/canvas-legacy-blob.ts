@@ -27,6 +27,7 @@ function extForMime(mime: string): string {
   if (mime.includes("webp")) return "webp";
   if (mime.includes("gif")) return "gif";
   if (mime.includes("svg")) return "svg";
+  if (mime.includes("gltf-binary") || mime.includes("model/gltf")) return "glb";
   return "jpg";
 }
 

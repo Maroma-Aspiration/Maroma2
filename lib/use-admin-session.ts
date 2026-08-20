@@ -35,6 +35,7 @@ export function setAdminDragPreference(enabled: boolean): void {
 /** True when the signed-in user has the admin role (verified via /api/auth/session). */
 export function useAdminSession() {
   const [isAdminUser, setIsAdminUser] = useState(false);
+  const [canEditNewsletter, setCanEditNewsletter] = useState(false);
   const [sessionReady, setSessionReady] = useState(false);
   const [adminModeEnabled, setAdminModeEnabled] = useState(false);
 
@@ -45,14 +46,18 @@ export function useAdminSession() {
         credentials: "same-origin",
       });
       const data = (await res.json()) as { user?: SessionUser | null };
-      const admin = data.user?.role === "admin";
+      const role = data.user?.role;
+      const admin = role === "admin";
+      const newsletter = role === "admin" || role === "newsletter";
       setIsAdminUser(admin);
+      setCanEditNewsletter(newsletter);
       if (!admin) {
         clearDragPreferenceIfSet();
       }
       setAdminModeEnabled(admin && readDragPreference() && !isAdminUiHidden());
     } catch {
       setIsAdminUser(false);
+      setCanEditNewsletter(false);
       clearDragPreferenceIfSet();
       setAdminModeEnabled(false);
     } finally {
@@ -84,5 +89,5 @@ export function useAdminSession() {
     };
   }, [syncDragPreference]);
 
-  return { isAdminUser, adminModeEnabled, sessionReady, refreshSession };
+  return { isAdminUser, canEditNewsletter, adminModeEnabled, sessionReady, refreshSession };
 }

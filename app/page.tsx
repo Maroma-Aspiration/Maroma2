@@ -22,7 +22,7 @@ export default async function Home({
       initialHeroVisual={initialHeroVisual}
       initialSiteContent={initialSiteContent}
       initialViewportIsMobile={initialViewportIsMobile}
-      initialSkipIntro={searchParams?.skipIntro === "1"}
+      initialSkipIntro={searchParams?.skipIntro === "1" || Boolean(searchParams?.q?.trim())}
       initialProductSearch={searchParams?.q ?? ""}
     />
   );

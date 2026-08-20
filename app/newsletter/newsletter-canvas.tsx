@@ -68,12 +68,15 @@ import {
   MASTHEAD_OVERLAY_IDS,
   canvasLayoutHeightOf,
   collectCanonicalMeasuredHeights,
+  contentOverlapsGreeting,
   firstStorySectionOverlapsGrid,
   isMastheadOverlayImage,
   measureElementHeight,
+  mergeStoryGridMeasuredHeight,
   paintOrderElements,
   pinIdsForElement,
   clearSpacingLocks,
+  pushElementsAfter,
   relayoutNewsletterCanvas,
   type RelayoutOptions,
 } from "../../lib/canvas-layout";
@@ -161,27 +164,7 @@ type MontageBounds = { minX: number; minY: number; w: number; h: number };
 const CANVAS_TOOLBAR_W = 320;
 const CANVAS_TOOLBAR_PAD = 12;
 const CANVAS_TOP_TOOLS_TOP = 80;
-const CANVAS_TOP_TOOLS_W = 320;
 const CANVAS_RIGHT_PAD = 16;
-
-function getCanvasDockObstacles(): DOMRect[] {
-  if (typeof document === "undefined") return [];
-  return [
-    ...Array.from(document.querySelectorAll(".newsletter-top-tools")),
-    ...Array.from(document.querySelectorAll(".newsletter-lifecycle-panel")),
-  ]
-    .map((node) => (node as HTMLElement).getBoundingClientRect())
-    .filter((rect) => rect.width > 0 && rect.height > 0);
-}
-
-function rectsOverlapWithPad(
-  top: number,
-  panelH: number,
-  rect: DOMRect,
-): boolean {
-  const bottom = top + Math.min(panelH, window.innerHeight - CANVAS_TOOLBAR_PAD * 2);
-  return top < rect.bottom + CANVAS_TOOLBAR_PAD && bottom > rect.top - CANVAS_TOOLBAR_PAD;
-}
 
 function clampCanvasToolbarPosition(
   left: number,
@@ -198,29 +181,18 @@ function clampCanvasToolbarPosition(
   };
 }
 
-/** Dock in the right gutter — left of the settings column when there is room. */
+/** Pin to the right of the viewport so the panel does not cover the newsletter text. */
 function defaultCanvasToolbarPosition(
   elRect: DOMRect,
   panelW: number,
   panelH: number,
 ): { left: number; top: number } {
-  const sideToolsW = Math.min(CANVAS_TOP_TOOLS_W, Math.max(240, window.innerWidth * 0.26));
-  const sideToolsLeft = window.innerWidth - CANVAS_RIGHT_PAD - sideToolsW;
-  let left = sideToolsLeft - CANVAS_TOOLBAR_PAD - panelW;
-  const newsletterRightEdge = window.innerWidth / 2 + Math.min(400, window.innerWidth * 0.42);
-  if (left < newsletterRightEdge + CANVAS_TOOLBAR_PAD) {
-    left = window.innerWidth - panelW - CANVAS_RIGHT_PAD;
-  }
-  let top = Math.max(CANVAS_TOP_TOOLS_TOP, elRect.top);
-  const obstacleLeft = getCanvasDockObstacles()
-    .filter((rect) => rectsOverlapWithPad(top, panelH, rect))
-    .reduce<number | null>((minLeft, rect) => {
-      if (minLeft == null) return rect.left;
-      return Math.min(minLeft, rect.left);
-    }, null);
-  if (obstacleLeft != null) {
-    left = Math.min(left, obstacleLeft - CANVAS_TOOLBAR_PAD - panelW);
-  }
+  const left = window.innerWidth - panelW - CANVAS_RIGHT_PAD;
+  const maxH = Math.min(panelH, window.innerHeight - CANVAS_TOOLBAR_PAD * 2);
+  const top = Math.max(
+    CANVAS_TOP_TOOLS_TOP,
+    Math.min(elRect.top, window.innerHeight - maxH - CANVAS_TOOLBAR_PAD),
+  );
   return clampCanvasToolbarPosition(left, top, panelW, panelH);
 }
 
@@ -431,6 +403,13 @@ function TextElView({
     .nl-story-body-inner p:last-child { margin-bottom: 0; }
   `
     : null;
+  const greetingParaStyle =
+    el.id === "migrated-greeting"
+      ? `
+    .nl-greeting-inner p { margin: 0 0 0.75em 0; }
+    .nl-greeting-inner p:last-child { margin-bottom: 0; }
+  `
+      : null;
 
   return (
     <div
@@ -457,15 +436,18 @@ function TextElView({
     >
       {titleParaStyle ? <style>{titleParaStyle}</style> : null}
       {storyBodyParaStyle ? <style>{storyBodyParaStyle}</style> : null}
+      {greetingParaStyle ? <style>{greetingParaStyle}</style> : null}
       {editing && <InlineFormatBar containerRef={ref as React.RefObject<HTMLDivElement>} />}
       <div
         ref={ref}
         className={
           el.id === "migrated-title"
             ? "nl-title-inner"
-            : /^migrated-sb-\d+$/.test(el.id)
-              ? "nl-story-body-inner"
-              : undefined
+            : el.id === "migrated-greeting"
+              ? "nl-greeting-inner"
+              : /^migrated-sb-\d+$/.test(el.id)
+                ? "nl-story-body-inner"
+                : undefined
         }
         contentEditable={editing}
         suppressContentEditableWarning
@@ -540,6 +522,9 @@ function ImageElView({
   })();
   const ox = el.objectPositionX ?? 0;
   const oy = el.objectPositionY ?? 0;
+  const isCircle =
+    el.borderRadius >= Math.min(el.w, el.h) / 2 - 2 && Math.abs(el.w - el.h) < 8;
+  const isPortrait = el.id === "migrated-portrait" || isCircle;
 
   const handleCropPanStart = (e: React.PointerEvent) => {
     if (!canEdit || !selected || !onCropPan) return;
@@ -575,7 +560,8 @@ function ImageElView({
         isolation: "isolate",
         cursor: canEdit ? (inMontage && selected ? "default" : "grab") : "default",
         background: el.src ? undefined : "rgba(167,199,188,0.1)",
-        boxShadow: el.shadow ? "0 8px 32px rgba(0,0,0,0.45)" : undefined,
+        boxShadow: isPortrait || el.shadow ? "0 10px 32px rgba(0,0,0,0.42)" : undefined,
+        boxSizing: "border-box",
       }}
       onPointerDown={canEdit ? onPointerDown : undefined}
     >
@@ -625,14 +611,16 @@ function ImageElView({
 }
 
 function DividerElView({
-  el, selected, canEdit, onPointerDown, layoutMinY = 0,
+  el, selected, canEdit, onPointerDown, layoutMinY = 0, outerRef,
 }: {
   el: CanvasDividerEl; selected: boolean; canEdit: boolean;
   onPointerDown?: (e: React.PointerEvent) => void;
   layoutMinY?: number;
+  outerRef?: React.Ref<HTMLDivElement>;
 }) {
   return (
     <div
+      ref={outerRef}
       className={`nl-canvas-el${selected ? " is-selected" : ""}`}
       style={{
         position: "absolute", left: el.x, top: el.y - layoutMinY, width: el.w,
@@ -655,13 +643,14 @@ function DividerElView({
 // ─── CTA button element ───────────────────────────────────────────────────────
 
 function CtaElView({
-  el, selected, canEdit, onPointerDown, layoutMinY = 0,
+  el, selected, canEdit, onPointerDown, layoutMinY = 0, outerRef,
 }: {
   el: CanvasCtaEl;
   selected: boolean;
   canEdit: boolean;
   onPointerDown?: (e: React.PointerEvent) => void;
   layoutMinY?: number;
+  outerRef?: React.Ref<HTMLDivElement>;
 }) {
   const cssVars = {
     "--cta-from": el.bgFrom,
@@ -675,6 +664,7 @@ function CtaElView({
 
   return (
     <div
+      ref={outerRef}
       className={`nl-canvas-el nl-cta-wrapper${selected ? " is-selected" : ""}`}
       style={{
         position: "absolute",
@@ -704,16 +694,18 @@ function CtaElView({
 // ─── Story grid element ───────────────────────────────────────────────────────
 
 function StoryGridElView({
-  el, selected, canEdit, onPointerDown, layoutMinY = 0,
+  el, selected, canEdit, onPointerDown, layoutMinY = 0, outerRef,
 }: {
   el: CanvasStoryGridEl;
   selected: boolean;
   canEdit: boolean;
   onPointerDown?: (e: React.PointerEvent) => void;
   layoutMinY?: number;
+  outerRef?: React.Ref<HTMLDivElement>;
 }) {
   return (
     <div
+      ref={outerRef}
       className={`nl-canvas-el nl-story-grid-el${selected ? " is-selected" : ""}`}
       style={{
         position: "absolute",
@@ -722,7 +714,8 @@ function StoryGridElView({
         zIndex: el.zIndex,
         cursor: canEdit ? "move" : "default",
         boxSizing: "border-box",
-        padding: "0 28px",
+        // Keep top padding so the heading clears the greeting above (CSS .nl-story-grid-el).
+        padding: "36px 28px 40px",
       }}
       onPointerDown={canEdit ? onPointerDown : undefined}
     >
@@ -1359,25 +1352,62 @@ export const NewsletterCanvas = forwardRef<NewsletterCanvasHandle, CanvasProps>(
   const elRefs = useRef<Map<string, HTMLDivElement>>(new Map());
 
   const applyStorySpacing = useCallback(
-    (els: CanvasEl[]) => {
+    (els: CanvasEl[], measuredHeights?: Record<string, number>) => {
       return layoutNewsletterCanvas(
-        { elements: els, measuredHeights: canvas.measuredHeights, storySpacingGaps: gaps },
+        {
+          elements: els,
+          measuredHeights: measuredHeights ?? canvas.measuredHeights,
+          storySpacingGaps: gaps,
+        },
         gaps,
       ).elements;
     },
     [gaps, canvas.measuredHeights],
   );
 
+  const collectDomMeasuredHeights = useCallback((): Record<string, number> => {
+    const out: Record<string, number> = {};
+    for (const [id, node] of elRefs.current) {
+      const h = Math.ceil(node.getBoundingClientRect().height);
+      if (h > 0) out[id] = h;
+    }
+    return out;
+  }, []);
+
   const collectMeasuredHeights = useCallback((): Record<string, number> => {
-    const enforced = applyStorySpacing(elementsRef.current);
-    return collectCanonicalMeasuredHeights(enforced, canvas.measuredHeights);
-  }, [applyStorySpacing, canvas.measuredHeights]);
+    const domHeights = collectDomMeasuredHeights();
+    const merged: Record<string, number> = { ...(canvas.measuredHeights ?? {}) };
+    for (const el of elementsRef.current) {
+      const est = measureElementHeight(el);
+      const dom = domHeights[el.id] ?? 0;
+      const prev = merged[el.id] ?? 0;
+      if (el.kind === "story-grid") {
+        merged[el.id] = mergeStoryGridMeasuredHeight(est, dom, prev);
+      } else {
+        merged[el.id] = Math.max(est, dom, prev);
+      }
+    }
+    const enforced = applyStorySpacing(elementsRef.current, merged);
+    return collectCanonicalMeasuredHeights(enforced, merged);
+  }, [applyStorySpacing, canvas.measuredHeights, collectDomMeasuredHeights]);
 
   const displayElements = useMemo(() => {
     if (draggingIdRef.current || resizingIdRef.current) return paintOrderElements(elements);
-    return paintOrderElements(applyStorySpacing(elements));
+    const domHeights = collectDomMeasuredHeights();
+    const merged: Record<string, number> = { ...(canvas.measuredHeights ?? {}) };
+    for (const el of elements) {
+      const est = measureElementHeight(el);
+      const dom = domHeights[el.id] ?? 0;
+      const prev = merged[el.id] ?? 0;
+      if (el.kind === "story-grid") {
+        merged[el.id] = mergeStoryGridMeasuredHeight(est, dom, prev);
+      } else {
+        merged[el.id] = Math.max(est, dom, prev);
+      }
+    }
+    return paintOrderElements(applyStorySpacing(elements, merged));
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [elements, dragTick, resizeTick, applyStorySpacing]);
+  }, [elements, dragTick, resizeTick, applyStorySpacing, canvas.measuredHeights, collectDomMeasuredHeights]);
 
   const layoutMinY = useMemo(
     () => (displayElements.length === 0 ? 0 : Math.min(0, ...displayElements.map((e) => e.y))),
@@ -1391,7 +1421,6 @@ export const NewsletterCanvas = forwardRef<NewsletterCanvasHandle, CanvasProps>(
   // Placement mode: user picked an element type from the menu and must click to place it
   const [pendingKind, setPendingKind] = useState<string | null>(null);
   const [ghostY, setGhostY] = useState<number>(0);
-  const [addMenuOpen, setAddMenuOpen] = useState(false);
   const uploadRefs = useRef<Map<string, React.RefObject<HTMLInputElement>>>(new Map());
   const clipboardRef = useRef<CanvasEl | null>(null);
   // Guards against re-entrant reflow loops
@@ -1459,7 +1488,19 @@ export const NewsletterCanvas = forwardRef<NewsletterCanvasHandle, CanvasProps>(
       relayoutOpts?: RelayoutOptions,
     ) => {
       const g = gapOverrides ?? storySpacingGaps ?? DEFAULT_STORY_SPACING_GAPS;
-      const heightOf = canvasLayoutHeightOf(canvas.measuredHeights);
+      const domHeights = collectDomMeasuredHeights();
+      const mergedHeights: Record<string, number> = { ...(canvas.measuredHeights ?? {}) };
+      for (const el of next) {
+        const est = measureElementHeight(el);
+        const dom = domHeights[el.id] ?? 0;
+        const prev = mergedHeights[el.id] ?? 0;
+        if (el.kind === "story-grid") {
+          mergedHeights[el.id] = mergeStoryGridMeasuredHeight(est, dom, prev);
+        } else {
+          mergedHeights[el.id] = Math.max(est, dom, prev);
+        }
+      }
+      const heightOf = canvasLayoutHeightOf(mergedHeights);
 
       isReflowingRef.current = true;
       const base = relayoutOpts?.compact ? clearSpacingLocks(next) : next;
@@ -1467,12 +1508,12 @@ export const NewsletterCanvas = forwardRef<NewsletterCanvasHandle, CanvasProps>(
         compact: true,
         ...relayoutOpts,
       });
-      upd({ elements: stacked });
+      upd({ elements: stacked, measuredHeights: collectCanonicalMeasuredHeights(stacked, mergedHeights) });
       requestAnimationFrame(() => {
         isReflowingRef.current = false;
       });
     },
-    [upd, storySpacingGaps, canvas.measuredHeights],
+    [upd, storySpacingGaps, canvas.measuredHeights, collectDomMeasuredHeights],
   );
 
   const elementsRef = useRef(elements);
@@ -1569,13 +1610,16 @@ export const NewsletterCanvas = forwardRef<NewsletterCanvasHandle, CanvasProps>(
   useLayoutEffect(() => {
     if (!canEdit || isReflowingRef.current || draggingIdRef.current || resizingIdRef.current) return;
 
-    const enforced = applyStorySpacing(elementsRef.current);
     const measuredHeights = collectMeasuredHeights();
-    const heightOf = canvasLayoutHeightOf(canvas.measuredHeights);
+    const heightOf = canvasLayoutHeightOf(measuredHeights);
+    const enforced = applyStorySpacing(elementsRef.current, measuredHeights);
 
-    if (firstStorySectionOverlapsGrid(enforced, heightOf)) {
+    if (
+      contentOverlapsGreeting(enforced, heightOf) ||
+      firstStorySectionOverlapsGrid(enforced, heightOf)
+    ) {
       isReflowingRef.current = true;
-      finishUpdRef.current(elementsRef.current);
+      finishUpdRef.current(enforced, gaps);
       requestAnimationFrame(() => {
         isReflowingRef.current = false;
       });
@@ -1769,6 +1813,28 @@ export const NewsletterCanvas = forwardRef<NewsletterCanvasHandle, CanvasProps>(
         return;
       }
       upd({ elements: applyCompact(withLock, target) }, opts);
+      return;
+    }
+
+    // Text / greeting growth: push everything below so Laura's letter opens space.
+    if (
+      target &&
+      isText(target) &&
+      patchNeedsRelayout(patch) &&
+      ("html" in patch || "fontSize" in patch || "lineHeight" in patch || "w" in patch)
+    ) {
+      const nextEl = { ...target, ...patch } as CanvasTextEl;
+      const oldH = measureElementHeight(target);
+      const newH = measureElementHeight(nextEl);
+      const delta = newH - oldH;
+      let els = withLock;
+      if (Math.abs(delta) >= 1) {
+        els = pushElementsAfter(els, id, delta, new Set());
+      }
+      const measuredHeights = { ...(canvasSnapshotRef.current.measuredHeights ?? {}) };
+      delete measuredHeights[id];
+      measuredHeights[id] = newH;
+      upd({ elements: els, measuredHeights }, opts);
       return;
     }
 
@@ -2135,7 +2201,6 @@ export const NewsletterCanvas = forwardRef<NewsletterCanvasHandle, CanvasProps>(
       }
       if (e.key === "Escape") {
         setPendingKind(null);
-        setAddMenuOpen(false);
       }
     };
     window.addEventListener("keydown", handler);
@@ -2211,89 +2276,27 @@ export const NewsletterCanvas = forwardRef<NewsletterCanvasHandle, CanvasProps>(
 
   useImperativeHandle(ref, () => ({ compactSpacing, restoreMontages }), [compactSpacing, restoreMontages]);
 
-  const addBar = canEdit ? (
-    <div className="nl-canvas-addbar" style={{ position: "relative" }}>
-      {pendingKind ? (
-        <div className="nl-canvas-placement-hint">
-          <span>Click on the canvas to place · <kbd>Esc</kbd> to cancel</span>
-          <button type="button" className="nl-canvas-add-btn" onClick={() => setPendingKind(null)}>✕ Cancel</button>
-        </div>
-      ) : (
-        <>
-          <div style={{ position: "relative", display: "inline-block" }}>
-            <button
-              type="button"
-              className="nl-canvas-add-btn nl-canvas-add-main"
-              onClick={() => setAddMenuOpen((v) => !v)}
-            >
-              + ADD ELEMENT ▾
-            </button>
-            {addMenuOpen && (
-              <div className="nl-canvas-add-dropdown">
-                {ADD_MENU_ITEMS.map(({ kind, label, icon }) => (
-                  <button
-                    key={kind}
-                    type="button"
-                    className="nl-canvas-add-dropdown-item"
-                    onClick={() => { setPendingKind(kind); setAddMenuOpen(false); }}
-                  >
-                    <span className="nl-canvas-add-dropdown-icon">{icon}</span>
-                    {label}
-                  </button>
-                ))}
-              </div>
-            )}
-          </div>
-          <button
-            type="button"
-            className="nl-canvas-add-btn"
-            title="Undo last change (⌘Z)"
-            disabled={!canUndo}
-            onClick={undo}
-          >
-            ↶ Undo
-          </button>
-          <button
-            type="button"
-            className="nl-canvas-add-btn"
-            title="Redo (⌘⇧Z)"
-            disabled={!canRedo}
-            onClick={redo}
-          >
-            ↷ Redo
-          </button>
-          <button
-            type="button"
-            className="nl-canvas-add-btn"
-            title="Auto-stack all elements vertically (optional; drag freely otherwise)"
-            onClick={() => compactSpacing(storySpacingGaps)}
-          >
-            ⇕ Apply spacing
-          </button>
-        </>
-      )}
-    </div>
-  ) : null;
-
   const isVisualPreview = Boolean(visualPreview);
+  const fitToWidth = isVisualPreview || !canEdit;
   const previewOuterRef = useRef<HTMLDivElement>(null);
-  const [fitPreviewWidth, setFitPreviewWidth] = useState(visualPreview?.width ?? 600);
+  const [fitPreviewWidth, setFitPreviewWidth] = useState(visualPreview?.width ?? CANVAS_W);
 
   useLayoutEffect(() => {
-    if (!visualPreview) return;
+    if (!fitToWidth) return;
     const el = previewOuterRef.current;
     if (!el) return;
+    const cap = visualPreview?.width ?? CANVAS_W;
     const measure = () => {
       const w = el.clientWidth;
-      setFitPreviewWidth(Math.min(visualPreview.width, w > 0 ? w : visualPreview.width));
+      setFitPreviewWidth(Math.min(cap, w > 0 ? w : cap));
     };
     measure();
     const ro = new ResizeObserver(measure);
     ro.observe(el);
     return () => ro.disconnect();
-  }, [visualPreview?.width, visualPreview]);
+  }, [fitToWidth, visualPreview?.width]);
 
-  const previewScale = visualPreview ? fitPreviewWidth / CANVAS_W : 1;
+  const previewScale = fitToWidth ? fitPreviewWidth / CANVAS_W : 1;
   const previewBg = visualPreview?.backgroundColor?.trim() || "#10151c";
 
   const canvasSurface = (
@@ -2414,12 +2417,12 @@ export const NewsletterCanvas = forwardRef<NewsletterCanvasHandle, CanvasProps>(
           }
 
           if (isDivider(el)) return (
-            <div key={el.id} ref={setRef}>
-              <DividerElView
-                el={el} selected={sel} canEdit={canEdit} layoutMinY={layoutMinY}
-                onPointerDown={(e) => handlePointerDown(el.id, e)}
-              />
-            </div>
+            <DividerElView
+              key={el.id}
+              outerRef={setRef}
+              el={el} selected={sel} canEdit={canEdit} layoutMinY={layoutMinY}
+              onPointerDown={(e) => handlePointerDown(el.id, e)}
+            />
           );
 
           if (isStoryGrid(el)) {
@@ -2437,22 +2440,22 @@ export const NewsletterCanvas = forwardRef<NewsletterCanvasHandle, CanvasProps>(
               }),
             };
             return (
-              <div key={el.id} ref={setRef}>
-                <StoryGridElView
-                  el={enrichedEl} selected={sel} canEdit={canEdit} layoutMinY={layoutMinY}
-                  onPointerDown={(e) => handlePointerDown(el.id, e)}
-                />
-              </div>
+              <StoryGridElView
+                key={el.id}
+                outerRef={setRef}
+                el={enrichedEl} selected={sel} canEdit={canEdit} layoutMinY={layoutMinY}
+                onPointerDown={(e) => handlePointerDown(el.id, e)}
+              />
             );
           }
 
           if (isCta(el)) return (
-            <div key={el.id} ref={setRef}>
-              <CtaElView
-                el={el} selected={sel} canEdit={canEdit} layoutMinY={layoutMinY}
-                onPointerDown={(e) => handlePointerDown(el.id, e)}
-              />
-            </div>
+            <CtaElView
+              key={el.id}
+              outerRef={setRef}
+              el={el} selected={sel} canEdit={canEdit} layoutMinY={layoutMinY}
+              onPointerDown={(e) => handlePointerDown(el.id, e)}
+            />
           );
 
           return null;
@@ -2512,14 +2515,14 @@ export const NewsletterCanvas = forwardRef<NewsletterCanvasHandle, CanvasProps>(
       </div>
   );
 
-  if (isVisualPreview && visualPreview) {
+  if (fitToWidth) {
     const scaledH = Math.ceil(h * previewScale);
     return (
       <div
         ref={previewOuterRef}
-        className="nl-canvas-visual-preview"
-        style={{ width: "100%", maxWidth: visualPreview.width, height: scaledH }}
-        aria-hidden
+        className={isVisualPreview ? "nl-canvas-visual-preview" : "nl-canvas-outer nl-canvas-fit"}
+        style={{ width: "100%", maxWidth: visualPreview?.width ?? CANVAS_W, height: scaledH }}
+        aria-hidden={isVisualPreview || undefined}
       >
         <div
           className="nl-canvas-visual-preview-scaler"
@@ -2528,9 +2531,9 @@ export const NewsletterCanvas = forwardRef<NewsletterCanvasHandle, CanvasProps>(
             height: h,
             transform: `scale(${previewScale})`,
             transformOrigin: "top left",
-            background: previewBg,
+            background: isVisualPreview ? previewBg : undefined,
             position: "relative",
-            pointerEvents: "none",
+            pointerEvents: isVisualPreview ? "none" : undefined,
           }}
         >
           {canvasSurface}
@@ -2541,7 +2544,6 @@ export const NewsletterCanvas = forwardRef<NewsletterCanvasHandle, CanvasProps>(
 
   return (
     <div className="nl-canvas-outer">
-      {canEdit && addBar ? <div className="nl-canvas-topbar">{addBar}</div> : null}
       {canvasSurface}
 
       {canEdit && selectedEl && (

@@ -1,16 +1,17 @@
 import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
 import { getSessionSecret, SESSION_COOKIE, verifySessionPayload } from "../../../../lib/auth-session";
+import { canEditNewsletter } from "../../../../lib/auth-roles";
 import { readStoriesState } from "../../../../lib/story-storage";
 import { ensureCanvasPublicImageUrls } from "../../../../lib/canvas-email-images";
 import { canvasToEmailHtml, canvasEmailOptionsFromState } from "../../../../lib/canvas-to-email";
 
 export async function GET(request: Request) {
-  // Auth guard — admin only
+  // Auth guard — admin or newsletter editor
   const secret = getSessionSecret();
   const token = cookies().get(SESSION_COOKIE)?.value;
   const session = secret && token ? await verifySessionPayload(token, secret) : null;
-  if (!session || session.role !== "admin") {
+  if (!session || !canEditNewsletter(session.role)) {
     return NextResponse.json({ error: "Unauthorised." }, { status: 401 });
   }
 

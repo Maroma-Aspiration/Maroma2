@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useId, useRef, type CSSProperties } from "react";
+import { useEffect, useId, useRef, useState, type CSSProperties } from "react";
 import {
   bindYouTubePlayer,
   isYouTubeUrl,
@@ -21,7 +21,85 @@ type HeroVideoMediaProps = {
   onEnded?: () => void;
   /** Fired once playback has actually started. */
   onPlaying?: () => void;
+  /** Crop as 9:16 (mobile Shorts). */
+  portrait?: boolean;
 };
+
+function HeroNativeVideo({
+  src,
+  poster,
+  objectFit,
+  loop,
+  onEnded,
+  onPlaying,
+}: {
+  src: string;
+  poster?: string;
+  objectFit?: CSSProperties["objectFit"];
+  loop: boolean;
+  onEnded?: () => void;
+  onPlaying?: () => void;
+}) {
+  const videoRef = useRef<HTMLVideoElement | null>(null);
+  const [needsTap, setNeedsTap] = useState(false);
+
+  useEffect(() => {
+    const video = videoRef.current;
+    if (!video) return;
+    video.muted = true;
+    video.playsInline = true;
+    const tryPlay = () => {
+      const play = video.play();
+      if (play && typeof play.then === "function") {
+        play.then(() => setNeedsTap(false)).catch(() => setNeedsTap(true));
+      }
+    };
+    tryPlay();
+    const timer = window.setTimeout(() => {
+      if (video.paused) setNeedsTap(true);
+    }, 1200);
+    return () => window.clearTimeout(timer);
+  }, [src]);
+
+  return (
+    <div className="hero-native-video-wrap">
+      <video
+        ref={videoRef}
+        className="hero-video"
+        autoPlay
+        muted
+        loop={loop}
+        playsInline
+        preload="auto"
+        poster={poster}
+        style={{ objectFit }}
+        onEnded={() => {
+          if (!loop) onEnded?.();
+        }}
+        onPlaying={() => {
+          setNeedsTap(false);
+          onPlaying?.();
+        }}
+      >
+        <source src={src} />
+      </video>
+      {needsTap ? (
+        <button
+          type="button"
+          className="hero-video-play"
+          onClick={() => {
+            const video = videoRef.current;
+            if (!video) return;
+            video.muted = true;
+            void video.play().then(() => setNeedsTap(false)).catch(() => undefined);
+          }}
+        >
+          Play video
+        </button>
+      ) : null}
+    </div>
+  );
+}
 
 export function HeroVideoMedia({
   src,
@@ -31,6 +109,7 @@ export function HeroVideoMedia({
   loop = true,
   onEnded,
   onPlaying,
+  portrait = false,
 }: HeroVideoMediaProps) {
   const youTubeId = isYouTubeUrl(src) ? parseYouTubeVideoId(src) : null;
   const iframeRef = useRef<HTMLIFrameElement | null>(null);
@@ -77,9 +156,10 @@ export function HeroVideoMedia({
   if (youTubeId) {
     const embedPoster = poster || youTubePosterUrl(youTubeId);
     const origin = typeof window !== "undefined" ? window.location.origin : undefined;
+    const isShort = portrait || /\/shorts\//i.test(src);
     return (
       <div
-        className={wrapClass}
+        className={`${wrapClass}${isShort ? " hero-youtube-wrap--shorts" : ""}`}
         style={embedPoster ? { backgroundImage: `url(${embedPoster})` } : undefined}
         aria-hidden="true"
       >
@@ -95,6 +175,7 @@ export function HeroVideoMedia({
           title=""
           allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
           referrerPolicy="strict-origin-when-cross-origin"
+          allowFullScreen
         />
       </div>
     );
@@ -102,21 +183,14 @@ export function HeroVideoMedia({
 
   if (src) {
     return (
-      <video
-        className="hero-video"
-        autoPlay
-        muted
-        loop={loop}
-        playsInline
+      <HeroNativeVideo
+        src={src}
         poster={poster}
-        style={{ objectFit }}
-        onEnded={() => {
-          if (!loop) onEnded?.();
-        }}
+        objectFit={objectFit}
+        loop={loop}
+        onEnded={onEnded}
         onPlaying={onPlaying}
-      >
-        <source src={src} />
-      </video>
+      />
     );
   }
 

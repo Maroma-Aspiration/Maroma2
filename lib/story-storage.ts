@@ -1,6 +1,7 @@
 import { promises as fs } from "fs";
 import path from "path";
 import { kv } from "@vercel/kv";
+import { reconcileNewsletterCanvasState } from "./canvas-reconcile-stories";
 import { syncAllBlocksToLegacy } from "./newsletter-block-legacy-sync";
 import { buildMigratedNewsletterBlocks } from "./newsletter-migrate-legacy-blocks";
 import { parseStoryImageFrame } from "./story-image-frame";
@@ -989,11 +990,17 @@ export function migrateLegacyToModular(state: StoriesState): StoriesState {
 }
 
 export async function readStoriesState(): Promise<StoriesState> {
+  let parsed: StoriesState;
   if (hasKvConfig) {
     try {
       const stored = await kv.get(storiesKvKey);
       if (stored) {
-        return parseState(stored);
+        parsed = parseState(stored);
+        const reconciled = reconcileNewsletterCanvasState(parsed);
+        if (newsletterCanvasRepaired(parsed, reconciled)) {
+          return writeStoriesState(reconciled);
+        }
+        return reconciled;
       }
     } catch {
       // fall back to file state
@@ -1001,10 +1008,25 @@ export async function readStoriesState(): Promise<StoriesState> {
   }
   try {
     const raw = await fs.readFile(storagePath, "utf8");
-    return parseState(JSON.parse(raw));
+    parsed = parseState(JSON.parse(raw));
   } catch {
-    return parseState({ ...defaultState });
+    parsed = parseState({ ...defaultState });
   }
+  const reconciled = reconcileNewsletterCanvasState(parsed);
+  if (newsletterCanvasRepaired(parsed, reconciled)) {
+    return writeStoriesState(reconciled);
+  }
+  return reconciled;
+}
+
+function newsletterCanvasRepaired(before: StoriesState, after: StoriesState): boolean {
+  const beforeCanvas = before.newsletterCanvas;
+  const afterCanvas = after.newsletterCanvas;
+  if (!afterCanvas?.enabled) return false;
+  if (JSON.stringify(beforeCanvas) !== JSON.stringify(afterCanvas)) return true;
+  const beforeStories = (before.stories ?? []).filter((s) => !s.kind || s.kind === "story").length;
+  const afterStories = (after.stories ?? []).filter((s) => !s.kind || s.kind === "story").length;
+  return afterStories > beforeStories;
 }
 
 export async function writeStoriesState(state: StoriesState): Promise<StoriesState> {

@@ -3,6 +3,8 @@ import { unstable_noStore as noStore } from "next/cache";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { getSessionSecret, SESSION_COOKIE, verifySessionPayload } from "../../lib/auth-session";
+import { canEditNewsletter } from "../../lib/auth-roles";
+import { restoreJulyIssueIfAvailable } from "../../lib/newsletter-restore-archive";
 import { readStoriesState } from "../../lib/story-storage";
 import { buildOgImageFromCanvas } from "../../lib/newsletter-archive-seo";
 import type { NewsletterBlock, StoriesState, StoryRecord } from "../../lib/story-types";
@@ -57,9 +59,13 @@ function buildOgImage(state: StoriesState): string | undefined {
   return undefined;
 }
 
+async function loadNewsletterState(): Promise<StoriesState> {
+  return (await restoreJulyIssueIfAvailable()) ?? (await readStoriesState());
+}
+
 export async function generateMetadata(): Promise<Metadata> {
   noStore();
-  const state = await readStoriesState();
+  const state = await loadNewsletterState();
   const title = buildIssueTitle(state);
   const description = buildDescription(state);
   const ogImage = buildOgImage(state);
@@ -138,22 +144,22 @@ export default async function NewsletterPage({
   searchParams?: Promise<Record<string, string | string[] | undefined>>;
 }) {
   noStore();
-  const state = await readStoriesState();
+  const state = await loadNewsletterState();
   const secret = getSessionSecret();
   const token = cookies().get(SESSION_COOKIE)?.value;
   const session = secret && token ? await verifySessionPayload(token, secret) : null;
-  const isAdmin = session?.role === "admin";
+  const canEdit = canEditNewsletter(session?.role);
   const params = (await searchParams) ?? {};
   const rawEdit = params.edit;
   const editParam = Array.isArray(rawEdit) ? rawEdit[0] : rawEdit;
   const requestedEdit = editParam === "1" || editParam === "true";
 
-  // If edit is requested but the user isn't logged in as admin, redirect to login
-  if (requestedEdit && !isAdmin) {
+  // If edit is requested but the user isn't a newsletter editor, redirect to login
+  if (requestedEdit && !canEdit) {
     redirect("/login?next=/newsletter%3Fedit%3D1");
   }
 
-  const editMode = requestedEdit && isAdmin;
+  const editMode = requestedEdit && canEdit;
   const jsonLd = buildJsonLd(state);
 
   return (
@@ -162,7 +168,12 @@ export default async function NewsletterPage({
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
       />
-      <NewsletterPageClient initialState={state} editMode={editMode} isAdmin={isAdmin} />
+      <NewsletterPageClient
+        initialState={state}
+        editMode={editMode}
+        isAdmin={session?.role === "admin"}
+        canEditNewsletter={canEdit}
+      />
     </>
   );
 }

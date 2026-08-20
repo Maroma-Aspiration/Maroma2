@@ -2,16 +2,34 @@ import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import { listAuthUsersAdmin, setAuthUserRole, createAuthUser, resetAuthUserPassword, editStoredAuthUser, deleteStoredAuthUser } from "../../../../lib/auth-user-store";
 import { getSessionSecret, SESSION_COOKIE, verifySessionPayload } from "../../../../lib/auth-session";
+import { isUserRole } from "../../../../lib/auth-roles";
+import type { UserRole } from "../../../../lib/auth-types";
+
+async function requireAdmin() {
+  const secret = getSessionSecret();
+  const token = cookies().get(SESSION_COOKIE)?.value;
+  const session = secret && token ? await verifySessionPayload(token, secret) : null;
+  if (!session || session.role !== "admin") return null;
+  return session;
+}
 
 export async function POST(request: Request) {
+  if (!(await requireAdmin())) {
+    return NextResponse.json({ error: "Admin access required." }, { status: 403 });
+  }
   let email = "";
   let password = "";
-  let role = "admin";
+  let role: UserRole = "admin";
   try {
     const body = (await request.json()) as { email?: string; password?: string; role?: string };
     email = typeof body.email === "string" ? body.email : "";
     password = typeof body.password === "string" ? body.password : "";
-    role = typeof body.role === "string" ? body.role : "admin";
+    if (typeof body.role === "string" && body.role.trim()) {
+      if (!isUserRole(body.role)) {
+        return NextResponse.json({ error: "Role must be admin, production, newsletter, or user." }, { status: 400 });
+      }
+      role = body.role;
+    }
   } catch {
     return NextResponse.json({ error: "Invalid JSON body." }, { status: 400 });
   }
@@ -19,8 +37,8 @@ export async function POST(request: Request) {
   if (!email || !password) {
     return NextResponse.json({ error: "Email and password are required." }, { status: 400 });
   }
-  if (role !== "admin" && role !== "production" && role !== "user") {
-    return NextResponse.json({ error: "Role must be admin, production, or user." }, { status: 400 });
+  if (password.trim().length < 8) {
+    return NextResponse.json({ error: "Password must be at least 8 characters." }, { status: 400 });
   }
 
   try {
@@ -36,11 +54,18 @@ export async function POST(request: Request) {
 }
 
 export async function GET() {
+  if (!(await requireAdmin())) {
+    return NextResponse.json({ error: "Admin access required." }, { status: 403 });
+  }
   const users = await listAuthUsersAdmin();
   return NextResponse.json({ users });
 }
 
 export async function PATCH(request: Request) {
+  const session = await requireAdmin();
+  if (!session) {
+    return NextResponse.json({ error: "Admin access required." }, { status: 403 });
+  }
   let body: { email?: string; newEmail?: string; role?: string; action?: string; password?: string };
   try {
     body = (await request.json()) as typeof body;
@@ -55,7 +80,7 @@ export async function PATCH(request: Request) {
 
   if (body.action === "edit_user") {
     const role = body.role;
-    if (role !== "admin" && role !== "production" && role !== "user") {
+    if (!isUserRole(role)) {
       return NextResponse.json({ error: "A valid role is required." }, { status: 400 });
     }
     try {
@@ -73,11 +98,10 @@ export async function PATCH(request: Request) {
     }
   }
 
-  // Reset password action
   if (body.action === "reset_password") {
     const password = typeof body.password === "string" ? body.password : "";
-    if (!password) {
-      return NextResponse.json({ error: "New password is required." }, { status: 400 });
+    if (password.trim().length < 8) {
+      return NextResponse.json({ error: "Password must be at least 8 characters." }, { status: 400 });
     }
     try {
       await resetAuthUserPassword(email, password);
@@ -85,13 +109,21 @@ export async function PATCH(request: Request) {
     } catch (error) {
       const message = (error as Error).message;
       if (message === "not_found") return NextResponse.json({ error: "User not found." }, { status: 404 });
+      if (message === "password_too_short") {
+        return NextResponse.json({ error: "Password must be at least 8 characters." }, { status: 400 });
+      }
+      if (message === "password_verify_failed" || message === "kv_write_verify_failed") {
+        return NextResponse.json(
+          { error: "Password could not be saved securely. Try again, or check KV storage." },
+          { status: 500 }
+        );
+      }
       return NextResponse.json({ error: "Could not reset password." }, { status: 500 });
     }
   }
 
-  // Update role action
   const role = typeof body.role === "string" ? body.role : "";
-  if (role !== "admin" && role !== "production" && role !== "user") {
+  if (!isUserRole(role)) {
     return NextResponse.json({ error: "Email and a valid role are required." }, { status: 400 });
   }
 
@@ -120,12 +152,13 @@ export async function DELETE(request: Request) {
   }
   if (!email) return NextResponse.json({ error: "Email is required." }, { status: 400 });
 
-  const secret = getSessionSecret();
-  const token = cookies().get(SESSION_COOKIE)?.value;
-  const session = secret && token ? await verifySessionPayload(token, secret) : null;
-  if (!session || session.role !== "admin") return NextResponse.json({ error: "Admin access required." }, { status: 403 });
+  const session = await requireAdmin();
+  if (!session) return NextResponse.json({ error: "Admin access required." }, { status: 403 });
   if (session.email.toLowerCase() === email) {
-    return NextResponse.json({ error: "You cannot delete the account you are currently using." }, { status: 400 });
+    return NextResponse.json(
+      { error: "Sign in as a different admin before deleting this account." },
+      { status: 400 }
+    );
   }
 
   try {

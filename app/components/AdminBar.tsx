@@ -17,11 +17,13 @@ export async function AdminBar() {
   if (!session || session.role !== "admin") return null;
 
   const links = [
-    { href: "/", label: "Home" },
-    { href: "/admin", label: "Site editor" },
+    { href: "/?skipIntro=1", label: "Home" },
     { href: "/newsletter?edit=1", label: "Newsletter" },
     { href: "/admin/products", label: "Products" },
+    { href: "/admin/gift-3d", label: "3D products" },
     { href: "/admin/b2b", label: "B2B" },
+    { href: "/admin/site", label: "Site" },
+    { href: "/admin/orders", label: "Orders" },
     { href: "/admin/users", label: "Manage users" },
   ];
 

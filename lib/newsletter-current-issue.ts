@@ -1,4 +1,3 @@
-import { buildOgImageFromCanvas } from "./newsletter-archive-seo";
 import { pickThumbnailFromCanvas } from "./newsletter-archive-utils";
 import type { NewsletterBlock, StoriesState } from "./story-types";
 
@@ -32,24 +31,8 @@ function buildCurrentIssuePreviewText(state: StoriesState): string {
 }
 
 function pickCurrentIssueThumbnail(state: StoriesState): string | undefined {
-  const fromCanvas = buildOgImageFromCanvas(state.newsletterCanvas);
-  if (fromCanvas?.trim()) return fromCanvas.trim();
-
-  const canvas = state.newsletterCanvas;
-  if (canvas?.elements?.length) {
-    for (const el of canvas.elements) {
-      if (el.kind === "image") {
-        const src = el.src?.trim();
-        if (src) return src;
-      }
-      if (el.kind === "story-grid") {
-        for (const story of el.stories ?? []) {
-          const url = story.imageUrl?.trim();
-          if (url) return url;
-        }
-      }
-    }
-  }
+  const fromCanvas = pickThumbnailFromCanvas(state.newsletterCanvas);
+  if (fromCanvas) return fromCanvas;
 
   const block = (state.newsletterBlocks ?? []).find(
     (b): b is Extract<NewsletterBlock, { kind: "image" }> => b.kind === "image" && b.images.length > 0
@@ -62,7 +45,7 @@ function pickCurrentIssueThumbnail(state: StoriesState): string | undefined {
   const story = (state.stories ?? []).find((s) => s.imageUrl?.trim() || (s.images && s.images.length > 0));
   if (story) return (story.imageUrl || story.images?.[0])?.trim() || undefined;
 
-  return pickThumbnailFromCanvas(canvas);
+  return undefined;
 }
 
 export function buildCurrentIssuePreview(state: StoriesState): CurrentIssuePreview | null {

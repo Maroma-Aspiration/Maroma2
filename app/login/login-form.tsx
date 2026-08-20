@@ -38,6 +38,7 @@ export function LoginForm() {
       const response = await fetch("/api/auth/login", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
+        credentials: "same-origin",
         body: JSON.stringify({ email, password })
       });
       const data = (await response.json()) as { ok?: boolean; role?: string; error?: string };
@@ -49,7 +50,16 @@ export function LoginForm() {
       const next =
         nextRaw && nextRaw.startsWith("/") && !nextRaw.startsWith("//") ? nextRaw : null;
       if (data.role === "admin") {
-        router.push(next ?? "/admin");
+        const dest =
+          !next || next === "/" || next === "/admin" ? "/?skipIntro=1" : next;
+        router.push(dest);
+        router.refresh();
+        return;
+      }
+      if (data.role === "newsletter") {
+        const dest =
+          next?.startsWith("/newsletter") ? next : "/newsletter?edit=1";
+        router.push(dest);
         router.refresh();
         return;
       }

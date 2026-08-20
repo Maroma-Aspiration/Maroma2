@@ -49,6 +49,9 @@ export function youTubeHeroEmbedUrl(videoId: string, options: YouTubeHeroEmbedOp
     iv_load_policy: "3",
     disablekb: "1",
     fs: "0",
+    // Legacy / best-effort — YouTube ignores most of these now; CSS crop hides the rest.
+    showinfo: "0",
+    cc_load_policy: "0",
   });
   if (loop) {
     params.set("loop", "1");

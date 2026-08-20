@@ -22,6 +22,9 @@ export default function AdminOrdersClient() {
   const [couponCode, setCouponCode] = useState("");
   const [couponType, setCouponType] = useState<"percent" | "fixed">("percent");
   const [couponValue, setCouponValue] = useState("10");
+  const [fromDate, setFromDate] = useState("");
+  const [toDate, setToDate] = useState("");
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
 
   const loadOrders = async () => {
     try {
@@ -118,10 +121,50 @@ export default function AdminOrdersClient() {
           </div>
         </div>
 
+        <div className="maroma-admin-coupon-form" style={{ marginBottom: 24 }}>
+          <h2 style={{ fontSize: "1.1rem", marginBottom: 12 }}>Export orders (Excel / CSV)</h2>
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
+            <label>
+              From
+              <input type="date" value={fromDate} onChange={(e) => setFromDate(e.target.value)} />
+            </label>
+            <label>
+              To
+              <input type="date" value={toDate} onChange={(e) => setToDate(e.target.value)} />
+            </label>
+            <button
+              type="button"
+              className="button primary button-sage"
+              onClick={() => {
+                const params = new URLSearchParams();
+                if (fromDate) params.set("from", fromDate);
+                if (toDate) params.set("to", toDate);
+                if (selectedIds.length) params.set("ids", selectedIds.join(","));
+                window.location.href = `/api/admin/orders/export?${params.toString()}`;
+              }}
+            >
+              Export {selectedIds.length ? "selected" : "range"}
+            </button>
+            {selectedIds.length ? (
+              <button type="button" className="button secondary" onClick={() => setSelectedIds([])}>
+                Clear selection
+              </button>
+            ) : null}
+          </div>
+        </div>
+
         <div style={{ overflowX: "auto" }}>
           <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "0.9rem" }}>
             <thead>
               <tr>
+                <th align="left">
+                  <input
+                    type="checkbox"
+                    checked={orders.length > 0 && selectedIds.length === orders.length}
+                    onChange={(e) => setSelectedIds(e.target.checked ? orders.map((o) => o.id) : [])}
+                    aria-label="Select all orders"
+                  />
+                </th>
                 <th align="left">Order</th>
                 <th align="left">Customer</th>
                 <th align="left">Status</th>
@@ -132,6 +175,18 @@ export default function AdminOrdersClient() {
             <tbody>
               {orders.map((order) => (
                 <tr key={order.id} style={{ borderTop: "1px solid #ddd" }}>
+                  <td style={{ padding: "10px 8px" }}>
+                    <input
+                      type="checkbox"
+                      checked={selectedIds.includes(order.id)}
+                      onChange={(e) =>
+                        setSelectedIds((current) =>
+                          e.target.checked ? [...current, order.id] : current.filter((id) => id !== order.id)
+                        )
+                      }
+                      aria-label={`Select ${order.orderNumber}`}
+                    />
+                  </td>
                   <td style={{ padding: "10px 8px" }}>
                     <strong>{order.orderNumber}</strong>
                     <br />

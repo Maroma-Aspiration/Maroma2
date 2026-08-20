@@ -1,14 +1,11 @@
 import type { UserRole } from "./auth-types";
+import { isUserRole } from "./auth-roles";
 
 export type AuthUserRow = {
   email: string;
   password: string;
   role: UserRole;
 };
-
-function isUserRole(value: unknown): value is UserRole {
-  return value === "admin" || value === "production" || value === "user";
-}
 
 export function normalizeAuthEmail(email: string): string {
   return email.trim().toLowerCase();

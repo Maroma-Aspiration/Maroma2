@@ -4,6 +4,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ProductPdpBuyRow } from "../../components/ProductPdpBuyRow";
 import { ProductPdpGallery } from "../../components/ProductPdpGallery";
+import { ProductReviews } from "../../components/ProductReviews";
 import { ProductAdminToolbar } from "../../components/ProductAdminToolbar";
 import { JsonLd } from "../../components/JsonLd";
 import { CurrencyPrice } from "../../components/CurrencyPrice";
@@ -17,6 +18,8 @@ import { getDisplayImageUrl } from "../../../lib/product-image";
 import { getSuggestedProducts } from "../../../lib/product-suggestions";
 import { getAvailableStock } from "../../../lib/commerce-stock";
 import { categoryBySlug } from "../../../lib/catalog-categories";
+import { readGift3dAssetsStore, toPublicGift3dAssets } from "../../../lib/gift-3d-assets-store";
+import { isGift3dPreviewProduct } from "../../../lib/gift-builder-catalog";
 import {
   auditProductSeoFacts,
   breadcrumbJsonLd,
@@ -88,11 +91,14 @@ function SuggestedCard({ product }: { product: ProductRecord }) {
 }
 
 export default async function ProductPage({ params, searchParams }: Props) {
-  const [{ product, isDraftPreview }, { products: liveProducts }, isAdmin, stockQty] = await Promise.all([
+  const [{ product, isDraftPreview }, { products: liveProducts }, isAdmin, stockQty, gift3dReady] = await Promise.all([
     readProductForRequest(params.id),
     readLiveStorefrontCatalog(),
     canPreviewDraftProduct(),
     getAvailableStock(params.id),
+    readGift3dAssetsStore()
+      .then((store) => Boolean(toPublicGift3dAssets(store)[params.id]?.glbUrl) || isGift3dPreviewProduct(params.id))
+      .catch(() => isGift3dPreviewProduct(params.id)),
   ]);
   if (!product) {
     notFound();
@@ -158,13 +164,15 @@ export default async function ProductPage({ params, searchParams }: Props) {
       ) : null}
       <div className="product-pdp-layout">
         <h1 className="product-pdp-title">{displayName}</h1>
-        <ProductPdpGallery images={gallery} productName={displayName} />
+        <ProductPdpGallery images={gallery} productName={displayName} ready3d={gift3dReady} />
 
         <div className="product-pdp-info">
           {subtitleText ? <p className="product-pdp-subtitle">{subtitleText}</p> : null}
           <p className="product-pdp-price"><CurrencyPrice raw={product.price} /></p>
 
           <ProductPdpBuyRow product={product} />
+
+          <ProductReviews productId={product.id} />
 
           {factRows.length > 0 ? (
             <section className="product-pdp-facts" aria-labelledby="pdp-facts-heading">

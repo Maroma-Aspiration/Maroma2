@@ -33,7 +33,9 @@ export function SignupForm() {
         return;
       }
       if (data.role === "admin") {
-        router.push("/admin");
+        router.push("/?skipIntro=1");
+      } else if (data.role === "newsletter") {
+        router.push("/newsletter?edit=1");
       } else {
         router.push("/account");
       }

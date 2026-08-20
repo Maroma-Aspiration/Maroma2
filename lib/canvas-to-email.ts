@@ -85,7 +85,7 @@ export type CanvasEmailOptions = {
   missionHeading?: string;
   missionHtml?: string;
   missionPlain?: string;
-  /** Keep absolute canvas layout (editor parity) — use in the email-preview iframe. */
+  /** Keep absolute canvas layout (editor parity). Default true so send/preview match the edit page. */
   preserveDesktopLayout?: boolean;
 };
 
@@ -102,6 +102,8 @@ export function canvasEmailOptionsFromState(
     missionHeading: state.newsletterMissionHeading,
     missionHtml: state.newsletterMissionHtml,
     missionPlain: state.newsletterMission,
+    // WYSIWYG: email uses the same absolute positions as the canvas editor.
+    preserveDesktopLayout: true,
     ...overrides,
   };
 }
@@ -193,10 +195,13 @@ function emailRenderedCropSrc(src: string, el: CanvasImageEl, ctx: RenderCtx): s
   const ox = scale(el.objectPositionX ?? 0);
   const oy = scale(el.objectPositionY ?? 0);
   const zoom = el.imageZoom ?? 1;
+  // Outbound (stacked) email: use the public Firebase/Blob URL directly.
+  // Wrapping every image in /api/newsletter/render-image breaks in inboxes when
+  // preview auth or email clients cannot reach that proxy.
+  if (stackedEmailLayout) return src;
   const needsFlatten =
     !isCircleImage(el) &&
-    (stackedEmailLayout ||
-      fit === "contain" ||
+    (fit === "contain" ||
       ox !== 0 ||
       oy !== 0 ||
       zoom !== 1);
@@ -428,7 +433,37 @@ function stackedRenderSequence(
 }
 
 function mobileEmailCss(preserveDesktopLayout = false): string {
-  if (preserveDesktopLayout) return "";
+  if (preserveDesktopLayout) {
+    return `
+    .email-mobile-viewport { container-type: inline-size; container-name: email-canvas; }
+    @media only screen and (max-width: 620px) {
+      .email-container { width: 100% !important; max-width: 100% !important; }
+      .email-canvas-cell { overflow: hidden !important; }
+      .email-mobile-viewport {
+        width: 100% !important;
+        max-width: 100% !important;
+        position: relative !important;
+        height: 0 !important;
+        padding-bottom: calc(var(--canvas-h) / var(--canvas-w) * 100%) !important;
+        overflow: hidden !important;
+      }
+      .email-canvas-root {
+        position: absolute !important;
+        top: 0 !important;
+        left: 0 !important;
+        width: calc(var(--canvas-w) * 1px) !important;
+        max-width: none !important;
+        height: calc(var(--canvas-h) * 1px) !important;
+        transform: scale(calc(100vw / (var(--canvas-w) * 1px)));
+        transform: scale(calc(100cqw / var(--canvas-w)));
+        transform-origin: top left !important;
+      }
+      .email-layer-cta a {
+        white-space: nowrap !important;
+      }
+    }
+    `;
+  }
   const desktopPortrait = MASTHEAD_DESKTOP_PORTRAIT_PX;
   const mobilePortrait = MASTHEAD_MOBILE_PORTRAIT_PX;
   const mobileHeroTextGap = MASTHEAD_MOBILE_HERO_TEXT_GAP_PX;
@@ -483,8 +518,8 @@ function mobileEmailCss(preserveDesktopLayout = false): string {
       }
       .email-story-grid-inner {
         display: grid !important;
-        grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
-        gap: 6px !important;
+        grid-template-columns: 1fr !important;
+        gap: 16px !important;
       }
       .email-story-card {
         display: flex !important;
@@ -650,8 +685,10 @@ function renderVisualImage(el: CanvasImageEl, ctx: RenderCtx, allElements: Canva
     : brCss
       ? `border-radius:${brCss};`
       : "";
-  const sh = el.shadow ? "box-shadow:0 8px 32px rgba(0,0,0,0.45);" : "";
-  const border = circle ? `border:3px solid ${ctx.emailBg};` : "";
+  const border = "";
+  const sh = el.shadow || circle
+    ? "box-shadow:0 10px 32px rgba(0,0,0,0.42);"
+    : "";
   const objPos = portraitCircle
     ? "object-position:center center;"
     : `object-position:calc(50% + ${px(scale(el.objectPositionX ?? 0))}) calc(50% + ${px(scale(el.objectPositionY ?? 0))});`;
@@ -716,6 +753,7 @@ function renderVisualCta(el: CanvasCtaEl, ctx: RenderCtx): string {
     "padding:16px 44px",
     "text-decoration:none",
     "text-align:center",
+    "white-space:nowrap",
   ]
     .filter(Boolean)
     .join(";");
@@ -798,6 +836,22 @@ function mastheadImageRadius(el: CanvasImageEl, allElements: CanvasEl[]): string
   return brCss ? `border-radius:${brCss};` : "border-radius:14px;";
 }
 
+/**
+ * Pull portrait up from below the hero so its top matches the editor.
+ * Prefer offset vs hero.y — email banner/hero use height:auto and often don't match canvas crop heights.
+ */
+function portraitPullFromHero(
+  portrait: CanvasImageEl | undefined,
+  hero: CanvasImageEl | undefined,
+  heroEmailH: number,
+  imageGap: number,
+): number {
+  if (!portrait) return Math.round(heroEmailH / 2);
+  if (!hero) return 0;
+  const aboveHeroCanvas = Math.max(0, hero.y - portrait.y);
+  return Math.max(0, Math.round(heroEmailH + imageGap + scale(aboveHeroCanvas)));
+}
+
 function renderEmailMastheadTable(
   elements: CanvasEl[],
   ctx: RenderCtx,
@@ -819,38 +873,53 @@ function renderEmailMastheadTable(
   const banner = top ?? logo;
   if (!banner && !hero && !portrait) return "";
 
-  const imageGap = MASTHEAD_IMAGE_GAP_PX;
-  const portraitPx = MASTHEAD_DESKTOP_PORTRAIT_PX;
-  const portraitHalf = Math.round(portraitPx / 2);
-  const mobileHalf = Math.round(MASTHEAD_MOBILE_PORTRAIT_PX / 2);
+  const imageGap = 0;
+  const portraitPx = Math.round(
+    ((portrait?.w || MASTHEAD_PORTRAIT_SIZE) / CANVAS_W) * EMAIL_W,
+  );
+  const mobilePortraitPx = Math.round(portraitPx * (MASTHEAD_MOBILE_EMAIL_W / EMAIL_W));
   const bodyGap = px(MASTHEAD_MOBILE_BODY_GAP_PX);
 
+  // Lock masthead heights to canvas aspect so layout matches the editor (not intrinsic photo ratio).
+  const bannerH =
+    banner?.w && banner?.h ? Math.round((banner.h / banner.w) * EMAIL_W) : 0;
   const heroH = hero?.w && hero?.h ? Math.round((hero.h / hero.w) * EMAIL_W) : 0;
-  const heroHMobile = hero?.w && hero?.h ? Math.round((hero.h / hero.w) * MASTHEAD_MOBILE_EMAIL_W) : 0;
-  const portraitPullDesktop = heroH + portraitHalf;
-  const portraitPullMobile = heroHMobile + mobileHalf;
+  const bannerHMobile =
+    banner?.w && banner?.h ? Math.round((banner.h / banner.w) * MASTHEAD_MOBILE_EMAIL_W) : 0;
+  const heroHMobile =
+    hero?.w && hero?.h ? Math.round((hero.h / hero.w) * MASTHEAD_MOBILE_EMAIL_W) : 0;
+
+  const portraitPullDesktop = portraitPullFromHero(portrait, hero, heroH, imageGap);
+  const portraitPullMobile = portraitPullFromHero(portrait, hero, heroHMobile, imageGap);
 
   const bannerSrc = banner?.src ? resolveImageSrc(banner.src, ctx) : "";
   const heroSrc = hero?.src ? resolveImageSrc(hero.src, ctx) : "";
   const portraitSrc = portrait?.src ? resolveImageSrc(portrait.src, ctx) : "";
 
-  const bannerBr = banner ? mastheadImageRadius(banner, allElements) : "";
-  const heroBr = hero ? mastheadImageRadius(hero, allElements) : "";
-  const portraitBorder = `border:3px solid ${ctx.emailBg};`;
+  const bannerBr = "border-radius:0;";
+  const heroBr =
+    hero && hero.borderRadius > 0
+      ? `border-radius:${Math.round((hero.borderRadius / CANVAS_W) * EMAIL_W)}px;`
+      : "border-radius:0;";
+  // Edit window: drop shadow only — no aqua outline on the portrait.
+  const portraitShadow = "box-shadow:0 10px 32px rgba(0,0,0,0.42);";
 
   const bannerRow = bannerSrc
     ? `<tr>
         <td align="center" style="padding:0;line-height:0;font-size:0;mso-line-height-rule:exactly;">
           <img class="email-img-el email-masthead-banner-img" src="${esc(bannerSrc)}" alt="" width="${EMAIL_W}"
-            style="display:block;width:100%;max-width:${EMAIL_W}px;height:auto;border:0;${bannerBr}" />
+            ${bannerH ? `height="${bannerH}"` : ""}
+            style="display:block;width:100%;max-width:100%;${bannerH ? `height:${bannerH}px;` : "height:auto;"}object-fit:cover;object-position:center center;border:0;outline:none;${bannerBr}" />
         </td>
       </tr>`
     : "";
 
   const portraitImg = portraitSrc
-    ? `<img class="email-img-el email-masthead-portrait-img" src="${esc(portraitSrc)}" alt=""
-        width="${portraitPx}" height="${portraitPx}"
-        style="display:block;width:${portraitPx}px;height:${portraitPx}px;max-width:${portraitPx}px;border:0;border-radius:50%;object-fit:cover;object-position:center center;${portraitBorder}margin:-${portraitPullDesktop}px auto 0 auto;position:relative;z-index:10;" />`
+    ? `<div class="email-masthead-portrait-wrap" style="margin:-${portraitPullDesktop}px auto 0 auto;width:${portraitPx}px;height:${portraitPx}px;max-width:${portraitPx}px;border-radius:50%;overflow:hidden;position:relative;z-index:10;line-height:0;font-size:0;border:0;outline:none;${portraitShadow}">
+        <img class="email-img-el email-masthead-portrait-img" src="${esc(portraitSrc)}" alt=""
+          width="${portraitPx}" height="${portraitPx}"
+          style="display:block;width:${portraitPx}px;height:${portraitPx}px;max-width:${portraitPx}px;border:0;outline:none;border-radius:50%;object-fit:cover;object-position:center center;" />
+      </div>`
     : "";
 
   const heroPortraitBlock =
@@ -860,9 +929,9 @@ function renderEmailMastheadTable(
           ${
             heroSrc
               ? `<tr>
-                  <td class="email-masthead-hero-cell" align="center" style="padding:${imageGap}px 0 0 0;line-height:0;font-size:0;mso-line-height-rule:exactly;">
+                  <td class="email-masthead-hero-cell" align="center" style="padding:0;line-height:0;font-size:0;mso-line-height-rule:exactly;">
                     <img class="email-img-el email-masthead-hero-img" src="${esc(heroSrc)}" alt="" width="${EMAIL_W}" ${heroH ? `height="${heroH}"` : ""}
-                      style="display:block;width:100%;max-width:${EMAIL_W}px;height:auto;border:0;position:relative;z-index:1;${heroBr}" />
+                      style="display:block;width:100%;max-width:100%;${heroH ? `height:${heroH}px;` : "height:auto;"}object-fit:cover;object-position:center center;border:0;outline:none;position:relative;z-index:1;${heroBr}" />
                   </td>
                 </tr>`
               : ""
@@ -893,14 +962,28 @@ function renderEmailMastheadTable(
   const portraitMobileCss = portraitSrc
     ? `<style type="text/css">
     @media only screen and (max-width:620px) {
-      .email-masthead-table .email-masthead-portrait-img {
-        margin-top:-${portraitPullMobile}px !important;
-        position:relative !important;
-        z-index:10 !important;
+      .email-masthead-table .email-masthead-banner-img {
+        ${bannerHMobile ? `height:${bannerHMobile}px !important;` : ""}
+        object-fit:cover !important;
       }
       .email-masthead-table .email-masthead-hero-img {
+        ${heroHMobile ? `height:${heroHMobile}px !important;` : ""}
+        object-fit:cover !important;
         position:relative !important;
         z-index:1 !important;
+      }
+      .email-masthead-table .email-masthead-portrait-wrap {
+        width:${mobilePortraitPx}px !important;
+        height:${mobilePortraitPx}px !important;
+        max-width:${mobilePortraitPx}px !important;
+        margin-top:-${portraitPullMobile}px !important;
+      }
+      .email-masthead-table .email-masthead-portrait-img {
+        width:${mobilePortraitPx}px !important;
+        height:${mobilePortraitPx}px !important;
+        max-width:${mobilePortraitPx}px !important;
+        border:0 !important;
+        outline:none !important;
       }
       .email-masthead-table .email-masthead-banner-img {
         position:relative !important;
@@ -1212,7 +1295,7 @@ export function canvasToEmailHtml(
     missionHeading,
     missionHtml,
     missionPlain,
-    preserveDesktopLayout = false,
+    preserveDesktopLayout = true,
   } = options;
 
   const EMAIL_BG = safeColor(backgroundColor, "#10151c");
@@ -1272,7 +1355,7 @@ export function canvasToEmailHtml(
   ${pixelHtml}
   <tr><td height="24" style="font-size:1px;line-height:1px;">&nbsp;</td></tr>
   <tr>
-    <td align="center" style="padding: 0 0 24px;">
+    <td align="center" style="padding: 0 20px 24px;">
       <p style="margin:0;font-family:${ctx.font};font-size:11px;color:${ctx.muted};line-height:1.6;">
         You are receiving this because you subscribed to Maroma updates.<br/>
         <a href="${esc(unsubHref)}" style="color:${ctx.muted};text-decoration:underline;">Unsubscribe</a>
@@ -1303,6 +1386,13 @@ export function canvasToEmailHtml(
     body, table, td, a { -webkit-text-size-adjust: 100%; -ms-text-size-adjust: 100%; }
     table, td { mso-table-lspace: 0pt; mso-table-rspace: 0pt; }
     img { -ms-interpolation-mode: bicubic; border: 0; height: auto; line-height: 100%; outline: none; text-decoration: none; }
+    img.email-masthead-portrait-img { border: 0 !important; outline: none !important; }
+    .email-masthead-portrait-wrap { box-shadow: 0 10px 32px rgba(0,0,0,0.42) !important; border: 0 !important; }
+    .email-masthead-table { width: 100% !important; max-width: 100% !important; }
+    .email-masthead-banner-img, .email-masthead-hero-img { width: 100% !important; max-width: 100% !important; display: block !important; }
+    .email-layer-text, .email-layer-divider, .email-layer-cta, .email-layer-story-grid, .email-mission-block {
+      padding-left: 20px; padding-right: 20px; box-sizing: border-box;
+    }
     a[x-apple-data-detectors] { color: inherit !important; text-decoration: none !important; font-size: inherit !important; }
     ${mobileEmailCss(preserveDesktopLayout)}
   </style>
@@ -1313,7 +1403,7 @@ export function canvasToEmailHtml(
   </div>
   <table width="100%" cellpadding="0" cellspacing="0" border="0" role="presentation" style="background-color:${EMAIL_BG};">
     <tr>
-      <td align="center" style="padding:20px 10px;">
+      <td align="center" style="padding:0;">
         <table class="email-container" width="${emailTableW}" cellpadding="0" cellspacing="0" border="0" role="presentation"
                style="background-color:${EMAIL_BG};max-width:${emailTableW}px;width:100%;">
           <tr>

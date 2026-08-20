@@ -347,3 +347,9 @@ export function getGiftElement(elementId: string): GiftElement | null {
     sizeGroup: def.sizeGroup ?? (def.category === "candle" ? "large" : def.category === "soap" ? "medium" : "small"),
   };
 }
+
+const GIFT_3D_PREVIEW_PRODUCT_IDS = new Set(GIFT_ELEMENT_DEFS.map((def) => def.productId));
+
+export function isGift3dPreviewProduct(productId: string): boolean {
+  return GIFT_3D_PREVIEW_PRODUCT_IDS.has(productId);
+}

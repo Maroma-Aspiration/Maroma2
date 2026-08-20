@@ -5,6 +5,7 @@ import type { AuthUserRow } from "./auth-users-config";
 import { normalizeAuthEmail, parseAuthUsersEnv } from "./auth-users-config";
 import { hashPassword, isPasswordHash, verifyPassword } from "./auth-password";
 import type { UserRole } from "./auth-types";
+import { isUserRole } from "./auth-roles";
 
 const storageDir = path.join(process.cwd(), "data");
 const storagePath = path.join(storageDir, "auth-users.json");
@@ -22,7 +23,7 @@ function parseRows(value: unknown): AuthUserRow[] {
     const email = typeof raw.email === "string" ? normalizeAuthEmail(raw.email) : "";
     const password = typeof raw.password === "string" ? raw.password : "";
     const role = raw.role;
-    if (!email || !password || (role !== "admin" && role !== "production" && role !== "user")) continue;
+    if (!email || !password || !isUserRole(role)) continue;
     out.push({ email, password, role });
   }
   return out;
@@ -48,12 +49,14 @@ export async function readStoredAuthUsers(): Promise<AuthUserRow[]> {
 export async function writeStoredAuthUsers(users: AuthUserRow[]): Promise<void> {
   const next = parseRows(users);
   if (hasKvConfig) {
-    try {
-      await kv.set(authUsersKvKey, next);
-      return;
-    } catch {
-      // fallback
+    await kv.set(authUsersKvKey, next);
+    // Verify the write landed — a silent filesystem fallback on Vercel loses passwords on the next cold start.
+    const verify = await kv.get(authUsersKvKey);
+    const verified = parseRows(verify);
+    if (verified.length !== next.length) {
+      throw new Error("kv_write_verify_failed");
     }
+    return;
   }
   await fs.mkdir(storageDir, { recursive: true });
   await fs.writeFile(storagePath, JSON.stringify(next, null, 2), "utf8");
@@ -165,11 +168,14 @@ export async function changeAuthUserPassword(
 export async function resetAuthUserPassword(email: string, newPassword: string): Promise<void> {
   const normalized = normalizeAuthEmail(email);
   if (!normalized) throw new Error("invalid_email");
-  if (!newPassword.trim()) throw new Error("invalid_password");
+  if (newPassword.trim().length < 8) throw new Error("password_too_short");
   const allUsers = await readAllAuthUsers();
   const existing = allUsers.find((u) => u.email === normalized);
   if (!existing) throw new Error("not_found");
-  await persistHashedPassword(normalized, existing.role, newPassword);
+  await persistHashedPassword(normalized, existing.role, newPassword.trim());
+  // Confirm the new password authenticates before returning success.
+  const check = await authenticateCredentialsAsync(normalized, newPassword.trim());
+  if (!check) throw new Error("password_verify_failed");
 }
 
 export async function setAuthUserRole(email: string, role: UserRole): Promise<AuthUserPublicRow> {

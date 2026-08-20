@@ -2,9 +2,15 @@ import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
 import { getSessionSecret, SESSION_COOKIE, verifySessionPayload } from "../../../../lib/auth-session";
 import { getB2bCompanyBySlug } from "../../../../lib/b2b-store";
+import {
+  isWhiteLabelCompany,
+  resolveCompanyAssortment,
+  whiteLabelDiscountRate,
+  whiteLabelMinSpendInr,
+} from "../../../../lib/b2b-pricing";
 import { decodeBasicHtmlEntities } from "../../../../lib/decode-html-entities";
 import { getDisplayImageUrl } from "../../../../lib/product-image";
-import { readMergedCatalog } from "../../../../lib/product-catalog-admin";
+import { readLiveStorefrontCatalog, readMergedCatalog } from "../../../../lib/product-catalog-admin";
 import { parseInrPriceNumber } from "../../../../lib/format-price";
 import type { ProductRecord } from "../../../../lib/product-types";
 
@@ -35,9 +41,12 @@ export async function GET(_request: Request, ctx: Ctx) {
     );
   }
 
-  const { products } = await readMergedCatalog();
+  const catalog = isWhiteLabelCompany(company)
+    ? await readLiveStorefrontCatalog()
+    : await readMergedCatalog();
+  const { products } = catalog;
   const byId = new Map<string, ProductRecord>(products.map((p) => [p.id, p]));
-  const assortment = company.assortment
+  const assortment = resolveCompanyAssortment(company, products)
     .map((item) => {
       const product = byId.get(item.productId);
       if (!product) return null;
@@ -61,6 +70,9 @@ export async function GET(_request: Request, ctx: Ctx) {
       name: company.name,
       commerceMode: company.commerceMode,
       status: company.status,
+      program: company.program,
+      whiteLabelDiscountPercent: Math.round(whiteLabelDiscountRate(company) * 100),
+      whiteLabelMinSpendInr: whiteLabelMinSpendInr(company),
       userEmail: company.userEmail,
       deliveryAddresses: company.deliveryAddresses,
     },

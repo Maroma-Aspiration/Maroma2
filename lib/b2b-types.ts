@@ -1,5 +1,6 @@
 export type B2bCommerceMode = "quote" | "checkout";
 export type B2bCompanyStatus = "pending" | "active" | "paused";
+export type B2bProgram = "custom" | "white_label";
 
 export type B2bAssortmentItem = {
   productId: string;
@@ -31,6 +32,10 @@ export type B2bCompany = {
   userEmail: string;
   commerceMode: B2bCommerceMode;
   status: B2bCompanyStatus;
+  /** White-label buyers get the full catalogue at a scheduled discount. */
+  program: B2bProgram;
+  whiteLabelDiscountPercent?: number;
+  whiteLabelMinSpendInr?: number;
   notes?: string;
   assortment: B2bAssortmentItem[];
   deliveryAddresses: B2bDeliveryAddress[];

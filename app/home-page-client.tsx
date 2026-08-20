@@ -13,6 +13,7 @@ import { SiteHeader } from "./components/SiteHeader";
 import { SignOutButton } from "./components/SignOutButton";
 import type { ProductRecord } from "../lib/product-types";
 import { isAdminUiHidden } from "../lib/admin-ui-visible";
+import { useAdminSession, setAdminDragPreference, ADMIN_DRAG_STORAGE_KEY } from "../lib/use-admin-session";
 import {
   getMaromaDesktopLikePointer,
   getMaromaForceMobileLayout,
@@ -37,6 +38,7 @@ import { buildMobilePersistenceSnapshot, MOBILE_DESIGN_WIDTH_PX } from "../lib/m
 import { mergeHeroMobileOverrides, resolveHeroMobileLayout, clampMobileRitualBandLayout } from "../lib/hero-mobile-layout";
 import { readHeroVisualLocalBackup, writeHeroVisualLocalBackup } from "../lib/hero-visual-local-backup";
 import { getVisualStateUpdatedAt, mergeHeroVisualStates } from "../lib/hero-visual-state-merge";
+import { requestShopScroll, SCROLL_TO_SHOP_EVENT } from "../lib/scroll-to-shop";
 import { parseHeroVisualState } from "../lib/hero-visual-state-parse";
 import { heroNudgeStyle } from "../lib/hero-visual-css";
 import {
@@ -218,7 +220,7 @@ export default function HomePageClient({
   initialSkipIntro = false,
   initialProductSearch = "",
 }: HomePageClientProps) {
-  const [introPhase, setIntroPhase] = useState<"playing" | "fading" | "done">(
+  const [introPhase, setIntroPhase] = useState<"playing" | "fading" | "skip-fading" | "done">(
     initialSkipIntro ? "done" : "playing"
   );
   const [introVideoReady, setIntroVideoReady] = useState(false);
@@ -255,6 +257,8 @@ export default function HomePageClient({
   const [floatingPanelPos, setFloatingPanelPos] = useState({ x: 0, y: 0 });
   const [floatingPanelMinimized, setFloatingPanelMinimized] = useState(false);
   const [adminDragEnabled, setAdminDragEnabled] = useState(false);
+  const { isAdminUser, sessionReady, refreshSession } = useAdminSession();
+  const showFloatingAdmin = sessionReady && isAdminUser && !isAdminUiHidden();
   const [saveStatus, setSaveStatus] = useState<"idle" | "saving" | "saved" | "error">("idle");
   const [bgColors, setBgColors] = useState<string[]>(initialHeroVisual.bgColors || ["#dbe3d0", "#cbd5c0", "#d6deca"]);
   const [bgAngle, setBgAngle] = useState<number>(initialHeroVisual.bgAngle || 135);
@@ -966,9 +970,27 @@ export default function HomePageClient({
   }, [content, products.length, adminMobilePreviewActive]);
 
   useEffect(() => {
-    const stored = window.localStorage.getItem("maroma-admin-drag");
+    if (!sessionReady) return;
+    if (!isAdminUser) {
+      setAdminDragEnabled(false);
+      return;
+    }
+    const stored = window.localStorage.getItem(ADMIN_DRAG_STORAGE_KEY);
     setAdminDragEnabled(stored === "true");
-  }, []);
+  }, [sessionReady, isAdminUser]);
+
+  useEffect(() => {
+    if (!isAdminUser) return;
+    const sync = () => {
+      setAdminDragEnabled(window.localStorage.getItem(ADMIN_DRAG_STORAGE_KEY) === "true");
+    };
+    window.addEventListener("maroma-admin-changed", sync);
+    window.addEventListener("storage", sync);
+    return () => {
+      window.removeEventListener("maroma-admin-changed", sync);
+      window.removeEventListener("storage", sync);
+    };
+  }, [isAdminUser]);
 
   useEffect(() => {
     const stored = window.localStorage.getItem("maroma-floating-admin-minimized");
@@ -2172,14 +2194,15 @@ export default function HomePageClient({
     window.localStorage.setItem("maroma-floating-admin-pos", JSON.stringify(next));
   };
 
-  const finishHomepageIntro = useCallback(() => {
+  const finishHomepageIntro = useCallback((mode: "end" | "skip" = "end") => {
     setIntroPhase((current) => {
       if (current !== "playing") return current;
+      const durationMs = mode === "skip" ? 400 : 4500;
       introFinishTimerRef.current = window.setTimeout(() => {
         setIntroPhase("done");
         introFinishTimerRef.current = null;
-      }, 2000);
-      return "fading";
+      }, durationMs);
+      return mode === "skip" ? "skip-fading" : "fading";
     });
   }, []);
 
@@ -2197,13 +2220,41 @@ export default function HomePageClient({
     };
   }, [initialSkipIntro]);
 
+  const skipHomepageIntroNow = useCallback(() => {
+    if (introFinishTimerRef.current) {
+      window.clearTimeout(introFinishTimerRef.current);
+      introFinishTimerRef.current = null;
+    }
+    const root = document.documentElement;
+    const body = document.body;
+    root.classList.remove("homepage-intro-active", "homepage-intro-fading", "homepage-intro-skip-fading");
+    body.classList.remove("homepage-intro-active", "homepage-intro-fading", "homepage-intro-skip-fading");
+    setIntroPhase("done");
+  }, []);
+
+  useEffect(() => {
+    if (initialSkipIntro) skipHomepageIntroNow();
+  }, [initialSkipIntro, skipHomepageIntroNow]);
+
+  useEffect(() => {
+    const onShop = () => skipHomepageIntroNow();
+    window.addEventListener(SCROLL_TO_SHOP_EVENT, onShop);
+    if (typeof window !== "undefined" && (window.location.hash === "#shop" || Boolean(initialProductSearch.trim()))) {
+      skipHomepageIntroNow();
+    }
+    return () => window.removeEventListener(SCROLL_TO_SHOP_EVENT, onShop);
+  }, [initialProductSearch, skipHomepageIntroNow]);
+
   useLayoutEffect(() => {
     const root = document.documentElement;
     const body = document.body;
     root.classList.toggle("homepage-intro-active", introPhase !== "done");
     body.classList.toggle("homepage-intro-active", introPhase !== "done");
-    root.classList.toggle("homepage-intro-fading", introPhase === "fading");
-    body.classList.toggle("homepage-intro-fading", introPhase === "fading");
+    const isFading = introPhase === "fading" || introPhase === "skip-fading";
+    root.classList.toggle("homepage-intro-fading", isFading);
+    body.classList.toggle("homepage-intro-fading", isFading);
+    root.classList.toggle("homepage-intro-skip-fading", introPhase === "skip-fading");
+    body.classList.toggle("homepage-intro-skip-fading", introPhase === "skip-fading");
     if (introPhase === "done") {
       root.style.removeProperty("--homepage-intro-reveal");
       return;
@@ -2215,7 +2266,7 @@ export default function HomePageClient({
       body.classList.toggle("homepage-intro-scroll-revealed", reveal >= 0.9);
     };
 
-    setReveal(introPhase === "fading" ? 1 : introScrollRevealRef.current);
+    setReveal(isFading ? 1 : introScrollRevealRef.current);
     if (introPhase === "playing") {
       const fadeDistance = Math.min(320, Math.max(220, window.innerHeight * 0.32));
       const homepageHoldDistance = Math.min(480, Math.max(340, window.innerHeight * 0.5));
@@ -2276,11 +2327,13 @@ export default function HomePageClient({
         root.classList.remove(
           "homepage-intro-active",
           "homepage-intro-fading",
+          "homepage-intro-skip-fading",
           "homepage-intro-scroll-revealed"
         );
         body.classList.remove(
           "homepage-intro-active",
           "homepage-intro-fading",
+          "homepage-intro-skip-fading",
           "homepage-intro-scroll-revealed"
         );
       };
@@ -3652,6 +3705,7 @@ export default function HomePageClient({
                 src={heroVideoSrcForRender}
                 poster={hero.video.poster}
                 variant="background"
+                portrait={Boolean(showMobileLayout && hero.video.mobileSrc?.trim())}
               />
             ) : null}
             <div
@@ -3722,7 +3776,14 @@ export default function HomePageClient({
               <Link href="/rituals" className="button primary button-sage">
                 {hero.ctaSecondary}
               </Link>
-              <Link href="#shop" className="button secondary">
+              <Link
+                href="/?skipIntro=1#shop"
+                className="button secondary"
+                onClick={(event) => {
+                  event.preventDefault();
+                  requestShopScroll();
+                }}
+              >
                 Search Products
               </Link>
             </div>
@@ -3778,6 +3839,7 @@ export default function HomePageClient({
                   src={heroVideoSrcForRender}
                   poster={hero.video.poster}
                   objectFit={heroPrimarySettings.fit}
+                  portrait={Boolean(showMobileLayout && hero.video.mobileSrc?.trim())}
                 />
               )}
             </div>
@@ -3883,7 +3945,7 @@ export default function HomePageClient({
     <>
       {introPhase !== "done" ? (
         <div
-          className={`homepage-video-intro${introVideoReady ? " is-video-ready" : ""}${introPhase === "fading" ? " is-fading" : ""}`}
+          className={`homepage-video-intro${introVideoReady ? " is-video-ready" : ""}${introPhase === "fading" || introPhase === "skip-fading" ? " is-fading" : ""}${introPhase === "skip-fading" ? " is-skip-fading" : ""}`}
           role="dialog"
           aria-label="Maroma introduction video"
         >
@@ -3895,6 +3957,7 @@ export default function HomePageClient({
               loop={false}
               onEnded={finishHomepageIntro}
               onPlaying={() => setIntroVideoReady(true)}
+              portrait={Boolean(showMobileLayout && hero.video.mobileSrc?.trim())}
             />
           </div>
           <div className="homepage-video-intro__loading" aria-hidden="true">
@@ -3903,7 +3966,7 @@ export default function HomePageClient({
           <button
             type="button"
             className="homepage-video-intro__skip"
-            onClick={finishHomepageIntro}
+            onClick={() => finishHomepageIntro("skip")}
           >
             Skip video
           </button>
@@ -3921,7 +3984,7 @@ export default function HomePageClient({
         pageContent
       )}
 
-      {!isAdminUiHidden() ? (
+      {showFloatingAdmin ? (
       <div
         ref={floatingPanelRef}
         className={`floating-admin-toggle${floatingPanelMinimized ? " is-minimized" : ""}${isMobileViewport ? " is-mobile-controls" : ""}${adminMobilePreviewActive ? " is-preview-docked" : ""}`}
@@ -3961,9 +4024,9 @@ export default function HomePageClient({
                     checked={adminDragEnabled}
                     onChange={(event) => {
                       const next = event.target.checked;
+                      if (!isAdminUser) return;
                       setAdminDragEnabled(next);
-                      window.localStorage.setItem("maroma-admin-drag", next ? "true" : "false");
-                      window.dispatchEvent(new Event("maroma-admin-changed"));
+                      setAdminDragPreference(next);
                     }}
                     aria-label="Toggle admin mode"
                   />
@@ -4028,7 +4091,12 @@ export default function HomePageClient({
                     : "SAVE ALL CHANGES"}
             </button>
             <div className="floating-admin-signout">
-              <SignOutButton />
+              <SignOutButton
+                onSignedOut={() => {
+                  setAdminDragEnabled(false);
+                  void refreshSession();
+                }}
+              />
             </div>
 
             {adminDragEnabled ? (
@@ -4778,9 +4846,6 @@ export default function HomePageClient({
                       Reset panel chrome
                     </button>
                   </div>
-                  <a href="/admin" className="floating-admin-link">
-                    Open Admin Page
-                  </a>
                   <button
                     type="button"
                     className="button secondary"

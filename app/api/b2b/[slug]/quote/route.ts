@@ -2,9 +2,8 @@ import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
 import { getSessionSecret, SESSION_COOKIE, verifySessionPayload } from "../../../../../lib/auth-session";
 import { appendB2bQuote, getB2bCompanyBySlug } from "../../../../../lib/b2b-store";
-import type { B2bAssortmentItem, B2bQuoteLine } from "../../../../../lib/b2b-types";
-import { readMergedCatalog } from "../../../../../lib/product-catalog-admin";
-import type { ProductRecord } from "../../../../../lib/product-types";
+import { buildB2bQuoteLines, isWhiteLabelCompany, whiteLabelMinSpendInr } from "../../../../../lib/b2b-pricing";
+import { readLiveStorefrontCatalog, readMergedCatalog } from "../../../../../lib/product-catalog-admin";
 import { resolveFromEmail, sendEmail } from "../../../../../lib/newsletter-send";
 
 type Ctx = { params: { slug: string } };
@@ -43,34 +42,12 @@ export async function POST(request: Request, ctx: Ctx) {
     return NextResponse.json({ error: "Add at least one product to the quote." }, { status: 400 });
   }
 
-  const assortmentById = new Map<string, B2bAssortmentItem>(
-    company.assortment.map((a) => [a.productId, a])
-  );
-  const { products } = await readMergedCatalog();
-  const productById = new Map<string, ProductRecord>(products.map((p) => [p.id, p]));
-
-  const lines: B2bQuoteLine[] = [];
-  for (const row of requested) {
-    const productId = typeof row.productId === "string" ? row.productId.trim() : "";
-    const qty = Math.floor(Number(row.quantity) || 0);
-    const item = assortmentById.get(productId);
-    const product = productById.get(productId);
-    if (!item || !product || qty < 1) continue;
-    if (qty < item.moq) {
-      return NextResponse.json(
-        { error: `${product.name} requires a minimum of ${item.moq}.` },
-        { status: 400 }
-      );
-    }
-    const lineTotalInr = Math.round(item.priceInr * qty * 100) / 100;
-    lines.push({
-      productId,
-      name: product.name,
-      sku: product.sku,
-      quantity: qty,
-      unitPriceInr: item.priceInr,
-      lineTotalInr,
-    });
+  const catalog = isWhiteLabelCompany(company)
+    ? await readLiveStorefrontCatalog()
+    : await readMergedCatalog();
+  const { lines, error: lineError } = buildB2bQuoteLines(company, catalog.products, requested);
+  if (lineError) {
+    return NextResponse.json({ error: lineError }, { status: 400 });
   }
 
   if (lines.length === 0) {
@@ -78,6 +55,18 @@ export async function POST(request: Request, ctx: Ctx) {
   }
 
   const subtotalInr = Math.round(lines.reduce((sum, l) => sum + l.lineTotalInr, 0) * 100) / 100;
+  const minSpend = whiteLabelMinSpendInr(company);
+  if (minSpend > 0 && subtotalInr < minSpend) {
+    return NextResponse.json(
+      {
+        error: `White-label quotes need a minimum of ₹${minSpend.toLocaleString("en-IN")}.`,
+        code: "min_spend",
+        minSpendInr: minSpend,
+        subtotalInr,
+      },
+      { status: 400 }
+    );
+  }
   const message = typeof body.message === "string" ? body.message.trim().slice(0, 2000) : "";
 
   const quote = await appendB2bQuote({

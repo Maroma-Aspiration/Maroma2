@@ -1,6 +1,7 @@
 import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
 import { getSessionSecret, SESSION_COOKIE, verifySessionPayload } from "../../../../lib/auth-session";
+import { canEditNewsletter } from "../../../../lib/auth-roles";
 import {
   appendCampaign,
   getMailingListRecipients,
@@ -13,6 +14,7 @@ import {
   siteOriginFromRequest
 } from "../../../../lib/newsletter-send";
 import { appendArchiveIssue } from "../../../../lib/newsletter-archive-storage";
+import { appendTestSnapshot } from "../../../../lib/newsletter-test-snapshot-storage";
 import {
   buildArchiveRenderMeta,
   buildArchiveSlug,
@@ -82,7 +84,7 @@ export async function POST(request: Request) {
   const sessionSecret = getSessionSecret();
   const token = cookies().get(SESSION_COOKIE)?.value;
   const session = sessionSecret && token ? await verifySessionPayload(token, sessionSecret) : null;
-  if (!session || session.role !== "admin") {
+  if (!session || !canEditNewsletter(session.role)) {
     return NextResponse.json({ error: "Unauthorised." }, { status: 401 });
   }
 
@@ -164,6 +166,8 @@ export async function POST(request: Request) {
     }
 
     let html: string;
+    let canvasForEmail: NewsletterCanvas | null = null;
+    let stateForMeta: StoriesState | null = null;
     if (plainTest) {
       html = "<p><strong>Maroma newsletter plain test</strong>: same as Postmark curl, sent from the app.</p>";
     } else {
@@ -174,30 +178,31 @@ export async function POST(request: Request) {
       }
       const fakeId = "test-subscriber";
       const urls = buildTrackedNewsletterUrls(origin, fakeId, "test-campaign", trackingSecret);
-      let canvasForEmail: NewsletterCanvas;
       try {
-        canvasForEmail = await prepareCanvasForEmail(state, origin);
+        const preparedCanvas = await prepareCanvasForEmail(state, origin);
+        canvasForEmail = preparedCanvas;
+        stateForMeta = state;
+        html = canvasToEmailHtml(
+          preparedCanvas,
+          canvasEmailOptionsFromState(state, {
+            subject,
+            previewText,
+            siteUrl: origin,
+            allowDataUrls: false,
+            storySpacingGaps,
+            tracking: {
+              pixelUrl: urls.pixelUrl,
+              unsubUrl: urls.unsubUrl,
+              viewOnlineUrl: `${origin}/newsletter/view`,
+            },
+          })
+        );
       } catch (err) {
         return NextResponse.json(
           { error: err instanceof Error ? err.message : "Could not prepare newsletter images." },
           { status: 400 }
         );
       }
-      html = canvasToEmailHtml(
-        canvasForEmail,
-        canvasEmailOptionsFromState(state, {
-          subject,
-          previewText,
-          siteUrl: origin,
-          allowDataUrls: false,
-          storySpacingGaps,
-          tracking: {
-            pixelUrl: urls.pixelUrl,
-            unsubUrl: urls.unsubUrl,
-            viewOnlineUrl: `${origin}/newsletter/view`,
-          },
-        })
-      );
     }
 
     const sentTo: string[] = [];
@@ -224,6 +229,23 @@ export async function POST(request: Request) {
         { error: failures[0]?.message ?? "Test send failed.", failures },
         { status: 500 }
       );
+    }
+
+    if (!plainTest && canvasForEmail && stateForMeta) {
+      try {
+        await appendTestSnapshot({
+          id: crypto.randomUUID(),
+          subject,
+          previewText,
+          sentAt: new Date().toISOString(),
+          thumbnailUrl: pickThumbnailFromCanvas(canvasForEmail),
+          canvas: canvasForEmail,
+          renderMeta: buildArchiveRenderMeta(stateForMeta, storySpacingGaps),
+          sentTo,
+        });
+      } catch (err) {
+        console.error("newsletter test snapshot failed", err);
+      }
     }
 
     return NextResponse.json({
@@ -272,9 +294,7 @@ export async function POST(request: Request) {
     );
   }
   const archiveSlug = buildArchiveSlug(subject, sentAt, campaignId);
-  const viewOnlineUrl = `${origin}/newsletter/archive/${archiveSlug}`;
-
-  await appendArchiveIssue({
+  const archived = await appendArchiveIssue({
     id: campaignId,
     slug: archiveSlug,
     subject,
@@ -285,6 +305,7 @@ export async function POST(request: Request) {
     renderMeta: buildArchiveRenderMeta(state, storySpacingGaps),
     recipientCount: recipients.length,
   });
+  const viewOnlineUrl = `${origin}/newsletter/archive/${archived.slug}`;
 
   await appendCampaign({
     id: campaignId,

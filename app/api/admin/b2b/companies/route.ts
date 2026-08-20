@@ -10,7 +10,7 @@ import {
   suggestB2bSlug,
   upsertB2bCompany,
 } from "../../../../../lib/b2b-store";
-import type { B2bAssortmentItem, B2bCommerceMode, B2bCompanyStatus } from "../../../../../lib/b2b-types";
+import type { B2bAssortmentItem, B2bCommerceMode, B2bCompanyStatus, B2bProgram } from "../../../../../lib/b2b-types";
 import { provisionAndEmailB2bCompanyWelcome } from "../../../../../lib/b2b-welcome-email";
 import { siteOriginFromRequest } from "../../../../../lib/newsletter-send";
 
@@ -58,6 +58,9 @@ export async function POST(request: Request) {
   const isUpdate = typeof body.id === "string" && Boolean(body.id.trim());
   const sendWelcome =
     body.sendWelcomeEmail === true || (!isUpdate && body.sendWelcomeEmail !== false);
+  const program: B2bProgram = body.program === "white_label" ? "white_label" : "custom";
+  const discountPct = Number(body.whiteLabelDiscountPercent);
+  const minSpend = Number(body.whiteLabelMinSpendInr);
 
   try {
     const company = await upsertB2bCompany({
@@ -65,8 +68,21 @@ export async function POST(request: Request) {
       name,
       slug: slugRaw,
       userEmail,
-      commerceMode,
+      commerceMode: program === "white_label" ? "checkout" : commerceMode,
       status,
+      program,
+      whiteLabelDiscountPercent:
+        program === "white_label"
+          ? Number.isFinite(discountPct) && discountPct > 0
+            ? discountPct
+            : 35
+          : undefined,
+      whiteLabelMinSpendInr:
+        program === "white_label"
+          ? Number.isFinite(minSpend) && minSpend > 0
+            ? minSpend
+            : 15000
+          : undefined,
       notes: typeof body.notes === "string" ? body.notes : undefined,
       assortment: Array.isArray(body.assortment) ? (body.assortment as B2bAssortmentItem[]) : undefined,
     });

@@ -13,6 +13,7 @@ function extForMime(mime: string): string {
   if (mime.includes("webp")) return "webp";
   if (mime.includes("gif")) return "gif";
   if (mime.includes("svg")) return "svg";
+  if (mime.includes("gltf-binary") || mime.includes("model/gltf")) return "glb";
   return "jpg";
 }
 
@@ -57,6 +58,43 @@ export async function uploadCanvasPublicBuffer(
     errors.length
       ? `Public image upload failed: ${errors.join(" | ")}`
       : "No public image storage configured. Set FIREBASE_* or BLOB_READ_WRITE_TOKEN."
+  );
+}
+
+/** Upload a reconstructed GLB (or other binary) with an explicit file extension. */
+export async function uploadPublicBinary(
+  prefix: string,
+  body: Buffer | Uint8Array,
+  contentType: string,
+  ext: string
+): Promise<CanvasPublicUploadResult> {
+  const mime = contentType || "application/octet-stream";
+  const safeExt = ext.replace(/^\./, "").trim() || extForMime(mime);
+  const errors: string[] = [];
+
+  if (isCanvasFirebaseConfigured()) {
+    try {
+      const path = makeCanvasObjectPath(prefix, safeExt);
+      const url = await uploadCanvasBuffer(path, body, mime);
+      return { url, storage: "firebase" };
+    } catch (err) {
+      errors.push(err instanceof Error ? err.message : String(err));
+    }
+  }
+
+  if (isCanvasBlobConfigured()) {
+    try {
+      const url = await uploadLegacyBlobBuffer(body, mime, prefix);
+      return { url, storage: "legacy-blob" };
+    } catch (err) {
+      errors.push(err instanceof Error ? err.message : String(err));
+    }
+  }
+
+  throw new Error(
+    errors.length
+      ? `Public file upload failed: ${errors.join(" | ")}`
+      : "No public file storage configured. Set FIREBASE_* or BLOB_READ_WRITE_TOKEN."
   );
 }
 

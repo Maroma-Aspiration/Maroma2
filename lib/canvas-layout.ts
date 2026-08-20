@@ -104,6 +104,9 @@ export function emailRenderStoryBodyInkHeight(el: CanvasTextEl): number {
 const GRID_H_PAD = 56;
 const GRID_CARD_GAP = 12;
 const GRID_HEADING_H = 54;
+/** Top + bottom padding on `.nl-story-grid-el` — must match StoryGridElView. */
+const GRID_PAD_TOP = 36;
+const GRID_PAD_BOTTOM = 40;
 
 /** Gap between TOP STORIES block and first story section (divider / headline). */
 export const STORY_GRID_TO_SECTION_GAP = 48;
@@ -113,30 +116,25 @@ function storyGridCardWidth(columns: number, canvasW = NEWSLETTER_CANVAS_WIDTH):
 }
 
 function estimateStoryGridCardHeight(
-  card: { title: string; excerpt?: string },
+  card: { title: string; excerpt?: string; imageUrl?: string },
   columns: number,
   canvasW = NEWSLETTER_CANVAS_WIDTH,
 ): number {
   const cardW = storyGridCardWidth(columns, canvasW);
-  const imgH = Math.round(cardW * 0.75);
-  const titleLines = Math.max(
-    1,
-    Math.ceil(card.title.length / Math.max(1, Math.floor(cardW / 7))),
-  );
-  const excerptLen = card.excerpt?.length ?? 0;
-  const excerptLines =
-    excerptLen > 0
-      ? Math.max(1, Math.ceil(excerptLen / Math.max(1, Math.floor(cardW / 6))))
-      : 0;
-  const bodyH = 36 + titleLines * 19 + excerptLines * 18 + 16;
-  return imgH + bodyH;
+  const imgH = card.imageUrl ? Math.round(cardW * 0.75) : 0;
+  // Match `.nl-sgrid-card-body` + title/excerpt min-heights in globals.css
+  const bodyPad = 14 + 22;
+  const bodyGap = 10;
+  const titleInk = Math.ceil(14 * 1.35 * 3);
+  const excerptInk = card.excerpt?.trim() ? Math.ceil(12 * 1.5 * 5) : 0;
+  return imgH + bodyPad + bodyGap + titleInk + excerptInk;
 }
 
 /** Match `.nl-story-grid-el` card rows (heading + 4:3 image + title/excerpt). */
 export function estimateStoryGridHeight(el: CanvasStoryGridEl): number {
   const cols = el.columns;
   const stories = el.stories;
-  if (stories.length === 0) return GRID_HEADING_H + 200;
+  if (stories.length === 0) return GRID_PAD_TOP + GRID_HEADING_H + GRID_PAD_BOTTOM + 200;
   const rowCount = Math.ceil(stories.length / cols);
   let cardsH = 0;
   for (let r = 0; r < rowCount; r++) {
@@ -144,10 +142,33 @@ export function estimateStoryGridHeight(el: CanvasStoryGridEl): number {
     cardsH += Math.max(...rowCards.map((c) => estimateStoryGridCardHeight(c, cols)), 200);
   }
   const heading = el.headingText ? GRID_HEADING_H : 0;
-  return heading + cardsH + Math.max(0, rowCount - 1) * GRID_CARD_GAP + 16;
+  return GRID_PAD_TOP + heading + cardsH + Math.max(0, rowCount - 1) * GRID_CARD_GAP + GRID_PAD_BOTTOM;
 }
 
-/** Never under-estimate TOP STORIES — measured DOM can lag one frame behind paint. */
+/** Prefer painted grid height; ignore stale saved measurements that exceed estimate. */
+export function mergeStoryGridMeasuredHeight(
+  est: number,
+  dom: number,
+  prev: number,
+): number {
+  if (dom > 0) return Math.min(dom, est + 16);
+  if (prev > 0 && prev <= est + 16) return prev;
+  return est;
+}
+
+/** Painted height of TOP STORIES for layout floor (never leave a gap under the grid). */
+export function storyGridVisualHeight(
+  grid: CanvasStoryGridEl,
+  heightOf: (el: CanvasEl) => number = measureElementHeight,
+): number {
+  const est = estimateStoryGridHeight(grid);
+  const measured = heightOf(grid);
+  if (measured > est + 32) return est;
+  if (measured > 0) return measured;
+  return est;
+}
+
+/** Never under-estimate TOP STORIES shell height in email — layout floor uses storyGridVisualHeight. */
 export function effectiveStoryGridHeight(
   grid: CanvasStoryGridEl,
   heightOf: (el: CanvasEl) => number,
@@ -158,9 +179,9 @@ export function effectiveStoryGridHeight(
 /** Minimum Y for the first story divider / headline — bottom of TOP STORIES + gap. */
 export function storyGridLayoutFloor(
   grid: CanvasStoryGridEl,
-  heightOf: (el: CanvasEl) => number,
+  heightOf: (el: CanvasEl) => number = measureElementHeight,
 ): number {
-  return grid.y + effectiveStoryGridHeight(grid, heightOf) + STORY_GRID_TO_SECTION_GAP;
+  return grid.y + storyGridVisualHeight(grid, heightOf) + STORY_GRID_TO_SECTION_GAP;
 }
 
 export function measureElementHeight(el: CanvasEl, domH?: number): number {
@@ -168,7 +189,11 @@ export function measureElementHeight(el: CanvasEl, domH?: number): number {
   if (isDivider(el)) return Math.max(el.thickness + 8, 12);
   if (isStoryGrid(el)) {
     const est = estimateStoryGridHeight(el);
-    if (domH !== undefined && domH > 0) return Math.max(domH, est);
+    const cap = est + 24;
+    if (domH !== undefined && domH > 0) {
+      if (domH > cap) return cap;
+      return domH;
+    }
     return est;
   }
   if (isCta(el)) return ctaInkHeight(el);
@@ -176,6 +201,16 @@ export function measureElementHeight(el: CanvasEl, domH?: number): number {
     const h = estimateTextHeight(el);
     // Issue title (large type, tight line-height) needs slack so the welcome line stacks below the glyphs.
     if (el.id === "migrated-title") return h + 14;
+    // Laura greeting: paragraph-aware ink so TOP STORIES stays below multi-paragraph welcome copy.
+    // Use a tighter chars/line factor than body — proportional fonts wrap more than 0.55 suggests.
+    if (el.id === "migrated-greeting") {
+      const ink = storyBodyInkHeightAt(el, el.w, el.fontSize * 1.02);
+      // Recompute with conservative wrap (≈0.48em avg glyph) via width shrink.
+      const conservative = storyBodyInkHeightAt(el, Math.max(120, el.w * 0.88), el.fontSize);
+      const base = Math.max(ink, conservative) + 20;
+      if (domH !== undefined && domH > 0) return Math.max(domH, base);
+      return base;
+    }
     // Story headlines: tight ink box — generous estimates leave a persistent gap before the hero image.
     if (/^migrated-st-\d+$/.test(el.id)) return storyHeadlineInkHeight(el);
     // Story body: ink height only — saved measurements must not inflate CTA gap.
@@ -722,6 +757,54 @@ function storyImageBlockBottom(
   return Math.max(...group.map((t) => t.y + dy + t.h));
 }
 
+/** Gap between Laura greeting body and the next block (TOP STORIES / stories). */
+export const GREETING_TO_NEXT_GAP = 100;
+
+/** Push TOP STORIES + everything below below the Laura greeting when it grows. */
+export function enforceContentBelowGreeting(
+  elements: CanvasEl[],
+  heightOf: (el: CanvasEl) => number = measureElementHeight,
+  gap = GREETING_TO_NEXT_GAP,
+): CanvasEl[] {
+  const greeting =
+    elements.find((e): e is CanvasTextEl => e.id === "migrated-greeting" && e.kind === "text") ??
+    elements.find((e): e is CanvasTextEl => e.id === "migrated-greeting-hd" && e.kind === "text");
+  if (!greeting) return elements;
+
+  const floor = greeting.y + heightOf(greeting) + gap;
+  const greetingOrder = canvasLayoutOrder(greeting);
+
+  const blockers = elements.filter((e) => {
+    if (MASTHEAD_OVERLAY_IDS.has(e.id)) return false;
+    if (canvasLayoutOrder(e) <= greetingOrder) return false;
+    return e.y < floor - 1;
+  });
+  if (blockers.length === 0) return elements;
+
+  const anchor = blockers.sort((a, b) => canvasLayoutOrder(a) - canvasLayoutOrder(b))[0];
+  return pushElementsFromLayoutOrder(elements, canvasLayoutOrder(anchor), floor - anchor.y);
+}
+
+/** True when TOP STORIES / later blocks sit inside the Laura greeting band. */
+export function contentOverlapsGreeting(
+  elements: CanvasEl[],
+  heightOf: (el: CanvasEl) => number = measureElementHeight,
+  gap = GREETING_TO_NEXT_GAP,
+): boolean {
+  const greeting =
+    elements.find((e): e is CanvasTextEl => e.id === "migrated-greeting" && e.kind === "text") ??
+    elements.find((e): e is CanvasTextEl => e.id === "migrated-greeting-hd" && e.kind === "text");
+  if (!greeting) return false;
+  const floor = greeting.y + heightOf(greeting) + gap;
+  const greetingOrder = canvasLayoutOrder(greeting);
+  return elements.some(
+    (e) =>
+      !MASTHEAD_OVERLAY_IDS.has(e.id) &&
+      canvasLayoutOrder(e) > greetingOrder &&
+      e.y < floor - 1,
+  );
+}
+
 /** Push story section 0 below TOP STORIES when any block overlaps the grid. */
 export function enforceStoryContentBelowGrid(
   elements: CanvasEl[],
@@ -776,6 +859,29 @@ function pushElementsFromLayoutOrder(
   });
 }
 
+/** Pull story sections up when they sit below the painted TOP STORIES block. */
+export function compactStorySectionsBelowGrid(
+  elements: CanvasEl[],
+  heightOf: (el: CanvasEl) => number = measureElementHeight,
+): CanvasEl[] {
+  const grid = elements.find(
+    (e): e is CanvasStoryGridEl => e.id === "migrated-story-grid" && isStoryGrid(e),
+  );
+  if (!grid) return elements;
+
+  const target = storyGridLayoutFloor(grid, heightOf);
+  const anchor =
+    elements.find((e) => e.id === "migrated-sdiv-0") ??
+    elements.find((e) => e.id === "migrated-st-0");
+  if (!anchor || anchor.y <= target + 8) return elements;
+
+  return pushElementsFromLayoutOrder(
+    elements,
+    canvasLayoutOrder(anchor),
+    target - anchor.y,
+  );
+}
+
 /** Chain story sections top-to-bottom — divider → headline → image → body → CTA → next section. */
 export function enforceStorySectionSpacing(
   elements: CanvasEl[],
@@ -800,9 +906,8 @@ export function enforceStorySectionSpacing(
       if (isSpacingLocked(sdiv)) {
         cursor = Math.max(cursor, sdiv.y + heightOf(sdiv) + gaps.aboveHeadline);
       } else {
-        const sdivY = Math.max(sdiv.y, cursor);
-        yById.set(sdiv.id, sdivY);
-        cursor = sdivY + heightOf(sdiv) + gaps.aboveHeadline;
+        yById.set(sdiv.id, cursor);
+        cursor = cursor + heightOf(sdiv) + gaps.aboveHeadline;
       }
     }
 
@@ -813,9 +918,8 @@ export function enforceStorySectionSpacing(
       y = st.y + storyHeadlineInkHeight(st) + gaps.belowHeadline;
       cursor = Math.max(cursor, y);
     } else {
-      const stY = Math.max(st.y, cursor);
-      yById.set(st.id, stY);
-      y = stY + storyHeadlineInkHeight(st) + gaps.belowHeadline;
+      yById.set(st.id, cursor);
+      y = cursor + storyHeadlineInkHeight(st) + gaps.belowHeadline;
     }
 
     const si = byId.get(`migrated-si-${idx}`);
@@ -833,7 +937,7 @@ export function enforceStorySectionSpacing(
     const cta = byId.get(`migrated-cta-${idx}`);
 
     if (sb && sb.kind === "text") {
-      const sbY = isSpacingLocked(sb) ? sb.y : Math.max(y, sb.y);
+      const sbY = isSpacingLocked(sb) ? sb.y : y;
       if (!isSpacingLocked(sb)) yById.set(sb.id, sbY);
       const sbH = storyBodyInkHeight(sb);
       const sbBottom = sbY + sbH;
@@ -961,9 +1065,12 @@ export function layoutCanvasStorySpacing(
   gaps: StorySpacingGaps = DEFAULT_STORY_SPACING_GAPS,
   heightOf: (el: CanvasEl) => number = measureElementHeight,
 ): CanvasEl[] {
-  let els = enforceStoryContentBelowGrid(elements, gaps, heightOf);
-  els = enforceStorySectionSpacing(els, gaps, heightOf);
+  let els = enforceContentBelowGreeting(elements, heightOf);
   els = enforceStoryContentBelowGrid(els, gaps, heightOf);
+  els = enforceStorySectionSpacing(els, gaps, heightOf);
+  els = compactStorySectionsBelowGrid(els, heightOf);
+  els = enforceStoryContentBelowGrid(els, gaps, heightOf);
+  els = enforceContentBelowGreeting(els, heightOf);
   return els;
 }
 
@@ -986,6 +1093,10 @@ export function collectCanonicalMeasuredHeights(
       out[el.id] = storyBodyInkHeight(el);
     } else if (isCta(el)) {
       out[el.id] = ctaInkHeight(el);
+    } else if (isStoryGrid(el)) {
+      const est = estimateStoryGridHeight(el);
+      const dom = measuredHeights?.[el.id] ?? 0;
+      out[el.id] = mergeStoryGridMeasuredHeight(est, dom, dom);
     } else {
       const h = heightOf(el);
       if (h > 0) out[el.id] = h;
@@ -994,14 +1105,20 @@ export function collectCanonicalMeasuredHeights(
   return out;
 }
 
-/** Story-spacing layout with canonical heights; returns positions + heights for save/export. */
+/** Story-spacing layout with full vertical compact stack beneath the masthead. */
 export function syncCanvasStoryLayout(
   elements: CanvasEl[],
   gaps: StorySpacingGaps = DEFAULT_STORY_SPACING_GAPS,
   measuredHeights?: Record<string, number>,
 ): { elements: CanvasEl[]; measuredHeights: Record<string, number> } {
   const heightOf = canvasLayoutHeightOf(measuredHeights);
-  const ordered = paintOrderElements(layoutCanvasStorySpacing(elements, gaps, heightOf));
+  const stacked = relayoutNewsletterCanvas(
+    clearSpacingLocks(elements),
+    gaps,
+    heightOf,
+    { compact: true },
+  );
+  const ordered = paintOrderElements(stacked);
   return {
     elements: ordered,
     measuredHeights: collectCanonicalMeasuredHeights(ordered, measuredHeights),

@@ -34,11 +34,14 @@ export default async function B2bIndexPage() {
   return (
     <main className="login-page">
       <section className="login-card">
-        <h1 className="login-title">No wholesale page</h1>
+        <h1 className="login-title">No wholesale page yet</h1>
         <p className="login-reason">
-          Signed in as <strong>{session.email}</strong>. No B2B company is linked to this account yet.
-          Contact Maroma if you expected access.
+          Signed in as <strong>{session.email}</strong>. This account is not linked to an approved B2B
+          company.
         </p>
+        <Link href="/b2b/apply" className="button primary button-sage">
+          Apply for white-label access
+        </Link>
         <Link href="/account" className="button secondary">
           Account
         </Link>

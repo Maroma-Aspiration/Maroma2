@@ -1,6 +1,7 @@
 import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
 import { getSessionSecret, SESSION_COOKIE, verifySessionPayload } from "../../../../lib/auth-session";
+import { canEditNewsletter } from "../../../../lib/auth-roles";
 import { migrateCanvasImagesToFirebase } from "../../../../lib/canvas-migrate-to-firebase";
 import { revalidateStoryConsumerRoutes } from "../../../../lib/revalidate-story-pages";
 import { readStoriesState, writeStoriesState } from "../../../../lib/story-storage";
@@ -9,8 +10,8 @@ export async function POST() {
   const secret = getSessionSecret();
   const token = (await cookies()).get(SESSION_COOKIE)?.value;
   const session = secret && token ? await verifySessionPayload(token, secret) : null;
-  if (session?.role !== "admin") {
-    return NextResponse.json({ error: "Admin sign-in required." }, { status: 401 });
+  if (!session || !canEditNewsletter(session.role)) {
+    return NextResponse.json({ error: "Newsletter editor sign-in required." }, { status: 401 });
   }
 
   try {

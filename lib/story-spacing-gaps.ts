@@ -95,6 +95,10 @@ export function gapBetweenStoryElements(
     return gaps.belowHeadline;
   }
 
+  if (c === "migrated-greeting" && (n === "migrated-story-grid" || n.startsWith("migrated-story-grid"))) return 100;
+  if (c === "migrated-greeting-hd" && (n === "migrated-story-grid" || n.startsWith("migrated-story-grid"))) return 100;
+  if (c === "migrated-greeting" && (n.startsWith("migrated-sdiv-") || n.startsWith("migrated-bdiv-"))) return 100;
+
   if (c === "migrated-story-grid" || c.startsWith("migrated-story-grid")) {
     if (n.startsWith("migrated-sdiv-")) return 48;
     if (n.startsWith("migrated-st-")) return 48;

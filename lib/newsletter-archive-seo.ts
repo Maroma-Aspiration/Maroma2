@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import type { NewsletterArchiveIssue, NewsletterArchiveSummary } from "./newsletter-archive-types";
 import type { NewsletterCanvas } from "./story-types";
-import { pickThumbnailFromCanvas } from "./newsletter-archive-utils";
+import { archiveIssueDisplayTitle, pickThumbnailFromCanvas, previewFromCanvas } from "./newsletter-archive-utils";
 
 export const SITE_URL = (process.env.NEXT_PUBLIC_SITE_URL ?? "https://maroma.com").replace(/\/$/, "");
 export const ARCHIVE_INDEX_URL = `${SITE_URL}/newsletter/archive`;
@@ -28,23 +28,10 @@ export function buildArchiveIndexDescription(issues: NewsletterArchiveSummary[])
 
 export function buildArchiveIssueDescription(issue: NewsletterArchiveIssue): string {
   if (issue.previewText.trim()) return issue.previewText.trim();
-  for (const el of issue.canvas.elements ?? []) {
-    if (el.kind === "text") {
-      const plain = el.html?.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();
-      if (plain && plain.length > 40) {
-        return plain.length > 220 ? `${plain.slice(0, 217)}…` : plain;
-      }
-    }
-    if (el.kind === "story-grid") {
-      for (const story of el.stories ?? []) {
-        const excerpt = story.excerpt?.trim();
-        if (excerpt && excerpt.length > 40) {
-          return excerpt.length > 220 ? `${excerpt.slice(0, 217)}…` : excerpt;
-        }
-      }
-    }
-  }
-  return `${issue.subject} | Maroma newsletter from ${new Intl.DateTimeFormat("en-US", { month: "long", year: "numeric" }).format(new Date(issue.sentAt))}.`;
+  const fromCanvas = previewFromCanvas(issue.canvas);
+  if (fromCanvas) return fromCanvas;
+  const title = archiveIssueDisplayTitle(issue);
+  return `${title} | Maroma newsletter from ${new Intl.DateTimeFormat("en-US", { month: "long", year: "numeric" }).format(new Date(issue.sentAt))}.`;
 }
 
 export function buildArchiveOgImage(issue: NewsletterArchiveIssue): string | undefined {
@@ -87,11 +74,12 @@ export function buildArchiveIndexMetadata(issues: NewsletterArchiveSummary[]): M
 }
 
 export function buildArchiveIssueMetadata(issue: NewsletterArchiveIssue): Metadata {
-  const title = `${issue.subject} | Maroma Newsletter`;
+  const headline = archiveIssueDisplayTitle(issue);
+  const title = `${headline} | Maroma Newsletter`;
   const description = buildArchiveIssueDescription(issue);
   const url = archiveIssueUrl(issue.slug);
   const ogImage = buildArchiveOgImage(issue);
-  const images = ogImage ? [{ url: ogImage, width: 1200, height: 630, alt: issue.subject }] : undefined;
+  const images = ogImage ? [{ url: ogImage, width: 1200, height: 630, alt: headline }] : undefined;
 
   return {
     title,
@@ -163,7 +151,7 @@ export function buildArchiveIssueJsonLd(issue: NewsletterArchiveIssue) {
   return {
     "@context": "https://schema.org",
     "@type": "NewsArticle",
-    headline: issue.subject,
+    headline: archiveIssueDisplayTitle(issue),
     description,
     datePublished: issue.sentAt,
     dateModified: issue.sentAt,

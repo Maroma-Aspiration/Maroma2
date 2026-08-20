@@ -227,7 +227,7 @@ export default function CheckoutClient() {
               <h2>Your basket is empty</h2>
               <p>Add a few ritual favourites before checkout. We will keep them here for you.</p>
               <div className="maroma-basket-empty-actions">
-                <Link href="/#shop" className="maroma-btn maroma-btn-primary">
+                <Link href="/?skipIntro=1#shop" className="maroma-btn maroma-btn-primary">
                   Shop the collection
                 </Link>
                 <Link href="/cart" className="maroma-btn maroma-btn-ghost">

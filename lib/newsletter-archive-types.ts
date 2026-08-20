@@ -30,4 +30,7 @@ export type NewsletterArchiveState = {
 export type NewsletterArchiveSummary = Pick<
   NewsletterArchiveIssue,
   "id" | "slug" | "subject" | "previewText" | "sentAt" | "thumbnailUrl" | "recipientCount"
->;
+> & {
+  /** Present for editor restore only — never listed on the public archive. */
+  testOnly?: boolean;
+};

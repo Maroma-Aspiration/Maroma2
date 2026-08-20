@@ -6,9 +6,11 @@ import type {
   B2bCompanyStatus,
   B2bDeliveryAddress,
   B2bOrder,
+  B2bProgram,
   B2bQuoteRequest,
   B2bStore,
 } from "./b2b-types";
+import { WHITE_LABEL_DISCOUNT_RATE, WHITE_LABEL_MIN_SPEND_INR } from "./b2b-pricing";
 
 const B2B_KV_KEY = "maroma:b2b";
 
@@ -114,6 +116,9 @@ function normalizeCompany(raw: unknown): B2bCompany | null {
     statusRaw === "pending" || statusRaw === "paused" || statusRaw === "active"
       ? statusRaw
       : "active";
+  const program: B2bProgram = row.program === "white_label" ? "white_label" : "custom";
+  const discountPct = Number(row.whiteLabelDiscountPercent);
+  const minSpend = Number(row.whiteLabelMinSpendInr);
 
   return {
     id,
@@ -122,6 +127,19 @@ function normalizeCompany(raw: unknown): B2bCompany | null {
     userEmail,
     commerceMode,
     status,
+    program,
+    whiteLabelDiscountPercent:
+      program === "white_label"
+        ? Number.isFinite(discountPct) && discountPct > 0
+          ? discountPct
+          : WHITE_LABEL_DISCOUNT_RATE * 100
+        : undefined,
+    whiteLabelMinSpendInr:
+      program === "white_label"
+        ? Number.isFinite(minSpend) && minSpend > 0
+          ? minSpend
+          : WHITE_LABEL_MIN_SPEND_INR
+        : undefined,
     notes: typeof row.notes === "string" ? row.notes : undefined,
     assortment: normalizeAssortment(row.assortment),
     deliveryAddresses: normalizeDeliveryAddresses(row.deliveryAddresses),
@@ -189,6 +207,9 @@ export type UpsertB2bCompanyInput = {
   userEmail: string;
   commerceMode?: B2bCommerceMode;
   status?: B2bCompanyStatus;
+  program?: B2bProgram;
+  whiteLabelDiscountPercent?: number;
+  whiteLabelMinSpendInr?: number;
   notes?: string;
   assortment?: B2bAssortmentItem[];
   deliveryAddresses?: B2bDeliveryAddress[];
@@ -226,6 +247,10 @@ export async function upsertB2bCompany(input: UpsertB2bCompanyInput): Promise<B2
       userEmail,
       commerceMode: input.commerceMode ?? existingById.commerceMode,
       status: input.status ?? existingById.status,
+      program: input.program ?? existingById.program,
+      whiteLabelDiscountPercent:
+        input.whiteLabelDiscountPercent ?? existingById.whiteLabelDiscountPercent,
+      whiteLabelMinSpendInr: input.whiteLabelMinSpendInr ?? existingById.whiteLabelMinSpendInr,
       notes: input.notes ?? existingById.notes,
       assortment: input.assortment ? normalizeAssortment(input.assortment) : existingById.assortment,
       deliveryAddresses: input.deliveryAddresses
@@ -245,6 +270,9 @@ export async function upsertB2bCompany(input: UpsertB2bCompanyInput): Promise<B2
     userEmail,
     commerceMode: input.commerceMode ?? "quote",
     status: input.status ?? "active",
+    program: input.program ?? "custom",
+    whiteLabelDiscountPercent: input.whiteLabelDiscountPercent,
+    whiteLabelMinSpendInr: input.whiteLabelMinSpendInr,
     notes: input.notes,
     assortment: normalizeAssortment(input.assortment ?? []),
     deliveryAddresses: normalizeDeliveryAddresses(input.deliveryAddresses ?? []),

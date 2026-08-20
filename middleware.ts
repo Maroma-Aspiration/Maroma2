@@ -2,6 +2,7 @@ import type { NextRequest } from "next/server";
 import { NextResponse } from "next/server";
 import { getSessionSecret, SESSION_COOKIE, verifySessionPayload } from "./lib/auth-session";
 import type { SessionPayload } from "./lib/auth-session";
+import { isNewsletterEditorPath } from "./lib/auth-roles";
 import { PREVIEW_COOKIE, previewAccessToken } from "./lib/preview-access";
 
 function isPreviewExempt(pathname: string): boolean {
@@ -12,7 +13,10 @@ function isPreviewExempt(pathname: string): boolean {
     pathname === "/favicon.ico" ||
     pathname === "/robots.txt" ||
     pathname === "/api/webhooks/razorpay" ||
-    pathname.startsWith("/api/newsletter/track/");
+    pathname.startsWith("/api/newsletter/track/") ||
+    // Email clients must fetch cropped images + "view in browser" without the site preview cookie.
+    pathname === "/api/newsletter/render-image" ||
+    pathname === "/newsletter/view";
 }
 
 function authFullyConfigured(): boolean {
@@ -40,6 +44,24 @@ function requiresAdmin(pathname: string, method: string): boolean {
   if (pathname.startsWith("/api/newsletter/send")) {
     return true;
   }
+  if (pathname.startsWith("/api/newsletter/email-html")) {
+    return true;
+  }
+  if (pathname.startsWith("/api/newsletter/previous-issue")) {
+    return true;
+  }
+  if (pathname.startsWith("/api/newsletter/restore-archive")) {
+    return true;
+  }
+  if (pathname === "/api/upload-canvas-image") {
+    return true;
+  }
+  if (pathname === "/api/blob-store-status") {
+    return true;
+  }
+  if (pathname === "/newsletter/email-preview") {
+    return true;
+  }
   if (pathname.startsWith("/api/products/upload")) {
     return true;
   }
@@ -53,6 +75,15 @@ function requiresAdmin(pathname: string, method: string): boolean {
     return true;
   }
   if (pathname === "/api/site-content" && method !== "GET") {
+    return true;
+  }
+  if (pathname === "/api/promos" && method !== "GET") {
+    return true;
+  }
+  if (pathname === "/api/homepage-content" && method !== "GET") {
+    return true;
+  }
+  if (pathname === "/api/stores" && method !== "GET") {
     return true;
   }
   if (pathname === "/api/hero-media-layout" && method !== "GET") {
@@ -71,6 +102,13 @@ function isProductionPath(pathname: string): boolean {
     pathname.startsWith("/api/admin/fulfillment/") ||
     pathname.startsWith("/api/admin/shiprocket/") ||
     pathname === "/api/auth/pwa-install";
+}
+
+function canAccessStaffPath(session: SessionPayload, pathname: string): boolean {
+  if (session.role === "admin") return true;
+  if (session.role === "production" && isProductionPath(pathname)) return true;
+  if (session.role === "newsletter" && isNewsletterEditorPath(pathname)) return true;
+  return false;
 }
 
 function isNewsletterPublicTrack(pathname: string): boolean {
@@ -178,15 +216,38 @@ export async function middleware(request: NextRequest) {
         nextParam && nextParam.startsWith("/") && !nextParam.startsWith("//") ? nextParam : null;
       if (session.role === "admin") {
         const url = request.nextUrl.clone();
-        // Homepage Login links use next=/ — send admins to the editor instead of bouncing home.
-        url.pathname = safeNext && safeNext !== "/" ? safeNext : "/admin";
-        url.search = "";
+        // Homepage Login links use next=/ — send admins to the live homepage editor.
+        if (!safeNext || safeNext === "/" || safeNext === "/admin") {
+          url.pathname = "/";
+          url.search = "skipIntro=1";
+        } else {
+          url.pathname = safeNext;
+          url.search = "";
+        }
         return NextResponse.redirect(url);
       }
       if (session.role === "production") {
         const url = request.nextUrl.clone();
         url.pathname = safeNext && isProductionPath(safeNext) ? safeNext : "/admin/orders";
         url.search = "";
+        return NextResponse.redirect(url);
+      }
+      if (session.role === "newsletter") {
+        const url = request.nextUrl.clone();
+        url.pathname = "/newsletter";
+        url.search = "edit=1";
+        if (safeNext?.startsWith("/newsletter")) {
+          try {
+            const dest = new URL(safeNext, request.nextUrl.origin);
+            url.pathname = dest.pathname;
+            url.search = dest.search || "edit=1";
+            if (url.pathname === "/newsletter" && !url.searchParams.get("edit")) {
+              url.searchParams.set("edit", "1");
+            }
+          } catch {
+            /* keep defaults */
+          }
+        }
         return NextResponse.redirect(url);
       }
       const url = request.nextUrl.clone();
@@ -215,13 +276,13 @@ export async function middleware(request: NextRequest) {
     return redirectToLogin(request, `${pathname}${request.nextUrl.search}`, "sign_in_required");
   }
 
-  if (session.role !== "admin" && !(session.role === "production" && isProductionPath(pathname))) {
+  if (!canAccessStaffPath(session, pathname)) {
     if (api) {
       return NextResponse.json({ error: "Forbidden", reason: "admin_role_required" }, { status: 403 });
     }
     const url = request.nextUrl.clone();
-    url.pathname = "/account";
-    url.searchParams.set("reason", "admin_only");
+    url.pathname = session.role === "newsletter" ? "/newsletter" : "/account";
+    url.search = session.role === "newsletter" ? "edit=1" : "reason=admin_only";
     return NextResponse.redirect(url);
   }
 

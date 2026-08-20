@@ -11,6 +11,7 @@
     "fetch:maroma-images": "node scripts/sync-product-images-from-maroma-store.mjs"
   },
   "dependencies": {
+    "@fal-ai/client": "^1.10.1",
     "@react-three/drei": "^9.122.0",
     "@react-three/fiber": "^8.18.0",
     "@vercel/blob": "^2.3.3",

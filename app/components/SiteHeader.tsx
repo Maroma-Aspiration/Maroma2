@@ -89,7 +89,7 @@ export function SiteHeader({ initialNav, initialViewportIsMobile = false }: Site
   );
   const [activeNavIndex, setActiveNavIndex] = useState(0);
   const { brand, nav } = navContent;
-  const navItems = useMemo(() => [...nav, "Journal", "Maroma Experiences"], [nav]);
+  const navItems = useMemo(() => [...nav, "Newsletter", "Maroma Experiences"], [nav]);
   const lastScrollY = useRef(0);
   const navLinksRef = useRef<HTMLDivElement>(null);
   const scrollItemRefs = useRef<(HTMLElement | null)[]>([]);
@@ -109,7 +109,7 @@ export function SiteHeader({ initialNav, initialViewportIsMobile = false }: Site
       kind: "link",
       key: item,
       label: item,
-      href: item === "Journal" ? "/blog" : item === "Maroma Experiences" ? MAROMA_EXPERIENCES_URL : getNavHref(item),
+      href: item === "Newsletter" ? "/blog" : item === "Maroma Experiences" ? MAROMA_EXPERIENCES_URL : getNavHref(item),
     }));
     return [...links, { kind: "spa-logo", key: "spa-logo" }];
   }, [navItems]);
@@ -583,10 +583,10 @@ export function SiteHeader({ initialNav, initialViewportIsMobile = false }: Site
       className="nav-experiences-link"
       aria-label="Visit Maroma Experiences"
     >
-      <img src="/maroma-experiences-logo.png" alt="Maroma Experiences" />
+      <img src="/maroma-experiences-logo.png" alt="Maroma Experiences" width={132} height={25} />
     </a>
   ) : (
-    <Link key={item} href={item === "Journal" ? "/blog" : getNavHref(item)}>
+    <Link key={item} href={item === "Newsletter" ? "/blog" : getNavHref(item)}>
       {item}
     </Link>
   ));
@@ -618,101 +618,111 @@ export function SiteHeader({ initialNav, initialViewportIsMobile = false }: Site
     <header
       className={`site-header site-header-responsive${scrolled ? " site-header-solid" : ""}${navLiftUp ? " site-header-lift" : ""}`}
     >
-      <div className="maroma-nav-shell maroma-nav-shell--desktop">
-        <nav className={`nav ${navStateClass}`}>
-          <Link href="/?skipIntro=1" className="brand" aria-label={`${brand} home`}>
-            <img src="/maroma-logo.png" alt={brand} className="brand-logo" />
-          </Link>
-          <div className="nav-links">{desktopNavLinks}</div>
-          <div className="nav-end">
-            <div className="spa-cta-wrap">
-              <img src="/spa-logo.png" alt="Maroma Spa" className="spa-book-logo" />
-              <a
-                className="spa-book-btn"
-                href={SPA_BOOKING_URL}
-                target="_blank"
-                rel="noopener noreferrer"
-                aria-label="Book Maroma Spa"
-              >
-                <span className="spa-book-text">BOOK NOW</span>
-              </a>
+      {isMobileNav ? (
+        <div className="maroma-nav-shell maroma-nav-shell--mobile">
+          <nav className={`nav nav-mobile ${navStateClass}`}>
+            <div className="nav-mobile-brand-row">
+              <Link href="/?skipIntro=1" className="brand" aria-label={`${brand} home`}>
+                <img src="/maroma-logo.png" alt={brand} className="brand-logo" width={160} height={22} />
+              </Link>
+              <div className="nav-basket-slot nav-basket-slot--inline" aria-label="Basket">
+                {basketLink}
+              </div>
             </div>
-            <div className="nav-basket-slot nav-basket-slot--inline-desktop" aria-label="Basket">
-              {basketLink}
-            </div>
-            <CurrencySelector compact />
-          </div>
-        </nav>
-      </div>
+            <div
+              ref={navLinksRef}
+              className="nav-links nav-links-carousel"
+              role="navigation"
+              aria-label="Site sections"
+              onPointerDown={onCarouselPointerDown}
+              onPointerMove={onCarouselPointerMove}
+              onPointerUp={endCarouselDrag}
+              onPointerCancel={endCarouselDrag}
+            >
+              {carouselDomItems.map((item, domIndex) => {
+                const logicalIndex = scrollItems.length > 0 ? domIndex % scrollItems.length : domIndex;
+                const loopPass = scrollItems.length > 0 ? Math.floor(domIndex / scrollItems.length) : 0;
+                const centered = logicalIndex === activeNavIndex;
+                const itemKey = `${item.key}-loop-${loopPass}`;
 
-      <div className="maroma-nav-shell maroma-nav-shell--mobile">
-        <nav className={`nav nav-mobile ${navStateClass}`}>
-          <div className="nav-mobile-brand-row">
-            <Link href="/?skipIntro=1" className="brand" aria-label={`${brand} home`}>
-              <img src="/maroma-logo.png" alt={brand} className="brand-logo" />
-            </Link>
-            <div className="nav-basket-slot nav-basket-slot--inline" aria-label="Basket">
-              {basketLink}
-            </div>
-          </div>
-          <div
-            ref={navLinksRef}
-            className="nav-links nav-links-carousel"
-            role="navigation"
-            aria-label="Site sections"
-            onPointerDown={onCarouselPointerDown}
-            onPointerMove={onCarouselPointerMove}
-            onPointerUp={endCarouselDrag}
-            onPointerCancel={endCarouselDrag}
-          >
-            {carouselDomItems.map((item, domIndex) => {
-              const logicalIndex = scrollItems.length > 0 ? domIndex % scrollItems.length : domIndex;
-              const loopPass = scrollItems.length > 0 ? Math.floor(domIndex / scrollItems.length) : 0;
-              const centered = logicalIndex === activeNavIndex;
-              const itemKey = `${item.key}-loop-${loopPass}`;
+                if (item.kind === "link") {
+                  return (
+                    <Link
+                      key={itemKey}
+                      href={item.href}
+                      className={`nav-scroll-item${centered ? " is-centered" : ""}`}
+                      ref={(el) => {
+                        scrollItemRefs.current[domIndex] = el;
+                      }}
+                      onClick={onCarouselItemClick(logicalIndex)}
+                      aria-hidden={loopPass > 0 ? true : undefined}
+                      tabIndex={loopPass > 0 ? -1 : undefined}
+                    >
+                      {item.label === "Maroma Experiences" ? (
+                        <img
+                          src="/maroma-experiences-logo.png"
+                          alt="Maroma Experiences"
+                          className="nav-experiences-logo"
+                          width={132}
+                          height={30}
+                        />
+                      ) : (
+                        item.label
+                      )}
+                    </Link>
+                  );
+                }
 
-              if (item.kind === "link") {
                 return (
-                  <Link
+                  <SpaBookRollLink
                     key={itemKey}
-                    href={item.href}
-                    className={`nav-scroll-item${centered ? " is-centered" : ""}`}
+                    carousel
+                    className={`nav-scroll-spa-logo nav-scroll-item${centered ? " is-centered" : ""}`}
                     ref={(el) => {
                       scrollItemRefs.current[domIndex] = el;
                     }}
-                    onClick={onCarouselItemClick(logicalIndex)}
                     aria-hidden={loopPass > 0 ? true : undefined}
                     tabIndex={loopPass > 0 ? -1 : undefined}
-                  >
-                    {item.label === "Maroma Experiences" ? (
-                      <img src="/maroma-experiences-logo.png" alt="Maroma Experiences" className="nav-experiences-logo" />
-                    ) : item.label}
-                  </Link>
+                    onClick={(event) => {
+                      if (dragState.current.moved) {
+                        event.preventDefault();
+                        dragState.current.moved = false;
+                      }
+                    }}
+                  />
                 );
-              }
-
-              return (
-                <SpaBookRollLink
-                  key={itemKey}
-                  carousel
-                  className={`nav-scroll-spa-logo nav-scroll-item${centered ? " is-centered" : ""}`}
-                  ref={(el) => {
-                    scrollItemRefs.current[domIndex] = el;
-                  }}
-                  aria-hidden={loopPass > 0 ? true : undefined}
-                  tabIndex={loopPass > 0 ? -1 : undefined}
-                  onClick={(event) => {
-                    if (dragState.current.moved) {
-                      event.preventDefault();
-                      dragState.current.moved = false;
-                    }
-                  }}
-                />
-              );
-            })}
-          </div>
-        </nav>
-      </div>
+              })}
+            </div>
+          </nav>
+        </div>
+      ) : (
+        <div className="maroma-nav-shell maroma-nav-shell--desktop">
+          <nav className={`nav ${navStateClass}`}>
+            <Link href="/?skipIntro=1" className="brand" aria-label={`${brand} home`}>
+              <img src="/maroma-logo.png" alt={brand} className="brand-logo" width={160} height={22} />
+            </Link>
+            <div className="nav-links">{desktopNavLinks}</div>
+            <div className="nav-end">
+              <div className="spa-cta-wrap">
+                <img src="/spa-logo.png" alt="Maroma Spa" className="spa-book-logo" width={86} height={36} />
+                <a
+                  className="spa-book-btn"
+                  href={SPA_BOOKING_URL}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  aria-label="Book Maroma Spa"
+                >
+                  <span className="spa-book-text">BOOK NOW</span>
+                </a>
+              </div>
+              <div className="nav-basket-slot nav-basket-slot--inline-desktop" aria-label="Basket">
+                {basketLink}
+              </div>
+              <CurrencySelector compact />
+            </div>
+          </nav>
+        </div>
+      )}
     </header>
   );
 }

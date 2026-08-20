@@ -20,7 +20,7 @@ const SHOP_CARE_LINKS = [
     id: "ingredient",
     label: "Shop by Ingredient",
     hint: "Botanical actives",
-    href: "/#shop"
+    href: "/?skipIntro=1#shop"
   }
 ] as const;
 

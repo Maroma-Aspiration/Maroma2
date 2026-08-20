@@ -34,7 +34,7 @@ export default async function AccountPage({
 
   const notice =
     searchParams.reason === "admin_only"
-      ? "Admin tools live under /admin. Your account uses the standard user role."
+      ? "Admin tools are in the top admin bar and on the homepage site editor."
       : null;
 
   return (
@@ -81,8 +81,8 @@ export default async function AccountPage({
         <div className="login-actions-row" style={{ marginTop: 24 }}>
           {session.role === "admin" ? (
             <>
-              <Link href="/admin" className="button primary button-sage">
-                Site admin
+              <Link href="/?skipIntro=1" className="button primary button-sage">
+                Site editor
               </Link>
               <Link href="/admin/orders" className="button secondary">
                 Orders
@@ -91,6 +91,11 @@ export default async function AccountPage({
                 B2B
               </Link>
             </>
+          ) : null}
+          {session.role === "newsletter" ? (
+            <Link href="/newsletter?edit=1" className="button primary button-sage">
+              Newsletter editor
+            </Link>
           ) : null}
           <Link href="/" className="button secondary">
             Home

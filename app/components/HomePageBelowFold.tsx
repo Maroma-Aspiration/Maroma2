@@ -3,7 +3,8 @@
 import { memo, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { ProductListingWithFilters } from "./ProductListingWithFilters";
-import { InstagramSection } from "./InstagramSection";
+import { PromoBannerStrip } from "./PromoBannerStrip";
+import { HomepageStorySections } from "./HomepageStorySections";
 import { catalogCategories } from "../../lib/catalog-categories";
 import type { ProductRecord } from "../../lib/product-types";
 
@@ -17,7 +18,7 @@ type HomePageBelowFoldProps = {
 
 /** Below-fold homepage content — isolated from hero layout churn. */
 export const HomePageBelowFold = memo(function HomePageBelowFold({
-  brand,
+  brand: _brand,
   products,
   productSearch,
   productStatus,
@@ -44,27 +45,9 @@ export const HomePageBelowFold = memo(function HomePageBelowFold({
 
   return (
     <>
-      <InstagramSection />
-
-      <div className="ticker-top-banner">
-        <img src="/staging-media/banners/care-banner.png" alt="" aria-hidden="true" />
-      </div>
-
-      <section className="scrolling-ticker-section">
-        <div className="ticker-wrap">
-          <div className="ticker">
-            <span className="ticker__item">
-              Vegan and Cruelty-free • No rabbits (or any other living thing was harmed or in any way even slightly inconvenienced by the creation of our products) • World Fair Trade Certified - everyone gets paid a fair wage and treated with respect • Naturally derived • Almost entirely locally-sourced • Palm-Oil Free • Good For You • Good for the Planet •
-            </span>
-            <span className="ticker__item">
-              Vegan and Cruelty-free • No rabbits (or any other living thing was harmed or in any way even slightly inconvenienced by the creation of our products) • World Fair Trade Certified - everyone gets paid a fair wage and treated with respect • Naturally derived • Almost entirely locally-sourced • Palm-Oil Free • Good For You • Good for the Planet •
-            </span>
-          </div>
-        </div>
-      </section>
-
-      <section className="product-database" id="shop" style={{ scrollMarginTop: "100px" }} aria-label="Searchable product database">
-        <div className="product-database-head">
+      <PromoBannerStrip />
+      <section className="product-database" id="shop" aria-label="Searchable product database">
+        <div className="product-database-head" id="shop-search">
           <div>
             <span className="eyebrow scroll-zoom">Shop database</span>
             <h2 className="scroll-zoom">Find Your Product Here</h2>
@@ -88,7 +71,7 @@ export const HomePageBelowFold = memo(function HomePageBelowFold({
               type="search"
               value={productSearch}
               onChange={handleSearchChange}
-              placeholder="Try soap, lavender, shampoo..."
+              placeholder="Try olive, lavender, incense..."
             />
           </label>
         </div>
@@ -98,15 +81,24 @@ export const HomePageBelowFold = memo(function HomePageBelowFold({
         </div>
       </section>
 
-      <footer className="footer">
-        <strong>{brand}</strong>
-        <div className="footer-legal-links">
-          <a href="/privacy">Privacy</a>
-          <a href="/terms">Terms</a>
-          <a href="/shipping">Shipping</a>
-          <a href="/returns">Returns</a>
+      <HomepageStorySections />
+
+      <div className="ticker-top-banner">
+        <img src="/staging-media/banners/care-banner.png" alt="" aria-hidden="true" />
+      </div>
+
+      <section className="scrolling-ticker-section">
+        <div className="ticker-wrap">
+          <div className="ticker">
+            <span className="ticker__item">
+              Vegan and Cruelty-free • No rabbits (or any other living thing was harmed or in any way even slightly inconvenienced by the creation of our products) • World Fair Trade Certified - everyone gets paid a fair wage and treated with respect • Naturally derived • Almost entirely locally-sourced • Palm-Oil Free • Good For You • Good for the Planet •
+            </span>
+            <span className="ticker__item">
+              Vegan and Cruelty-free • No rabbits (or any other living thing was harmed or in any way even slightly inconvenienced by the creation of our products) • World Fair Trade Certified - everyone gets paid a fair wage and treated with respect • Naturally derived • Almost entirely locally-sourced • Palm-Oil Free • Good For You • Good for the Planet •
+            </span>
+          </div>
         </div>
-      </footer>
+      </section>
     </>
   );
 });

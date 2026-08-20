@@ -24,6 +24,9 @@ type PortalPayload = {
     name: string;
     commerceMode: "quote" | "checkout";
     status: string;
+    program?: "custom" | "white_label";
+    whiteLabelDiscountPercent?: number;
+    whiteLabelMinSpendInr?: number;
     userEmail: string;
     deliveryAddresses: B2bDeliveryAddress[];
   };
@@ -118,6 +121,7 @@ export default function B2bPortalClient({ slug }: { slug: string }) {
   const [addressDraft, setAddressDraft] = useState<AddressDraft>(emptyAddress());
   const [editingAddressId, setEditingAddressId] = useState<string | null>(null);
   const [showAddressForm, setShowAddressForm] = useState(false);
+  const [catalogQuery, setCatalogQuery] = useState("");
   const [savingAddress, setSavingAddress] = useState(false);
 
   const load = useCallback(async () => {
@@ -460,6 +464,16 @@ export default function B2bPortalClient({ slug }: { slug: string }) {
 
   const isQuote = data.company.commerceMode === "quote";
   const selectedAddress = addresses.find((a) => a.id === selectedAddressId) ?? null;
+  const isWhiteLabel = data.company.program === "white_label";
+  const minSpend = data.company.whiteLabelMinSpendInr ?? 0;
+  const discountPct = data.company.whiteLabelDiscountPercent ?? 35;
+  const remainingMin = Math.max(0, minSpend - subtotal);
+  const catalogQueryNorm = catalogQuery.trim().toLowerCase();
+  const visibleAssortment = catalogQueryNorm
+    ? data.assortment.filter((row) =>
+        `${row.name} ${row.sku}`.toLowerCase().includes(catalogQueryNorm)
+      )
+    : data.assortment;
 
   return (
     <main className="catalog-admin-page b2b-portal-page">
@@ -471,7 +485,9 @@ export default function B2bPortalClient({ slug }: { slug: string }) {
             </p>
             <h1>{data.company.name}</h1>
             <p className="catalog-admin-lede">
-              Restricted assortment with your negotiated rates.
+              {isWhiteLabel
+                ? `White-label programme: full catalogue at ${discountPct}% off. Minimum order ₹${minSpend.toLocaleString("en-IN")}.`
+                : "Restricted assortment with your negotiated rates."}
               {isQuote
                 ? " Submit a quote request — Maroma will confirm availability and invoicing."
                 : " Checkout with negotiated rates — pay now or request an invoice."}
@@ -479,7 +495,7 @@ export default function B2bPortalClient({ slug }: { slug: string }) {
             </p>
           </div>
           <div className="catalog-admin-header-actions">
-            <Link href="/" className="button secondary">
+            <Link href="/?skipIntro=1#shop" className="button secondary">
               Shop
             </Link>
           </div>
@@ -493,8 +509,24 @@ export default function B2bPortalClient({ slug }: { slug: string }) {
           </section>
         ) : (
           <section className="catalog-admin-card">
+            {isWhiteLabel ? (
+              <p className="catalog-admin-card-copy">
+                {remainingMin > 0
+                  ? `Add ₹${remainingMin.toLocaleString("en-IN")} more to reach the ₹${minSpend.toLocaleString("en-IN")} minimum.`
+                  : `Minimum spend of ₹${minSpend.toLocaleString("en-IN")} met.`}
+              </p>
+            ) : null}
+            <label className="catalog-admin-field" style={{ marginBottom: 12 }}>
+              <span>Search catalogue</span>
+              <input
+                type="search"
+                value={catalogQuery}
+                onChange={(e) => setCatalogQuery(e.target.value)}
+                placeholder="Name or SKU"
+              />
+            </label>
             <div style={{ display: "grid", gap: 14 }}>
-              {data.assortment.map((row) => (
+              {visibleAssortment.map((row) => (
                 <article
                   key={row.productId}
                   style={{
@@ -740,6 +772,9 @@ export default function B2bPortalClient({ slug }: { slug: string }) {
                       <th>Qty</th>
                       <th>Unit</th>
                       <th>Total</th>
+                      <th>
+                        <span className="visually-hidden">Remove</span>
+                      </th>
                     </tr>
                   </thead>
                   <tbody>
@@ -747,12 +782,48 @@ export default function B2bPortalClient({ slug }: { slug: string }) {
                       <tr key={line.productId}>
                         <td>
                           <strong>{decodeBasicHtmlEntities(line.name)}</strong>
-                          <small>{line.sku}</small>
+                          <small>
+                            {line.sku}
+                            {line.moq > 1 ? ` · MOQ ${line.moq}` : ""}
+                          </small>
                         </td>
-                        <td>{line.quantity}</td>
+                        <td>
+                          <input
+                            className="b2b-summary-qty"
+                            type="number"
+                            min={0}
+                            step={1}
+                            aria-label={`Quantity for ${decodeBasicHtmlEntities(line.name)}`}
+                            value={qty[line.productId] ?? 0}
+                            onChange={(e) =>
+                              setQty((current) => ({
+                                ...current,
+                                [line.productId]: Math.max(
+                                  0,
+                                  Math.floor(Number(e.target.value) || 0)
+                                ),
+                              }))
+                            }
+                          />
+                        </td>
                         <td>{formatInrPrice(String(line.priceInr)) ?? `₹${line.priceInr}`}</td>
                         <td>
                           {formatInrPrice(String(line.lineTotal)) ?? `₹${line.lineTotal}`}
+                        </td>
+                        <td>
+                          <button
+                            type="button"
+                            className="button secondary b2b-summary-remove"
+                            aria-label={`Remove ${decodeBasicHtmlEntities(line.name)}`}
+                            onClick={() =>
+                              setQty((current) => ({
+                                ...current,
+                                [line.productId]: 0,
+                              }))
+                            }
+                          >
+                            Remove
+                          </button>
                         </td>
                       </tr>
                     ))}

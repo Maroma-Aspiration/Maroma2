@@ -1,10 +1,12 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { roleDisplayLabel } from "../../../lib/auth-roles";
+import type { UserRole } from "../../../lib/auth-types";
 
 type UserRow = {
   email: string;
-  role: "admin" | "production" | "user";
+  role: UserRole;
   source: "env" | "stored";
   credentialSource: "env" | "stored";
 };
@@ -80,7 +82,11 @@ export default function AdminUsersPage() {
 
   const deleteUser = async (row: UserRow) => {
     if (row.email.toLowerCase() === currentEmail) {
-      setFeedback(row.email, false, "You cannot delete the account you are currently using");
+      setFeedback(
+        row.email,
+        false,
+        "You are signed in as this user — sign in as another admin first, then delete"
+      );
       return;
     }
     if (!window.confirm(`Delete ${row.email}? This account will immediately lose access.`)) return;
@@ -89,6 +95,7 @@ export default function AdminUsersPage() {
       const response = await fetch("/api/auth/users", {
         method: "DELETE",
         headers: { "Content-Type": "application/json" },
+        credentials: "same-origin",
         body: JSON.stringify({ email: row.email }),
       });
       const data = (await response.json()) as { error?: string };
@@ -109,12 +116,20 @@ export default function AdminUsersPage() {
 
   const resetPassword = async (email: string) => {
     const pw = newPasswords[email]?.trim();
-    if (!pw) return;
+    if (!pw) {
+      setFeedback(email, false, "Enter a new password first");
+      return;
+    }
+    if (pw.length < 8) {
+      setFeedback(email, false, "Password must be at least 8 characters");
+      return;
+    }
     setResetingEmail(email);
     try {
       const response = await fetch("/api/auth/users", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
+        credentials: "same-origin",
         body: JSON.stringify({ email, action: "reset_password", password: pw })
       });
       const data = (await response.json()) as { ok?: boolean; error?: string };
@@ -122,7 +137,14 @@ export default function AdminUsersPage() {
         setFeedback(email, false, data.error ?? `HTTP ${response.status}`);
         return;
       }
-      setFeedback(email, true, "Password updated");
+      const isSelf = email.toLowerCase() === currentEmail;
+      setFeedback(
+        email,
+        true,
+        isSelf
+          ? "Password updated — use it next time you sign in"
+          : "Password updated"
+      );
       setNewPasswords((prev) => ({ ...prev, [email]: "" }));
       await loadUsers();
     } catch (e) {
@@ -146,7 +168,7 @@ export default function AdminUsersPage() {
         return;
       }
       setUsers((prev) => prev.map((row) => (row.email === email ? { ...row, role, source: "stored", credentialSource: "stored" } : row)));
-      setFeedback(email, true, `Role changed to ${role === "admin" ? "Admin" : role === "production" ? "Production" : "Read-only"}`);
+      setFeedback(email, true, `Role changed to ${roleDisplayLabel(role)}`);
     } catch {
       setFeedback(email, false, "Network error");
     } finally {
@@ -185,7 +207,7 @@ export default function AdminUsersPage() {
   return (
     <main className="admin" style={{ maxWidth: 920, margin: "0 auto", padding: "2rem 1rem" }}>
       <nav className="admin-top-nav" aria-label="Admin sections">
-        <a href="/admin">Main Admin</a>
+        <a href="/?skipIntro=1">Site editor</a>
         <a href="/newsletter?edit=1">Newsletter editor</a>
         <a href="/admin/products">Products</a>
         <a href="/admin/users">Manage Users</a>
@@ -194,6 +216,12 @@ export default function AdminUsersPage() {
         <div>
           <h1>Manage Users</h1>
           <p>Create accounts, reset passwords, and assign roles. Passwords are stored hashed and cannot be viewed.</p>
+          {currentEmail ? (
+            <p style={{ marginTop: 8, fontSize: 13, opacity: 0.75 }}>
+              Signed in as <strong>{currentEmail}</strong>. To delete that account, sign in as another admin first.
+              To change its password, type a new password (8+ characters) and click <strong>Reset password</strong>.
+            </p>
+          ) : null}
         </div>
       </header>
 
@@ -234,6 +262,7 @@ export default function AdminUsersPage() {
             >
               <option value="admin" style={{ background: "#1e2823", color: "#e8f3f0" }}>Admin (can edit)</option>
               <option value="production" style={{ background: "#1e2823", color: "#e8f3f0" }}>Production (fulfillment only)</option>
+              <option value="newsletter" style={{ background: "#1e2823", color: "#e8f3f0" }}>Newsletter (editor only)</option>
               <option value="user" style={{ background: "#1e2823", color: "#e8f3f0" }}>User (read-only)</option>
             </select>
           </label>
@@ -274,13 +303,13 @@ export default function AdminUsersPage() {
                     </span>
                     <span style={{
                       fontSize: 11, fontWeight: 600, padding: "2px 8px", borderRadius: 20,
-                      background: row.role === "admin" ? "rgba(30,180,120,0.18)" : "rgba(180,140,30,0.18)",
-                      color: row.role === "admin" ? "#3ecf8e" : "#d4a830",
-                      border: `1px solid ${row.role === "admin" ? "rgba(62,207,142,0.3)" : "rgba(212,168,48,0.3)"}`,
+                      background: row.role === "admin" ? "rgba(30,180,120,0.18)" : row.role === "newsletter" ? "rgba(60,140,200,0.18)" : "rgba(180,140,30,0.18)",
+                      color: row.role === "admin" ? "#3ecf8e" : row.role === "newsletter" ? "#6eb8e8" : "#d4a830",
+                      border: `1px solid ${row.role === "admin" ? "rgba(62,207,142,0.3)" : row.role === "newsletter" ? "rgba(110,184,232,0.3)" : "rgba(212,168,48,0.3)"}`,
                       whiteSpace: "nowrap",
                       flexShrink: 0,
                     }}>
-                      {row.role === "admin" ? "Admin" : row.role === "production" ? "Production" : "Read-only"}
+                      {roleDisplayLabel(row.role)}
                     </span>
                     <span style={{ fontSize: 11, opacity: 0.55 }}>
                       {row.credentialSource === "env" ? "env credentials" : "stored (hashed)"}
@@ -301,25 +330,33 @@ export default function AdminUsersPage() {
                 )}
 
                 <div style={{ display: "flex", flexDirection: "column", gap: 8, alignItems: "flex-end" }}>
-                  <select value={row.role} disabled={savingEmail === row.email} onChange={(event) => void updateRole(row.email, event.target.value as UserRow["role"])} style={{ padding: "6px 10px", borderRadius: 6, background: "#1e2823", color: "#e8f3f0" }}><option value="admin">Admin</option><option value="production">Production</option><option value="user">Read-only</option></select>
+                  <select value={row.role} disabled={savingEmail === row.email} onChange={(event) => void updateRole(row.email, event.target.value as UserRow["role"])} style={{ padding: "6px 10px", borderRadius: 6, background: "#1e2823", color: "#e8f3f0" }}><option value="admin">Admin</option><option value="production">Production</option><option value="newsletter">Newsletter</option><option value="user">Read-only</option></select>
 
                   <div style={{ display: "flex", gap: 7 }}>
                     <button type="button" onClick={() => void editUser(row)} disabled={editingEmail === row.email || deletingEmail === row.email} style={{ padding: "6px 12px", borderRadius: 7, border: "1px solid rgba(19,74,87,.24)", background: "rgba(255,255,255,.56)", color: "#134a57", fontWeight: 700, cursor: "pointer" }}>
                       {editingEmail === row.email ? "Saving…" : "Edit user"}
                     </button>
-                    <button type="button" onClick={() => void deleteUser(row)} disabled={deletingEmail === row.email || row.email.toLowerCase() === currentEmail} title={row.email.toLowerCase() === currentEmail ? "You cannot delete your current account" : "Delete user"} style={{ padding: "6px 12px", borderRadius: 7, border: "1px solid rgba(181,67,55,.3)", background: "rgba(181,67,55,.08)", color: "#a23d32", fontWeight: 700, cursor: "pointer", opacity: row.email.toLowerCase() === currentEmail ? .45 : 1 }}>
-                      {deletingEmail === row.email ? "Deleting…" : "Delete"}
+                    <button type="button" onClick={() => void deleteUser(row)} disabled={deletingEmail === row.email || row.email.toLowerCase() === currentEmail} title={row.email.toLowerCase() === currentEmail ? "Sign in as a different admin to delete this account" : "Delete user"} style={{ padding: "6px 12px", borderRadius: 7, border: "1px solid rgba(181,67,55,.3)", background: "rgba(181,67,55,.08)", color: "#a23d32", fontWeight: 700, cursor: "pointer", opacity: row.email.toLowerCase() === currentEmail ? .45 : 1 }}>
+                      {deletingEmail === row.email ? "Deleting…" : row.email.toLowerCase() === currentEmail ? "Current session" : "Delete"}
                     </button>
                   </div>
 
                   <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
                     <input
                       type="password"
-                      placeholder="New password"
+                      placeholder="New password (min 8)"
+                      minLength={8}
+                      autoComplete="new-password"
                       value={newPasswords[row.email] ?? ""}
                       onChange={(e) => setNewPasswords((prev) => ({ ...prev, [row.email]: e.target.value }))}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") {
+                          e.preventDefault();
+                          void resetPassword(row.email);
+                        }
+                      }}
                       style={{
-                        padding: "6px 10px", borderRadius: 6, fontSize: 12, width: 140,
+                        padding: "6px 10px", borderRadius: 6, fontSize: 12, width: 160,
                         border: "1px solid rgba(255,255,255,0.15)",
                         background: "rgba(255,255,255,0.05)", color: "inherit",
                       }}
@@ -327,13 +364,14 @@ export default function AdminUsersPage() {
                     <button
                       type="button"
                       onClick={() => void resetPassword(row.email)}
-                      disabled={resetingEmail === row.email || !newPasswords[row.email]?.trim()}
+                      disabled={resetingEmail === row.email || (newPasswords[row.email]?.trim().length ?? 0) < 8}
+                      title={(newPasswords[row.email]?.trim().length ?? 0) < 8 ? "Enter at least 8 characters" : "Save new password"}
                       style={{
                         padding: "6px 12px", borderRadius: 6, fontSize: 12, fontWeight: 600,
                         border: "none", cursor: "pointer", whiteSpace: "nowrap",
                         background: "rgba(100,140,255,0.15)", color: "#8aadff",
                         outline: "1px solid rgba(100,140,255,0.3)",
-                        opacity: !newPasswords[row.email]?.trim() ? 0.4 : 1,
+                        opacity: (newPasswords[row.email]?.trim().length ?? 0) < 8 ? 0.4 : 1,
                       }}
                     >
                       {resetingEmail === row.email ? "Saving…" : "Reset password"}

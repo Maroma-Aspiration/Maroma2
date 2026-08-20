@@ -56,7 +56,7 @@ export default function CartClient() {
               <h2>Nothing here yet</h2>
               <p>Explore our face, body, and hair rituals. Each one is crafted in Auroville with care for you and the planet.</p>
               <div className="maroma-basket-empty-actions">
-                <Link href="/#shop" className="maroma-btn maroma-btn-primary">
+                <Link href="/?skipIntro=1#shop" className="maroma-btn maroma-btn-primary">
                   Shop the collection
                 </Link>
                 <Link href="/rituals" className="maroma-btn maroma-btn-ghost">
@@ -121,7 +121,7 @@ export default function CartClient() {
                 ))}
               </ul>
 
-              <Link href="/#shop" className="maroma-basket-continue">
+              <Link href="/?skipIntro=1#shop" className="maroma-basket-continue">
                 ← Continue shopping
               </Link>
             </section>

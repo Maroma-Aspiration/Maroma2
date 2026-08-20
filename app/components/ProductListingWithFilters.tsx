@@ -20,6 +20,7 @@ import {
   type PerfumeNavSelection,
 } from "../../lib/perfume-shop-nav";
 import { getDisplayImageUrl } from "../../lib/product-image";
+import { isGift3dPreviewProduct } from "../../lib/gift-builder-catalog";
 import type { ProductRecord } from "../../lib/product-types";
 import { useAdminSession } from "../../lib/use-admin-session";
 
@@ -239,6 +240,7 @@ export function ProductListingWithFilters({ products, categorySlug, searchQuery 
     typeKey: null,
     lineKey: null,
   });
+  const [ready3dIds, setReady3dIds] = useState<Set<string>>(() => new Set());
   const { adminModeEnabled: isAdmin } = useAdminSession();
 
   const availableShopTypes = useMemo(() => {
@@ -260,6 +262,25 @@ export function ProductListingWithFilters({ products, categorySlug, searchQuery 
     if (!categorySlug || !shopTypeId) return;
     window.sessionStorage.setItem(`maroma-shop-type:${categorySlug}`, shopTypeId);
   }, [categorySlug, shopTypeId]);
+
+  useEffect(() => {
+    let cancelled = false;
+    void fetch("/api/gift-3d-assets", { cache: "no-store" })
+      .then((res) => res.json())
+      .then((data: { assets?: Record<string, { glbUrl?: string }> }) => {
+        if (cancelled) return;
+        const ids = Object.entries(data.assets ?? {})
+          .filter(([, asset]) => Boolean(asset?.glbUrl))
+          .map(([id]) => id);
+        setReady3dIds(new Set(ids));
+      })
+      .catch(() => {
+        if (!cancelled) setReady3dIds(new Set());
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const shopTypeProducts = useMemo(() => {
     if (!shopTypeId) return categorySlug ? [] : products;
@@ -944,6 +965,11 @@ export function ProductListingWithFilters({ products, categorySlug, searchQuery 
                           <span>No image</span>
                         )}
                       </div>
+                      {ready3dIds.has(product.id) || isGift3dPreviewProduct(product.id) ? (
+                        <span className="product-card-3d-badge">
+                          {ready3dIds.has(product.id) ? "3D ready" : "3D"}
+                        </span>
+                      ) : null}
                     </div>
                     <div className="product-copy">
                       <h3 className="product-card-title">{decodeBasicHtmlEntities(product.name)}</h3>
@@ -985,7 +1011,9 @@ export function ProductListingWithFilters({ products, categorySlug, searchQuery 
 
         {filtered.length === 0 ? (
           <p className="product-listing-empty">
-            No products match these filters. Try clearing some attributes or the price range.
+            {products.length === 0 && searchQuery.trim()
+              ? "No products match this search. Try fewer words or a different spelling."
+              : "No products match these filters. Try clearing some attributes or the price range."}
           </p>
         ) : null}
       </div>

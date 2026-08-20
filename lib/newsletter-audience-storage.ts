@@ -260,6 +260,58 @@ export async function mergeNewsletterSubscribers(
   return { state: next, added, updated };
 }
 
+/** Public website signup: add (or re-subscribe) one address on the campaign list. */
+export async function subscribePublicNewsletter(email: string): Promise<void> {
+  const norm = normalizeSubscriber({ email });
+  if (!norm) {
+    throw new Error("Enter a valid email address.");
+  }
+
+  const state = await readNewsletterAudience();
+  const now = new Date().toISOString();
+  const byEmail = new Map(state.subscribers.map((s) => [s.email, { ...s }]));
+  const prev = byEmail.get(norm.email);
+  if (!prev) {
+    byEmail.set(norm.email, { ...norm, subscribedAt: now });
+  } else if (prev.unsubscribedAt) {
+    byEmail.set(norm.email, { ...prev, unsubscribedAt: undefined, subscribedAt: now });
+  }
+  const subscribers = Array.from(byEmail.values());
+  const sub = byEmail.get(norm.email);
+  if (!sub) {
+    throw new Error("Enter a valid email address.");
+  }
+
+  let lists = [...state.mailingLists];
+  let selectedListId = state.selectedListId;
+  let list = lists.find((entry) => entry.id === selectedListId) ?? lists[0];
+  if (!list) {
+    list = {
+      id: crypto.randomUUID(),
+      name: DEFAULT_LIST_NAME,
+      createdAt: now,
+      updatedAt: now,
+      subscriberIds: [],
+    };
+    lists.push(list);
+    selectedListId = list.id;
+  }
+  if (!list.subscriberIds.includes(sub.id)) {
+    lists = lists.map((entry) =>
+      entry.id === list!.id
+        ? { ...entry, subscriberIds: [...entry.subscriberIds, sub.id], updatedAt: now }
+        : entry
+    );
+  }
+
+  await writeNewsletterAudience({
+    ...state,
+    subscribers,
+    mailingLists: lists,
+    selectedListId: selectedListId ?? list.id,
+  });
+}
+
 export function summarizeMailingLists(state: NewsletterAudienceState): NewsletterMailingListSummary[] {
   const byId = new Map(state.subscribers.map((s) => [s.id, s]));
   return [...state.mailingLists]

@@ -28,6 +28,9 @@ import {
   resolveNewsletterInkColor,
   storePreviousNewsletterIssue,
 } from "../../lib/newsletter-issue-reset";
+import { preferServerCanvasOverLocalDraft } from "../../lib/newsletter-restore-issue";
+import { reconcileNewsletterCanvasState } from "../../lib/canvas-reconcile-stories";
+import type { NewsletterArchiveSummary } from "../../lib/newsletter-archive-types";
 import { refreshStorySnapshotsInBlocks, storyToBlock } from "../../lib/newsletter-migrate-legacy-blocks";
 import { hideNewsletterExcerptBecauseBodyCoversIt } from "../../lib/newsletter-story-display";
 import { normalizeStoryImageFrame, storySingleImageFrameStyles } from "../../lib/story-image-frame";
@@ -40,9 +43,10 @@ import {
   parseEmailList,
   saveTestMailingList,
 } from "../../lib/test-mailing-list";
-import { MASTHEAD_BANNER_W, MASTHEAD_PORTRAIT_SIZE, mastheadCenterX, estimateStoryGridHeight } from "../../lib/canvas-layout";
-import { NewsletterCanvas, makeTextEl, makeImageEl, makeDividerEl, makeStoryGridEl, makeCtaEl, estimateTextHeight, type NewsletterCanvasHandle } from "./newsletter-canvas";
+import { MASTHEAD_BANNER_W, MASTHEAD_PORTRAIT_SIZE, mastheadCenterX, estimateStoryGridHeight, ensureMastheadZOrder, measureElementHeight, GREETING_TO_NEXT_GAP } from "../../lib/canvas-layout";
+import { NewsletterCanvas, makeTextEl, makeImageEl, makeDividerEl, makeStoryGridEl, makeCtaEl, type NewsletterCanvasHandle } from "./newsletter-canvas";
 import StorySpacingControls from "./story-spacing-controls";
+import { useAdminSession } from "../../lib/use-admin-session";
 
 type StoryFieldKey = "title" | "excerpt" | "body" | "ctaLabel" | "ctaUrl" | "sourceUrl" | "imageUrl";
 
@@ -260,6 +264,82 @@ const RICH_POUR_HEADING_ALIASES: Record<string, "title" | "mission" | "greeting"
   introduction: "intro"
 };
 
+function extractPourImageSrc(el: Element): string {
+  const img =
+    el.tagName.toUpperCase() === "IMG"
+      ? el
+      : el.querySelector("img");
+  if (!img) return "";
+  const candidates = [
+    img.getAttribute("src") ?? "",
+    img.getAttribute("data-src") ?? "",
+    img.getAttribute("data-lazy-src") ?? "",
+  ];
+  for (const raw of candidates) {
+    const src = raw.trim();
+    if (!src || /^javascript:/i.test(src)) continue;
+    if (/^(https?:|data:image\/|blob:)/i.test(src)) return src;
+  }
+  return "";
+}
+
+/** True for short headline-like lines; false for prose paragraphs (even if pasted as <h*> / bold). */
+function looksLikeStoryTitle(raw: string): boolean {
+  const t = raw.replace(/\s+/g, " ").trim();
+  if (!t) return false;
+  const unquoted = t.replace(/^[“”"']+|["'”’]+$/g, "").trim();
+  if (unquoted.length < 3 || unquoted.length > 80) return false;
+  if (/[.!?]\s/.test(unquoted)) return false;
+  if (/[.!?]$/.test(unquoted)) return false;
+  if (/:$/.test(unquoted)) return false;
+  if ((unquoted.match(/[,;:]/g) ?? []).length >= 2) return false;
+  const words = unquoted.split(/\s+/).filter(Boolean);
+  if (words.length > 14) return false;
+  return true;
+}
+
+const STORY_GRID_SUMMARY_LEN = 150;
+
+/** Fixed-length blurb for TOP STORIES tiles so every card fills the same text block. */
+function buildStoryGridSummary(
+  story: { title?: string; excerpt?: string; body?: string },
+  length = STORY_GRID_SUMMARY_LEN,
+): string {
+  const plain = `${story.excerpt || ""} ${story.body || ""}`
+    .replace(/<[^>]+>/g, " ")
+    .replace(/&nbsp;|&#160;/gi, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+  const source = plain || (story.title || "").trim();
+  if (!source) return "Read more in this month’s story…".slice(0, length);
+
+  let summary = source;
+  if (summary.length > length) {
+    const slice = summary.slice(0, length - 1);
+    const at = slice.lastIndexOf(" ");
+    summary = `${(at > length * 0.55 ? slice.slice(0, at) : slice).trimEnd()}…`;
+  } else if (summary.length < length - 1) {
+    // Extend with following content already included; if still short, soft-pad with
+    // a second pass from the title so short teasers still approach full length.
+    const title = (story.title || "").replace(/\s+/g, " ").trim();
+    if (title && !summary.toLowerCase().includes(title.toLowerCase().slice(0, 24))) {
+      const extended = `${summary} ${title}`.replace(/\s+/g, " ").trim();
+      if (extended.length <= length) summary = extended;
+      else {
+        const slice = extended.slice(0, length - 1);
+        const at = slice.lastIndexOf(" ");
+        summary = `${(at > length * 0.55 ? slice.slice(0, at) : slice).trimEnd()}…`;
+      }
+    }
+    // Final equalize: if still short, truncate-style ellipsis only when we hit the cap;
+    // CSS line-clamp + min-height keeps tile bottoms aligned regardless.
+  }
+  if (summary.length > length) {
+    summary = `${summary.slice(0, length - 1).trimEnd()}…`;
+  }
+  return summary;
+}
+
 function applyRichTextPour(
   html: string,
   prev: StoriesState,
@@ -271,10 +351,17 @@ function applyRichTextPour(
   template.content.querySelectorAll("script,style,iframe,object,embed,link,meta,head").forEach((n) => n.remove());
 
   const root = template.content;
-  const blocks: { kind: "h" | "block" | "hr"; level?: number; text?: string; html?: string; node?: Element }[] = [];
+  const blocks: {
+    kind: "h" | "block" | "hr" | "image";
+    level?: number;
+    text?: string;
+    html?: string;
+    src?: string;
+    node?: Element;
+  }[] = [];
 
   const BLOCK_LIKE_TAGS = new Set([
-    "P", "DIV", "UL", "OL", "BLOCKQUOTE", "H1", "H2", "H3", "H4", "HR", "SECTION", "ARTICLE", "MAIN", "HEADER", "FOOTER", "ASIDE"
+    "P", "DIV", "UL", "OL", "BLOCKQUOTE", "H1", "H2", "H3", "H4", "HR", "SECTION", "ARTICLE", "MAIN", "HEADER", "FOOTER", "ASIDE", "FIGURE", "PICTURE"
   ]);
   const containsBlockChild = (el: Element): boolean => {
     for (const child of Array.from(el.children)) {
@@ -288,9 +375,10 @@ function applyRichTextPour(
   // in pastes that use bold instead of <h> tags (Word, Google Docs, plain email).
   // Handles <strong>, <b>, and <span style="font-weight:700"> from real-world pastes.
   // Requires ≥75% of non-whitespace characters to be inside bold markup.
+  // Keep this strict: long or multi-sentence bold paragraphs are body copy, not titles.
   const isEntirelyBold = (el: Element): boolean => {
     const text = (el.textContent ?? "").trim();
-    if (!text || text.length > 300) return false;
+    if (!looksLikeStoryTitle(text)) return false;
     const isBoldEl = (node: Node): boolean => {
       if (node.nodeType !== Node.ELEMENT_NODE) return false;
       const e = node as HTMLElement;
@@ -312,6 +400,18 @@ function applyRichTextPour(
     return totalNonSpace > 0 && boldChars / totalNonSpace >= 0.75;
   };
 
+  const pushImagesFrom = (el: Element) => {
+    if (el.tagName.toUpperCase() === "IMG") {
+      const src = extractPourImageSrc(el);
+      if (src) blocks.push({ kind: "image", src });
+      return;
+    }
+    el.querySelectorAll("img").forEach((img) => {
+      const src = extractPourImageSrc(img);
+      if (src) blocks.push({ kind: "image", src });
+    });
+  };
+
   let prevWasBlank = false;
   const walk = (node: Node) => {
     if (node.nodeType !== Node.ELEMENT_NODE) return;
@@ -319,7 +419,15 @@ function applyRichTextPour(
     const tag = el.tagName.toUpperCase();
     if (tag === "H1" || tag === "H2" || tag === "H3" || tag === "H4") {
       prevWasBlank = false;
-      blocks.push({ kind: "h", level: Number(tag.slice(1)), text: (el.textContent ?? "").trim(), node: el });
+      const text = (el.textContent ?? "").trim();
+      // Word/Docs/ChatGPT often paste body as <h*>; only keep real headline-shaped lines.
+      if (looksLikeStoryTitle(text)) {
+        blocks.push({ kind: "h", level: Number(tag.slice(1)), text, node: el });
+      } else if (text) {
+        pushImagesFrom(el);
+        const out = blockNodeToHtml(el);
+        if (out) blocks.push({ kind: "block", html: out, text });
+      }
       return;
     }
     if (tag === "HR") {
@@ -327,13 +435,21 @@ function applyRichTextPour(
       blocks.push({ kind: "hr" });
       return;
     }
+    if (tag === "IMG" || tag === "FIGURE" || tag === "PICTURE") {
+      prevWasBlank = false;
+      pushImagesFrom(el);
+      return;
+    }
     if (tag === "DIV" || tag === "SECTION" || tag === "ARTICLE" || tag === "MAIN" || tag === "HEADER" || tag === "FOOTER" || tag === "ASIDE") {
       if (containsBlockChild(el)) {
         el.childNodes.forEach(walk);
         return;
       }
-      const out = blockNodeToHtml(el);
-      if (out) blocks.push({ kind: "block", html: out, text: (el.textContent ?? "").trim() });
+      pushImagesFrom(el);
+      const clone = el.cloneNode(true) as Element;
+      clone.querySelectorAll("img,figure,picture").forEach((n) => n.remove());
+      const out = blockNodeToHtml(clone);
+      if (out) blocks.push({ kind: "block", html: out, text: (clone.textContent ?? "").trim() });
       return;
     }
     if (tag === "P" || tag === "UL" || tag === "OL" || tag === "BLOCKQUOTE") {
@@ -346,18 +462,28 @@ function applyRichTextPour(
       }
       // Empty paragraph → remember so the NEXT paragraph can be promoted
       if (tag === "P" && !text) {
+        // Still capture any images in "empty" wrappers
+        if (el.querySelector("img")) {
+          prevWasBlank = false;
+          pushImagesFrom(el);
+          return;
+        }
         prevWasBlank = true;
         return;
       }
       // Short non-bold paragraph preceded by a blank → story headline
-      if (tag === "P" && prevWasBlank && text.length <= 120 && !/[.!?]\s/.test(text) && !/,$/.test(text)) {
+      if (tag === "P" && prevWasBlank && looksLikeStoryTitle(text)) {
         prevWasBlank = false;
         blocks.push({ kind: "h", level: 2, text, node: el });
         return;
       }
       prevWasBlank = false;
-      const out = blockNodeToHtml(el);
-      if (out) blocks.push({ kind: "block", html: out, text });
+      pushImagesFrom(el);
+      const clone = el.cloneNode(true) as Element;
+      clone.querySelectorAll("img,figure,picture").forEach((n) => n.remove());
+      const out = blockNodeToHtml(clone);
+      const cleanedText = (clone.textContent ?? "").trim();
+      if (out && cleanedText) blocks.push({ kind: "block", html: out, text: cleanedText });
       return;
     }
     el.childNodes.forEach(walk);
@@ -374,23 +500,68 @@ function applyRichTextPour(
     if (firstBlockIdx >= 0) {
       const candidate = blocks[firstBlockIdx];
       const candidateText = (candidate.text ?? "").trim();
-      const looksLikeTitle = candidateText.length <= 140 && !/[.!?]\s/.test(candidateText);
-      if (looksLikeTitle && blocks.length > firstBlockIdx + 1) {
+      if (looksLikeStoryTitle(candidateText) && blocks.length > firstBlockIdx + 1) {
         blocks[firstBlockIdx] = { kind: "h", level: 2, text: candidateText };
       }
     }
   }
 
+  // Promote remaining title-shaped plain lines that sit after a blank / prior story
+  // break when the paste had no heading markup (common with Notes / plain email).
+  if (!hasAnyHeading) {
+    let prevBlankOrBreak = true;
+    for (let i = 0; i < blocks.length; i++) {
+      const b = blocks[i];
+      if (b.kind === "hr") {
+        prevBlankOrBreak = true;
+        continue;
+      }
+      if (b.kind !== "block") {
+        prevBlankOrBreak = false;
+        continue;
+      }
+      const t = (b.text ?? "").trim();
+      if (prevBlankOrBreak && looksLikeStoryTitle(t)) {
+        blocks[i] = { kind: "h", level: 2, text: t };
+        prevBlankOrBreak = false;
+        continue;
+      }
+      prevBlankOrBreak = false;
+    }
+  }
+
   let topApplied = 0;
   let storyApplied = 0;
+  let imagesApplied = 0;
   let storiesAppendedOrReplaced: StoryRecord[] = [];
   if (options.replaceStories) storiesAppendedOrReplaced = [];
 
   let firstTitleSet = false;
   let currentSection: { kind: "title" | "mission" | "greeting" | "intro" | "story"; story?: StoryRecord } | null = null;
+  let pendingImageSrc = "";
+
+  const attachImageToStory = (story: StoryRecord, src: string) => {
+    if (!src) return;
+    if (!story.imageUrl) {
+      story.imageUrl = src;
+      story.images = [src];
+      imagesApplied += 1;
+      return;
+    }
+    const images = Array.isArray(story.images) ? [...story.images] : story.imageUrl ? [story.imageUrl] : [];
+    if (!images.includes(src)) {
+      images.push(src);
+      story.images = images;
+      imagesApplied += 1;
+    }
+  };
 
   const flushStory = () => {
     if (currentSection?.kind === "story" && currentSection.story && (currentSection.story.title || currentSection.story.excerpt)) {
+      if (pendingImageSrc && !currentSection.story.imageUrl) {
+        attachImageToStory(currentSection.story, pendingImageSrc);
+        pendingImageSrc = "";
+      }
       storiesAppendedOrReplaced.push(currentSection.story);
     }
   };
@@ -399,6 +570,16 @@ function applyRichTextPour(
     if (block.kind === "hr") {
       flushStory();
       currentSection = null;
+      continue;
+    }
+    if (block.kind === "image") {
+      const src = (block.src ?? "").trim();
+      if (!src) continue;
+      if (currentSection?.kind === "story" && currentSection.story) {
+        attachImageToStory(currentSection.story, src);
+      } else {
+        pendingImageSrc = src;
+      }
       continue;
     }
     if (block.kind === "h") {
@@ -441,26 +622,28 @@ function applyRichTextPour(
         continue;
       }
       const now = new Date().toISOString();
-      currentSection = {
+      const story: StoryRecord = {
+        id: crypto.randomUUID(),
         kind: "story",
-        story: {
-          id: crypto.randomUUID(),
-          kind: "story",
-          slug: "",
-          title: block.text ?? "",
-          excerpt: "",
-          body: "",
-          imageUrl: "",
-          sourceUrl: "",
-          source: "manual",
-          ctaLabel: "Read more",
-          ctaUrl: "",
-          publishedAt: now,
-          updatedAt: now,
-          featured: false,
-          imageFrame: normalizeStoryImageFrame(undefined),
-        }
+        slug: "",
+        title: block.text ?? "",
+        excerpt: "",
+        body: "",
+        imageUrl: "",
+        sourceUrl: "",
+        source: "manual",
+        ctaLabel: "Read more",
+        ctaUrl: "",
+        publishedAt: now,
+        updatedAt: now,
+        featured: false,
+        imageFrame: normalizeStoryImageFrame(undefined),
       };
+      if (pendingImageSrc) {
+        attachImageToStory(story, pendingImageSrc);
+        pendingImageSrc = "";
+      }
+      currentSection = { kind: "story", story };
       continue;
     }
     if (block.kind === "block") {
@@ -508,6 +691,28 @@ function applyRichTextPour(
   }
   flushStory();
 
+  // Heal false story breaks: Word/Docs/ChatGPT often paste body paragraphs as <h*>,
+  // which would otherwise become one story per paragraph (headline-sized body text).
+  {
+    const healed: StoryRecord[] = [];
+    for (const story of storiesAppendedOrReplaced) {
+      const title = (story.title ?? "").trim();
+      if (healed.length > 0 && title && !looksLikeStoryTitle(title)) {
+        const prevStory = healed[healed.length - 1];
+        const titleHtml = `<p>${escapeHtml(title)}</p>`;
+        prevStory.body = `${prevStory.body || ""}${titleHtml}${story.body || ""}`;
+        if (!prevStory.excerpt) prevStory.excerpt = title;
+        if (story.imageUrl) attachImageToStory(prevStory, story.imageUrl);
+        if (Array.isArray(story.images)) {
+          for (const src of story.images) attachImageToStory(prevStory, src);
+        }
+        continue;
+      }
+      healed.push(story);
+    }
+    storiesAppendedOrReplaced = healed;
+  }
+
   if (options.replaceStories) {
     next.stories = storiesAppendedOrReplaced;
   } else {
@@ -517,7 +722,7 @@ function applyRichTextPour(
   const newCount = storiesAppendedOrReplaced.length;
   return {
     next,
-    summary: `Rich text pour: ${topApplied} header field(s), ${newCount} story section(s) ${options.replaceStories ? "(replaced existing)" : "(appended)"}.`
+    summary: `Rich text pour: ${topApplied} header field(s), ${newCount} story section(s)${imagesApplied ? `, ${imagesApplied} image(s)` : ""} ${options.replaceStories ? "(replaced existing)" : "(appended)"}.`
   };
 }
 
@@ -527,6 +732,8 @@ type Props = {
   initialState: StoriesState;
   editMode: boolean;
   isAdmin?: boolean;
+  /** Admin or newsletter-editor role — unlocks canvas editing when editMode is on. */
+  canEditNewsletter?: boolean;
 };
 
 type EditableTarget =
@@ -1268,21 +1475,37 @@ function IssueTitleEditable({
 const CANVAS_LS_KEY = "maroma-newsletter-canvas-draft";
 const CANVAS_LS_SAVED_KEY = "maroma-newsletter-canvas-saved-at";
 
+function canvasLayoutSignature(canvas: StoriesState["newsletterCanvas"]): string {
+  return JSON.stringify(
+    (canvas?.elements ?? []).map((e) => [e.id, Math.round(e.y)]),
+  );
+}
+
 function withCanvasStoryGaps(s: StoriesState): StoriesState {
-  const existing = parseStorySpacingGaps(s.newsletterCanvas?.storySpacingGaps);
+  const beforeSig = canvasLayoutSignature(s.newsletterCanvas);
+  const reconciled = reconcileNewsletterCanvasState(s);
+  const afterSig = canvasLayoutSignature(reconciled.newsletterCanvas);
+  if (beforeSig !== afterSig && typeof window !== "undefined") {
+    try {
+      localStorage.removeItem(CANVAS_LS_KEY);
+    } catch {
+      // ignore
+    }
+  }
+  const existing = parseStorySpacingGaps(reconciled.newsletterCanvas?.storySpacingGaps);
   if (existing) {
     return {
-      ...s,
+      ...reconciled,
       newsletterCanvas: {
-        ...(s.newsletterCanvas ?? { enabled: false, elements: [] }),
+        ...(reconciled.newsletterCanvas ?? { enabled: false, elements: [] }),
         storySpacingGaps: existing,
       },
     };
   }
   return {
-    ...s,
+    ...reconciled,
     newsletterCanvas: {
-      ...(s.newsletterCanvas ?? { enabled: false, elements: [] }),
+      ...(reconciled.newsletterCanvas ?? { enabled: false, elements: [] }),
       storySpacingGaps:
         typeof window !== "undefined" ? loadStorySpacingGaps() : { ...DEFAULT_STORY_SPACING_GAPS },
     },
@@ -1313,10 +1536,22 @@ function syncCanvasMastheadAssets(state: StoriesState): StoriesState {
   };
 }
 
-export default function NewsletterPageClient({ initialState, editMode, isAdmin = false }: Props) {
+export default function NewsletterPageClient({
+  initialState,
+  editMode,
+  isAdmin = false,
+  canEditNewsletter: canEditNewsletterProp = false,
+}: Props) {
   // Always-current ref so saveStories never captures a stale closure
   const stateRef = useRef<StoriesState>(initialState);
   const canvasRef = useRef<NewsletterCanvasHandle>(null);
+  const { isAdminUser, canEditNewsletter: canEditNewsletterSession, sessionReady } = useAdminSession();
+  const newsletterEditor = Boolean(
+    sessionReady ? canEditNewsletterSession : canEditNewsletterProp || isAdmin,
+  );
+  /** Live session wins — never show editor chrome after sign-out with a stale SSR edit flag. */
+  const canEdit = Boolean(editMode && sessionReady && newsletterEditor);
+  const showAdminEntry = newsletterEditor;
 
   const [state, setState] = useState<StoriesState>(() => {
     // On first render in the browser, check if localStorage has a newer canvas draft
@@ -1329,6 +1564,9 @@ export default function NewsletterPageClient({ initialState, editMode, isAdmin =
       const draftHasCanvas = draft.canvas?.enabled && (draft.canvas?.elements?.length ?? 0) > 0;
       // Use draft if: server has no canvas, or draft was saved after the last confirmed API save
       const lastApiSave = Number(localStorage.getItem(CANVAS_LS_SAVED_KEY) ?? 0);
+      if (draftHasCanvas && preferServerCanvasOverLocalDraft(initialState.newsletterCanvas, draft.canvas)) {
+        return withCanvasStoryGaps(initialState);
+      }
       if (draftHasCanvas && (!serverHasCanvas || draft.savedAt > lastApiSave)) {
         return withCanvasStoryGaps({ ...initialState, newsletterCanvas: draft.canvas });
       }
@@ -1354,8 +1592,43 @@ export default function NewsletterPageClient({ initialState, editMode, isAdmin =
   useEffect(() => { stateRef.current = state; }, [state]);
 
   useEffect(() => {
+    try {
+      const raw = localStorage.getItem(CANVAS_LS_KEY);
+      if (raw) {
+        const draft = JSON.parse(raw) as { canvas?: import("../../lib/story-types").NewsletterCanvas };
+        if (preferServerCanvasOverLocalDraft(initialState.newsletterCanvas, draft.canvas)) {
+          localStorage.removeItem(CANVAS_LS_KEY);
+          localStorage.setItem(CANVAS_LS_SAVED_KEY, String(Date.now()));
+        }
+      }
+    } catch {
+      // ignore
+    }
+    if (!canEdit) return;
     setHasPreviousIssueBackup(hasPreviousNewsletterIssueBackup());
-  }, []);
+    void fetch("/api/newsletter/previous-issue")
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data: { exists?: boolean } | null) => {
+        if (data?.exists) setHasPreviousIssueBackup(true);
+      })
+      .catch(() => {
+        // local backup still applies
+      });
+    void fetch("/api/newsletter/restore-archive")
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data: { issues?: NewsletterArchiveSummary[] } | null) => {
+        const issues = data?.issues ?? [];
+        setArchiveIssues(issues);
+        setRestoreArchiveSlug((current) => {
+          if (current) return current;
+          const july = issues.find((issue) => /july/i.test(issue.subject));
+          return july?.slug || issues.find((issue) => issue.testOnly)?.slug || issues[0]?.slug || "";
+        });
+      })
+      .catch(() => {
+        // restore picker stays empty
+      });
+  }, [canEdit, initialState.newsletterCanvas]);
 
   // Auto-save canvas draft to localStorage whenever canvas changes (debounced)
   const canvasDraftTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -1375,6 +1648,8 @@ export default function NewsletterPageClient({ initialState, editMode, isAdmin =
   const [status, setStatus] = useState("");
   const [saveState, setSaveState] = useState<"idle" | "saving" | "saved">("idle");
   const [hasPreviousIssueBackup, setHasPreviousIssueBackup] = useState(false);
+  const [archiveIssues, setArchiveIssues] = useState<NewsletterArchiveSummary[]>([]);
+  const [restoreArchiveSlug, setRestoreArchiveSlug] = useState("");
   const [selectedEditorTarget, setSelectedEditorTarget] = useState<EditableTarget | null>(null);
   const [selectedStoryEdit, setSelectedStoryEdit] = useState<{ storyId: string; field: StoryEditField } | null>(null);
   const [selectedLayoutDividerId, setSelectedLayoutDividerId] = useState<string | null>(null);
@@ -1454,8 +1729,7 @@ export default function NewsletterPageClient({ initialState, editMode, isAdmin =
   const storyImageUploadRef = useRef<HTMLInputElement | null>(null);
   const textPourRef = useRef<HTMLInputElement | null>(null);
   const mailingListRef = useRef<HTMLInputElement | null>(null);
-  const canEdit = editMode;
-  const canTransformImages = editMode;
+  const canTransformImages = canEdit;
   const isImageTarget = (target: EditableTarget) =>
     target === "topImage" ||
     target === "logoImage" ||
@@ -3639,9 +3913,11 @@ export default function NewsletterPageClient({ initialState, editMode, isAdmin =
 
   // Shared logic: build canvas elements from any StoriesState snapshot.
   // Pass existingEls to preserve user-customised styles.
-  // preservePositions=true (default false): also preserve X/Y positions — used by
-  // explicit "Convert to canvas" only. On rich-text-pour, positions are always
+  // preservePositions=true (default false): also preserve X/Y positions for flow text —
+  // used by explicit "Convert to canvas" only. On rich-text-pour, flow positions are
   // recalculated fresh so auto-reflow artifacts don't corrupt the layout.
+  // Masthead overlays (banner/logo/portrait/hero) always keep their canvas geometry
+  // and crop when present — pour/rebuild must not undo the composed masthead.
   const buildCanvasElements = (
     s: StoriesState,
     existingEls?: import("../../lib/story-types").CanvasEl[],
@@ -3689,7 +3965,7 @@ export default function NewsletterPageClient({ initialState, editMode, isAdmin =
       if (lockedIds.has(id)) {
         // Already added verbatim — advance y past the locked element's actual bottom
         const ex = existingById.get(id);
-        if (ex && ex.kind === "text") return Math.max(atY, ex.y + estimateTextHeight(ex) + trailingGap);
+        if (ex && ex.kind === "text") return Math.max(atY, ex.y + measureElementHeight(ex) + trailingGap);
         return atY;
       }
       const base = makeTextEl({ id, x: 28, w: 660, zIndex: 5, ...opts, html, y: atY });
@@ -3707,7 +3983,7 @@ export default function NewsletterPageClient({ initialState, editMode, isAdmin =
           } as import("../../lib/story-types").CanvasTextEl
         : base;
       els.push(el);
-      return atY + estimateTextHeight(base) + trailingGap;
+      return atY + measureElementHeight(el) + trailingGap;
     };
 
     const addDivider = (id: string, atY: number): number => {
@@ -3727,81 +4003,104 @@ export default function NewsletterPageClient({ initialState, editMode, isAdmin =
       return fallbackY;
     };
 
+    /** Masthead overlays are user-composed — never reset geometry/crop on pour/rebuild. */
+    const pushMastheadImage = (
+      id: string,
+      src: string,
+      defaults: Partial<import("../../lib/story-types").CanvasImageEl>,
+    ) => {
+      if (!src || lockedIds.has(id)) return;
+      const existing = existingById.get(id);
+      if (existing && existing.kind === "image") {
+        const kept = { ...existing, src } as import("../../lib/story-types").CanvasImageEl & {
+          montageGroup?: string;
+          montageIndex?: number;
+          montageCols?: number;
+        };
+        delete kept.montageGroup;
+        delete kept.montageIndex;
+        delete kept.montageCols;
+        if (id === "migrated-portrait") {
+          kept.shadow = true;
+          if (!kept.borderRadius || kept.borderRadius < MASTHEAD_PORTRAIT_SIZE / 2 - 2) {
+            kept.borderRadius = MASTHEAD_PORTRAIT_SIZE / 2;
+          }
+        }
+        els.push(kept);
+        return;
+      }
+      els.push(makeImageEl(src, { id, ...defaults }));
+    };
+
+    const mastheadBottom = (id: string): number | null => {
+      const el = els.find((e) => e.id === id) ?? (lockedIds.has(id) ? existingById.get(id) : undefined);
+      if (el && el.kind === "image") return el.y + el.h;
+      return null;
+    };
+
     let y = 0;
 
     // ── Top banner image (full-bleed) ──────────────────────────────
     if (s.newsletterTopImageUrl) {
-      if (!lockedIds.has("migrated-top")) {
-        const topW = MASTHEAD_BANNER_W;
-        els.push(makeImageEl(s.newsletterTopImageUrl, {
-          id: "migrated-top",
-          x: mastheadCenterX(topW),
-          y: -34,
-          w: topW,
-          h: 300,
-          zIndex: 1,
-          borderRadius: 0,
-        }));
-      }
-      y = lockedIds.has("migrated-top") ? yPastLocked("migrated-top", 280) : 280;
+      pushMastheadImage("migrated-top", s.newsletterTopImageUrl, {
+        x: mastheadCenterX(MASTHEAD_BANNER_W),
+        y: -34,
+        w: MASTHEAD_BANNER_W,
+        h: 300,
+        zIndex: 1,
+        borderRadius: 0,
+      });
+      y = Math.max(y, mastheadBottom("migrated-top") ?? 280);
     }
 
     // ── Logo (centred over banner) ─────────────────────────────────
-    if (s.newsletterLogoUrl && !lockedIds.has("migrated-logo")) {
+    if (s.newsletterLogoUrl) {
       const logoW = 400;
       const logoY = s.newsletterTopImageUrl ? 10 : 0;
-      els.push(makeImageEl(s.newsletterLogoUrl, {
-        id: "migrated-logo",
+      pushMastheadImage("migrated-logo", s.newsletterLogoUrl, {
         x: mastheadCenterX(logoW),
         y: logoY,
         w: logoW,
         h: 130,
         zIndex: 3,
         borderRadius: 0,
-      }));
+      });
     }
 
     // ── Portrait circle ────────────────────────────────────────────
     if (s.newsletterPortraitUrl) {
-      if (!lockedIds.has("migrated-portrait")) {
-        const portraitW = MASTHEAD_PORTRAIT_SIZE;
-        const portraitY = Math.max(0, y - 60);
-        els.push(makeImageEl(s.newsletterPortraitUrl, {
-          id: "migrated-portrait",
-          x: mastheadCenterX(portraitW),
-          y: portraitY,
-          w: portraitW,
-          h: MASTHEAD_PORTRAIT_SIZE,
-          zIndex: 10,
-          borderRadius: MASTHEAD_PORTRAIT_SIZE / 2,
-          objectPositionX: 0,
-          objectPositionY: 0,
-          imageZoom: 1,
-        }));
-        y = Math.max(y, portraitY + 220);
-      } else {
-        y = yPastLocked("migrated-portrait", y);
-      }
+      const portraitW = MASTHEAD_PORTRAIT_SIZE;
+      const portraitY = Math.max(0, y - 60);
+      pushMastheadImage("migrated-portrait", s.newsletterPortraitUrl, {
+        x: mastheadCenterX(portraitW),
+        y: portraitY,
+        w: portraitW,
+        h: MASTHEAD_PORTRAIT_SIZE,
+        zIndex: 10,
+        borderRadius: MASTHEAD_PORTRAIT_SIZE / 2,
+        objectPositionX: 0,
+        objectPositionY: 0,
+        imageZoom: 1,
+        shadow: true,
+      });
+      const portraitBottom = mastheadBottom("migrated-portrait");
+      if (portraitBottom != null) y = Math.max(y, portraitBottom + 20);
     }
 
     // ── Hero / celebration image ───────────────────────────────────
     if (s.newsletterHeroImageUrl) {
-      if (!lockedIds.has("migrated-hero")) {
-        const heroW = MASTHEAD_BANNER_W;
-        const heroY = y;
-        els.push(makeImageEl(s.newsletterHeroImageUrl, {
-          id: "migrated-hero",
-          x: mastheadCenterX(heroW),
-          y: heroY,
-          w: heroW,
-          h: 320,
-          zIndex: 2,
-          borderRadius: 14,
-        }));
-        y = heroY + 340;
-      } else {
-        y = yPastLocked("migrated-hero", y);
-      }
+      const heroW = MASTHEAD_BANNER_W;
+      const heroY = y;
+      pushMastheadImage("migrated-hero", s.newsletterHeroImageUrl, {
+        x: mastheadCenterX(heroW),
+        y: heroY,
+        w: heroW,
+        h: 320,
+        zIndex: 2,
+        borderRadius: 14,
+      });
+      const heroBottom = mastheadBottom("migrated-hero");
+      if (heroBottom != null) y = Math.max(y, heroBottom + 20);
     }
 
     y += 28;
@@ -3904,16 +4203,19 @@ export default function NewsletterPageClient({ initialState, editMode, isAdmin =
     const storyItems: StoryItem[] = s.stories.map(story => ({ story }));
 
     if (storyItems.length > 0) {
-      y += 56; // gap before TOP STORIES section
+      y += GREETING_TO_NEXT_GAP; // gap before TOP STORIES section
 
-      // Build one-sentence summaries: first sentence of excerpt/body
+      // Equal-length summaries so TOP STORIES tiles share the same text block height.
       const topStories = storyItems.slice(0, 3); // only first 3 in the grid
       const cardData: import("../../lib/story-types").CanvasStoryCardData[] = topStories.map(({ story }, cardIdx) => {
-        const rawExcerpt = story.excerpt || story.body?.replace(/<[^>]+>/g, " ") || "";
-        const firstSentence = rawExcerpt.split(/(?<=[.!?])\s/)[0]?.trim() ?? "";
-        const excerpt = firstSentence.length > 120 ? firstSentence.slice(0, 117) + "…" : firstSentence;
+        const excerpt = buildStoryGridSummary(story);
         const existingStoryImg = existingById.get(`migrated-si-${cardIdx}`) as import("../../lib/story-types").CanvasImageEl | undefined;
-        return { storyId: story.id, title: story.title || "", imageUrl: story.imageUrl || existingStoryImg?.src || undefined, excerpt: excerpt || undefined };
+        return {
+          storyId: story.id,
+          title: story.title || "",
+          imageUrl: story.imageUrl || existingStoryImg?.src || undefined,
+          excerpt,
+        };
       });
 
       const cols: 2 | 3 = topStories.length >= 3 ? 3 : 2;
@@ -4036,7 +4338,7 @@ export default function NewsletterPageClient({ initialState, editMode, isAdmin =
       });
     }
 
-    return els;
+    return ensureMastheadZOrder(els);
   };
 
   const migrateToCanvas = () => {
@@ -4134,8 +4436,30 @@ export default function NewsletterPageClient({ initialState, editMode, isAdmin =
       return;
     }
 
-    const fresh = createFreshNewsletterIssueState(stateRef.current);
-    storePreviousNewsletterIssue(stateRef.current);
+    const previous = stateRef.current;
+    storePreviousNewsletterIssue(previous);
+    setStatus("Saving previous issue...");
+    setSaveState("saving");
+    try {
+      const backupRes = await fetch("/api/newsletter/previous-issue", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ state: previous }),
+      });
+      if (!backupRes.ok) {
+        const payload = (await backupRes.json().catch(() => null)) as { error?: string } | null;
+        throw new Error(payload?.error || "Could not save the current issue before creating a new one.");
+      }
+    } catch (err) {
+      setSaveState("idle");
+      setStatus(err instanceof Error ? err.message : "Could not save the current issue.");
+      window.alert(
+        "The current issue could not be backed up, so a new issue was not created. Try Save newsletter first, then Create new issue again.",
+      );
+      return;
+    }
+
+    const fresh = createFreshNewsletterIssueState(previous);
     setHasPreviousIssueBackup(true);
     stateRef.current = fresh;
     setState(fresh);
@@ -4157,7 +4481,7 @@ export default function NewsletterPageClient({ initialState, editMode, isAdmin =
 
     try {
       await saveStories(fresh);
-      setStatus("New issue created.");
+      setStatus("New issue created. Delete this issue will restore the previous draft.");
     } catch {
       // saveStories sets the visible error state
     }
@@ -4190,7 +4514,16 @@ export default function NewsletterPageClient({ initialState, editMode, isAdmin =
   };
 
   const deleteCurrentIssue = async () => {
-    const rawPrevious = loadPreviousNewsletterIssue();
+    let rawPrevious = loadPreviousNewsletterIssue();
+    try {
+      const res = await fetch("/api/newsletter/previous-issue");
+      if (res.ok) {
+        const data = (await res.json()) as { state?: StoriesState | null };
+        if (data.state) rawPrevious = data.state;
+      }
+    } catch {
+      // fall back to the browser copy
+    }
     if (!rawPrevious) {
       window.alert(
         'No previous issue to restore. "Delete this issue" is available after you use Create new issue. It brings back the draft you had right before that.',
@@ -4228,10 +4561,60 @@ export default function NewsletterPageClient({ initialState, editMode, isAdmin =
     try {
       await saveStories(restored);
       clearPreviousNewsletterIssue();
+      await fetch("/api/newsletter/previous-issue", { method: "DELETE" }).catch(() => null);
       setHasPreviousIssueBackup(false);
       setStatus("Previous issue restored.");
     } catch {
       // saveStories sets the visible error state
+    }
+  };
+
+  const restoreArchiveIssue = async (month?: string) => {
+    const slug = month ? "" : restoreArchiveSlug.trim();
+    if (
+      !window.confirm(
+        month
+          ? `Replace the editor with the ${month} issue (including test sends and the previous draft)? The current draft will be saved so Delete this issue can bring it back.`
+          : slug
+          ? "Replace the editor with that issue? The current draft will be saved so Delete this issue can bring it back."
+          : "Restore the latest sent or test issue into the editor? The current draft will be saved so Delete this issue can bring it back.",
+      )
+    ) {
+      return;
+    }
+
+    setStatus(month ? `Restoring ${month} issue...` : "Restoring sent issue...");
+    setSaveState("saving");
+    try {
+      const res = await fetch("/api/newsletter/restore-archive", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(month ? { month } : { slug: slug || undefined }),
+      });
+      const data = (await res.json().catch(() => null)) as { state?: StoriesState; error?: string } | null;
+      if (!res.ok || !data?.state) {
+        throw new Error(data?.error || "Could not restore that issue.");
+      }
+      const restored = withCanvasStoryGaps(data.state);
+      stateRef.current = restored;
+      setState(restored);
+      setCampaignSubject(restored.newsletterTitle?.trim() || "Maroma newsletter");
+      setHasPreviousIssueBackup(true);
+      setSelectedEditorTarget(null);
+      setSelectedStoryEdit(null);
+      setSelectedLayoutDividerId(null);
+      setSelectedBlockId(null);
+      try {
+        localStorage.removeItem(CANVAS_LS_KEY);
+        localStorage.setItem(CANVAS_LS_SAVED_KEY, String(Date.now()));
+      } catch {
+        // ignore
+      }
+      setSaveState("saved");
+      setStatus("Sent issue restored into the editor.");
+    } catch (err) {
+      setSaveState("idle");
+      setStatus(err instanceof Error ? err.message : "Could not restore that issue.");
     }
   };
 
@@ -4421,10 +4804,29 @@ export default function NewsletterPageClient({ initialState, editMode, isAdmin =
     const text = event.clipboardData.getData("text/plain");
     if (!text) return;
     event.preventDefault();
-    document.execCommand("insertText", false, text);
+    // Preserve blank lines as empty <p>s so story-title detection can see section breaks.
+    const asHtml = text
+      .replace(/\r\n/g, "\n")
+      .replace(/\r/g, "\n")
+      .split("\n")
+      .map((line) => (line.trim() ? `<p>${escapeHtml(line.trim())}</p>` : "<p></p>"))
+      .join("");
+    const sel = window.getSelection();
+    if (!sel || sel.rangeCount === 0) {
+      if (richPourRef.current) richPourRef.current.innerHTML += asHtml;
+      return;
+    }
+    const range = sel.getRangeAt(0);
+    range.deleteContents();
+    const fragment = range.createContextualFragment(asHtml);
+    range.insertNode(fragment);
+    range.collapse(false);
     if (richPourRef.current) {
       normalizeRichPourEditorContent(richPourRef.current);
     }
+    richPourRef.current?.focus();
+    sel.removeAllRanges();
+    sel.addRange(range);
   };
 
   const handleMailingListFile = async (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -4960,7 +5362,7 @@ export default function NewsletterPageClient({ initialState, editMode, isAdmin =
       {renderStoryEditPortal()}
       {renderLayoutDividerPortal()}
       <section
-        className={`newsletter-shell ${state.newsletterTextAlign === "left" ? "is-align-left" : "is-align-center"}${canEdit ? " is-preview" : ""} newsletter-font-${state.newsletterFontFamily ?? "serif"}`}
+        className={`newsletter-shell ${state.newsletterTextAlign === "left" ? "is-align-left" : "is-align-center"}${canEdit ? " is-preview" : ""}${state.newsletterCanvas?.enabled ? " newsletter-shell--canvas" : ""} newsletter-font-${state.newsletterFontFamily ?? "serif"}`}
         style={
           {
             "--newsletter-section-heading-size": `${state.newsletterSectionHeadingSizeRem ?? 0.86}rem`,
@@ -5066,9 +5468,55 @@ export default function NewsletterPageClient({ initialState, editMode, isAdmin =
                     {sendingCampaign ? "Sending" : campaignSent ? "Sent!" : "Send campaign now"}
                   </button>
                 </div>
-                <p className="admin-status newsletter-send-status" style={{ opacity: 0.85 }}>
-                  Email clients block inline images. Use Host images (or send test) so photos upload to Firebase/Blob as public HTTPS links.
-                </p>
+                <details className="newsletter-test-list-details" open={testMailingList.length === 0}>
+                  <summary className="newsletter-test-list-summary">
+                    Test mailing list
+                    {testMailingList.length > 0 ? (
+                      <span className="newsletter-test-list-count">{testMailingList.length}</span>
+                    ) : null}
+                  </summary>
+                  <div className="newsletter-test-list">
+                    <p className="admin-rss-hint">
+                      Saved in this browser. These addresses receive Send newsletter test.
+                    </p>
+                    {testMailingList.length > 0 ? (
+                      <ul className="newsletter-test-list-chips">
+                        {testMailingList.map((email) => (
+                          <li key={email}>
+                            <span>{email}</span>
+                            <button
+                              type="button"
+                              className="newsletter-test-list-remove"
+                              aria-label={`Remove ${email}`}
+                              onClick={() => removeTestMailingEmail(email)}
+                            >
+                              ×
+                            </button>
+                          </li>
+                        ))}
+                      </ul>
+                    ) : (
+                      <p className="admin-rss-hint">No test addresses yet. Add yours below.</p>
+                    )}
+                    <div className="newsletter-test-list-add">
+                      <input
+                        type="email"
+                        value={newTestEmail}
+                        placeholder="you@example.com"
+                        onChange={(e) => setNewTestEmail(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter") {
+                            e.preventDefault();
+                            addTestMailingEmail();
+                          }
+                        }}
+                      />
+                      <button type="button" className="button secondary" onClick={addTestMailingEmail}>
+                        Add
+                      </button>
+                    </div>
+                  </div>
+                </details>
                 {deliveryStatus ? <p className="admin-status newsletter-send-status">{deliveryStatus}</p> : null}
               </>
             ) : null}
@@ -5079,7 +5527,8 @@ export default function NewsletterPageClient({ initialState, editMode, isAdmin =
                   <h3>Issue lifecycle</h3>
                   <p className="admin-rss-hint">
                     Start a fresh issue: stories are cleared and the title/greeting reset to placeholders. Masthead images, mission, colours, and layout stay unchanged.
-                    If the new issue looks wrong, use Delete this issue to restore the draft from before creating it.
+                    The previous draft is saved on the server, so Delete this issue still works after a refresh or on another computer.
+                    Test sends are also saved privately so you can restore them; they do not appear on the public archive.
                   </p>
                   <div className="newsletter-issue-lifecycle-actions">
                     <button
@@ -5108,6 +5557,51 @@ export default function NewsletterPageClient({ initialState, editMode, isAdmin =
                       Delete this issue
                     </button>
                   </div>
+                  {archiveIssues.length > 0 ? (
+                    <div className="newsletter-issue-lifecycle-actions" style={{ marginTop: 12 }}>
+                      <label>
+                        Restore a sent or test issue
+                        <select
+                          value={restoreArchiveSlug}
+                          onChange={(e) => setRestoreArchiveSlug(e.target.value)}
+                        >
+                          {archiveIssues.map((issue) => (
+                            <option key={issue.slug} value={issue.slug}>
+                              {issue.testOnly ? "[TEST] " : ""}
+                              {issue.subject} — {formatStoryDate(issue.sentAt)}
+                            </option>
+                          ))}
+                        </select>
+                      </label>
+                      <button
+                        type="button"
+                        className="button secondary"
+                        onClick={() => void restoreArchiveIssue()}
+                        disabled={saveState === "saving" || !restoreArchiveSlug}
+                      >
+                        Restore into editor
+                      </button>
+                      <button
+                        type="button"
+                        className="button secondary"
+                        onClick={() => void restoreArchiveIssue("july")}
+                        disabled={saveState === "saving"}
+                      >
+                        Restore July issue
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="newsletter-issue-lifecycle-actions" style={{ marginTop: 12 }}>
+                      <button
+                        type="button"
+                        className="button secondary"
+                        onClick={() => void restoreArchiveIssue("july")}
+                        disabled={saveState === "saving"}
+                      >
+                        Restore July issue
+                      </button>
+                    </div>
+                  )}
                 </section>
                 <label className="newsletter-bg-color-control" title="Background color">
                   Background
@@ -5241,6 +5735,7 @@ export default function NewsletterPageClient({ initialState, editMode, isAdmin =
                     Paste from Word, Google Docs, a webpage, or an email.
                     Headings and <strong>bold text on its own line</strong> start new stories.
                     Headings named <code>Mission</code> or <code>Greeting</code> fill those slots.
+                    Images in the paste are attached to the story above them.
                   </p>
                   <div
                     ref={richPourRef}
@@ -5351,57 +5846,8 @@ export default function NewsletterPageClient({ initialState, editMode, isAdmin =
                     Email subject
                     <input value={campaignSubject} onChange={(e) => setCampaignSubject(e.target.value)} />
                   </label>
-                  <details className="newsletter-test-list-details">
-                    <summary className="newsletter-test-list-summary">
-                      Test mailing list
-                      {testMailingList.length > 0 ? (
-                        <span className="newsletter-test-list-count">{testMailingList.length}</span>
-                      ) : null}
-                    </summary>
-                    <div className="newsletter-test-list">
-                      <p className="admin-rss-hint">
-                        Saved in this browser. These addresses receive Send newsletter test.
-                      </p>
-                      {testMailingList.length > 0 ? (
-                        <ul className="newsletter-test-list-chips">
-                          {testMailingList.map((email) => (
-                            <li key={email}>
-                              <span>{email}</span>
-                              <button
-                                type="button"
-                                className="newsletter-test-list-remove"
-                                aria-label={`Remove ${email}`}
-                                onClick={() => removeTestMailingEmail(email)}
-                              >
-                                ×
-                              </button>
-                            </li>
-                          ))}
-                        </ul>
-                      ) : (
-                        <p className="admin-rss-hint">No test addresses yet. Add yours below.</p>
-                      )}
-                      <div className="newsletter-test-list-add">
-                        <input
-                          type="email"
-                          value={newTestEmail}
-                          placeholder="you@example.com"
-                          onChange={(e) => setNewTestEmail(e.target.value)}
-                          onKeyDown={(e) => {
-                            if (e.key === "Enter") {
-                              e.preventDefault();
-                              addTestMailingEmail();
-                            }
-                          }}
-                        />
-                        <button type="button" className="button secondary" onClick={addTestMailingEmail}>
-                          Add
-                        </button>
-                      </div>
-                    </div>
-                  </details>
                   <p className="admin-rss-hint">
-                    Subject is prefixed with [TEST]. Check Postmark Activity for the MessageID if nothing arrives.
+                    Subject is prefixed with [TEST] for test sends. Check Postmark Activity for the MessageID if nothing arrives.
                   </p>
                 </section>
 
@@ -6485,70 +6931,6 @@ export default function NewsletterPageClient({ initialState, editMode, isAdmin =
 
         </>)}
 
-        {canEdit && showGlobalControls ? (
-          <div className="newsletter-inline-toolbar newsletter-bottom-toolbar">
-            <div className="newsletter-add-block">
-              <button
-                type="button"
-                className="button secondary"
-                onClick={() => setShowAddBlockMenu((p) => !p)}
-                aria-haspopup="menu"
-                aria-expanded={showAddBlockMenu}
-              >
-                + Add element ▾
-              </button>
-              {showAddBlockMenu ? (
-                <div className="newsletter-add-block-menu" role="menu">
-                  <button type="button" className="newsletter-add-block-item" onClick={() => addNewsletterBlock("heading")}>Heading</button>
-                  <button type="button" className="newsletter-add-block-item" onClick={() => addNewsletterBlock("text")}>Text</button>
-                  <button type="button" className="newsletter-add-block-item" onClick={() => addNewsletterBlock("text-box")}>Text box</button>
-                  <button type="button" className="newsletter-add-block-item" onClick={() => addNewsletterBlock("image")}>Image / montage</button>
-                  <button type="button" className="newsletter-add-block-item" onClick={() => addNewsletterBlock("divider")}>Divider (full rule)</button>
-                  <button type="button" className="newsletter-add-block-item" onClick={() => addNewsletterBlock("decorative-line")}>Decorative line</button>
-                  <button type="button" className="newsletter-add-block-item" onClick={() => addNewsletterBlock("spacer")}>Spacer</button>
-                  {modularLayout ? (
-                    <button
-                      type="button"
-                      className="newsletter-add-block-item"
-                      onClick={() => {
-                        setShowAddBlockMenu(false);
-                        openAddStoryDialog();
-                      }}
-                    >
-                      Story
-                    </button>
-                  ) : null}
-                </div>
-              ) : null}
-            </div>
-            <button
-              type="button"
-              className="button secondary"
-              onClick={() =>
-                modularLayout
-                  ? openAddStoryDialog()
-                  : setState((prev) => ({ ...prev, stories: [...prev.stories, emptyStory()] }))
-              }
-              title={
-                modularLayout
-                  ? "Open the Add story window. Paste a title and body, click OK"
-                  : "Append a story to the classic story list below the greeting"
-              }
-            >
-              {modularLayout ? "Add story" : "Add story (legacy)"}
-            </button>
-            {(state.newsletterCanvas?.elements?.length ?? 0) > 0 && (
-              <button
-                type="button"
-                className="button secondary"
-                onClick={() => canvasRef.current?.restoreMontages()}
-                title="Re-arrange multi-image montages into mosaic layout"
-              >
-                ⊞ Restore montages
-              </button>
-            )}
-          </div>
-        ) : null}
       </section>
       {canEdit && showGlobalControls ? (
         <div className="newsletter-lifecycle-panel">
@@ -6715,7 +7097,7 @@ export default function NewsletterPageClient({ initialState, editMode, isAdmin =
         >
           {showGlobalControls ? "Done" : "Edit menu"}
         </button>
-      ) : isAdmin ? (
+      ) : showAdminEntry ? (
         <a
           className="newsletter-edit-pill"
           href="/newsletter?edit=1"
