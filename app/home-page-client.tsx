@@ -3976,7 +3976,7 @@ export default function HomePageClient({
       {adminMobilePreviewActive ? (
         <MobilePreviewFrame
           frameRef={adminMobilePreviewFrameRef}
-          header={<SiteHeader initialNav={previewNav} />}
+          header={<SiteHeader initialNav={previewNav} initialViewportIsMobile />}
         >
           {pageContent}
         </MobilePreviewFrame>

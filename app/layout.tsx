@@ -21,6 +21,7 @@ import { SiteHeader } from "./components/SiteHeader";
 import { SlowNetworkAlert } from "./components/SlowNetworkAlert";
 import { ViewportRootSync } from "./components/ViewportRootSync";
 import { ShopHashScroll } from "./components/ShopHashScroll";
+import "./nav-critical.css";
 import "./globals.css";
 import "./home-responsive.css";
 import "./components/home-collections.css";
@@ -91,10 +92,15 @@ export default async function RootLayout({
       className={`${sans.variable} ${serif.variable} ${raleway.variable} ${josefin.variable}${initialViewportIsMobile ? " maroma-viewport-mobile" : ""}`}
       {...(initialViewportIsMobile ? { "data-maroma-viewport-mobile": "" } : {})}
     >
+      <head>
+        <link rel="preload" as="image" href="/nav-maroma-logo.png" />
+        <link rel="preload" as="image" href="/nav-maroma-experiences.png" />
+        <link rel="preload" as="image" href="/nav-spa-logo.png" />
+      </head>
       <body className="antialiased">
         <style
           dangerouslySetInnerHTML={{
-            __html: `.maroma-nav-shell--mobile{display:none}.site-header .nav{display:flex;align-items:center;justify-content:space-between;width:100%;max-width:100%;gap:12px;box-sizing:border-box}.site-header .nav-links{display:flex;align-items:center;flex-wrap:nowrap;overflow:hidden;min-width:0;flex:1 1 auto}.spa-cta-wrap .spa-book-logo{width:86px;height:36px;max-height:36px;object-fit:contain}.nav-experiences-link img,.nav-experiences-logo{height:25px;width:auto;max-width:132px;object-fit:contain}html.maroma-viewport-mobile .maroma-nav-shell--desktop,html[data-maroma-viewport-mobile] .maroma-nav-shell--desktop{display:none!important}html.maroma-viewport-mobile .maroma-nav-shell--mobile,html[data-maroma-viewport-mobile] .maroma-nav-shell--mobile{display:block!important}`,
+            __html: `.site-header .nav.nav-overlay,.site-header .nav.nav-overlay::before,.site-header .nav-end{background:transparent!important}.hero{--hero-nav-lift:calc(88px + var(--admin-bar-height,0px) + var(--nav-bottom-gap,2mm))}.hero-artboard{margin-top:calc(-1 * var(--hero-nav-lift));padding-top:var(--hero-nav-lift)}.site-header .brand-logo{width:160px!important;height:22px!important;max-height:22px!important;object-fit:contain}.site-header .nav-experiences-link img,.site-header .nav-experiences-logo{width:132px!important;height:25px!important;max-width:132px!important;object-fit:contain}.site-header .spa-cta-wrap .spa-book-logo{width:86px!important;height:36px!important;max-height:36px!important;object-fit:contain}.site-header .nav-links{overflow:hidden;min-width:0}`,
           }}
         />
         <JsonLd data={[organizationJsonLd(), websiteJsonLd()]} />

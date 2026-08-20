@@ -6,6 +6,7 @@ import {
   forwardRef,
   useCallback,
   useEffect,
+  useLayoutEffect,
   useMemo,
   useRef,
   useState,
@@ -32,6 +33,39 @@ type NavScrollItem =
 
 const SPA_BOOKING_URL = "https://www.themaromaspa.com/register?next=/booking";
 const MAROMA_EXPERIENCES_URL = "https://www.maromaexperience.com";
+
+const NAV_IMG_STYLE = {
+  display: "block",
+  objectFit: "contain",
+  flexShrink: 0,
+} as const;
+
+function NavImg({
+  src,
+  alt,
+  className,
+  width,
+  height,
+}: {
+  src: string;
+  alt: string;
+  className?: string;
+  width: number;
+  height: number;
+}) {
+  return (
+    <img
+      src={src}
+      alt={alt}
+      className={className}
+      width={width}
+      height={height}
+      decoding="sync"
+      fetchPriority="high"
+      style={{ ...NAV_IMG_STYLE, width, height, maxWidth: width, maxHeight: height }}
+    />
+  );
+}
 
 type SpaBookRollLinkProps = {
   className?: string;
@@ -65,7 +99,7 @@ const SpaBookRollLink = forwardRef<HTMLAnchorElement, SpaBookRollLinkProps>(func
     >
       <span className="spa-roll-track" aria-hidden="true">
         <span className="spa-roll-panel spa-roll-panel--logo">
-          <img src="/spa-logo.png" alt="" className="spa-book-logo" />
+          <NavImg src="/nav-spa-logo.png" alt="" className="spa-book-logo" width={68} height={24} />
         </span>
         <span className="spa-roll-panel spa-roll-panel--book">
           <span className="spa-book-text">BOOK NOW</span>
@@ -82,11 +116,16 @@ export function SiteHeader({ initialNav, initialViewportIsMobile = false }: Site
   const [navContent, setNavContent] = useState<Pick<SiteContent, "brand" | "nav">>(initialNav);
   const [scrolled, setScrolled] = useState(false);
   const [navLiftUp, setNavLiftUp] = useState(false);
-  const isMobileNav = useSyncExternalStore(
+  const viewportIsMobile = useSyncExternalStore(
     subscribeMaromaMobileViewport,
     getMaromaMobileViewportMatches,
     () => initialViewportIsMobile
   );
+  const [navLayoutReady, setNavLayoutReady] = useState(false);
+  useLayoutEffect(() => {
+    setNavLayoutReady(true);
+  }, []);
+  const isMobileNav = navLayoutReady ? viewportIsMobile : initialViewportIsMobile;
   const [activeNavIndex, setActiveNavIndex] = useState(0);
   const { brand, nav } = navContent;
   const navItems = useMemo(() => [...nav, "Newsletter", "Maroma Experiences"], [nav]);
@@ -583,7 +622,7 @@ export function SiteHeader({ initialNav, initialViewportIsMobile = false }: Site
       className="nav-experiences-link"
       aria-label="Visit Maroma Experiences"
     >
-      <img src="/maroma-experiences-logo.png" alt="Maroma Experiences" width={132} height={25} />
+      <NavImg src="/nav-maroma-experiences.png" alt="Maroma Experiences" width={132} height={25} />
     </a>
   ) : (
     <Link key={item} href={item === "Newsletter" ? "/blog" : getNavHref(item)}>
@@ -600,7 +639,7 @@ export function SiteHeader({ initialNav, initialViewportIsMobile = false }: Site
       >
         <nav className={`nav nav-b2b ${navStateClass}`}>
           <Link href="/?skipIntro=1" className="brand" aria-label={`${brand} home`}>
-            <img src="/maroma-logo.png" alt={brand} className="brand-logo" />
+            <NavImg src="/nav-maroma-logo.png" alt={brand} className="brand-logo" width={160} height={22} />
           </Link>
           <p className="nav-b2b-label">Wholesale</p>
           <div className="nav-end nav-end--b2b">
@@ -623,7 +662,7 @@ export function SiteHeader({ initialNav, initialViewportIsMobile = false }: Site
           <nav className={`nav nav-mobile ${navStateClass}`}>
             <div className="nav-mobile-brand-row">
               <Link href="/?skipIntro=1" className="brand" aria-label={`${brand} home`}>
-                <img src="/maroma-logo.png" alt={brand} className="brand-logo" width={160} height={22} />
+                <NavImg src="/nav-maroma-logo.png" alt={brand} className="brand-logo" width={160} height={22} />
               </Link>
               <div className="nav-basket-slot nav-basket-slot--inline" aria-label="Basket">
                 {basketLink}
@@ -659,8 +698,8 @@ export function SiteHeader({ initialNav, initialViewportIsMobile = false }: Site
                       tabIndex={loopPass > 0 ? -1 : undefined}
                     >
                       {item.label === "Maroma Experiences" ? (
-                        <img
-                          src="/maroma-experiences-logo.png"
+                        <NavImg
+                          src="/nav-maroma-experiences.png"
                           alt="Maroma Experiences"
                           className="nav-experiences-logo"
                           width={132}
@@ -699,12 +738,12 @@ export function SiteHeader({ initialNav, initialViewportIsMobile = false }: Site
         <div className="maroma-nav-shell maroma-nav-shell--desktop">
           <nav className={`nav ${navStateClass}`}>
             <Link href="/?skipIntro=1" className="brand" aria-label={`${brand} home`}>
-              <img src="/maroma-logo.png" alt={brand} className="brand-logo" width={160} height={22} />
+              <NavImg src="/nav-maroma-logo.png" alt={brand} className="brand-logo" width={160} height={22} />
             </Link>
             <div className="nav-links">{desktopNavLinks}</div>
             <div className="nav-end">
               <div className="spa-cta-wrap">
-                <img src="/spa-logo.png" alt="Maroma Spa" className="spa-book-logo" width={86} height={36} />
+                <NavImg src="/nav-spa-logo.png" alt="Maroma Spa" className="spa-book-logo" width={86} height={36} />
                 <a
                   className="spa-book-btn"
                   href={SPA_BOOKING_URL}

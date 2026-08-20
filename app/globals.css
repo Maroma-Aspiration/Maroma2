@@ -17,7 +17,7 @@
   --ease: cubic-bezier(0.22, 1, 0.36, 1);
   --font-sans: "Montserrat", "Helvetica", sans-serif;
   --maroma-site-bg-image: url("/staging-media/backgrounds/loved-for-a-reason-background.png");
-  --maroma-site-bg-color: #e8e3d8;
+  --maroma-site-bg-color: #cbd5c0;
   --maroma-site-bg: var(--maroma-site-bg-image) center top / cover fixed no-repeat;
 }
 
@@ -198,14 +198,22 @@ img {
   inset: 0;
   z-index: -1;
   pointer-events: none;
-  background: var(--maroma-site-bg);
+  background: transparent;
   opacity: 1;
 }
 
-.nav-overlay,
+.nav-overlay {
+  background: transparent;
+  border-bottom-color: transparent;
+}
+
 .nav-solid {
   background: var(--maroma-site-bg);
   border-bottom-color: transparent;
+}
+
+.nav-solid::before {
+  background: var(--maroma-site-bg);
 }
 
 .site-header-solid .nav-basket-slot {
@@ -266,8 +274,10 @@ img {
 
 .brand-logo {
   height: 22px;
-  width: auto;
-  max-width: 100%;
+  width: 160px;
+  max-width: 160px;
+  max-height: 22px;
+  object-fit: contain;
   display: block;
   filter: brightness(0) saturate(100%) invert(72%) sepia(18%) saturate(950%) hue-rotate(152deg) brightness(98%) contrast(94%);
   transition:
@@ -387,8 +397,10 @@ img {
 .nav-experiences-link img,
 .nav-experiences-logo {
   display: block;
-  width: auto;
+  width: 132px;
   height: 25px;
+  max-width: 132px;
+  max-height: 25px;
   object-fit: contain;
 }
 
@@ -6407,7 +6419,13 @@ body.admin-mobile-preview-active .scroller-section.scroller-loved-for-a-reason {
       backdrop-filter 0.35s var(--ease);
   }
 
-  .nav-mobile.nav-overlay,
+  .nav-mobile.nav-overlay {
+    background: transparent;
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+    border-bottom-color: transparent;
+  }
+
   .nav-mobile.nav-solid {
     background: var(--maroma-site-bg);
     backdrop-filter: none;
@@ -6417,7 +6435,7 @@ body.admin-mobile-preview-active .scroller-section.scroller-loved-for-a-reason {
 
   .nav-mobile.nav-overlay::before {
     opacity: 1 !important;
-    background: var(--maroma-site-bg);
+    background: transparent;
   }
 
   .brand {
@@ -15120,8 +15138,14 @@ html.maroma-viewport-mobile .login-form .button { min-height:52px; font-size:1re
     height: 16px;
   }
 
-  .nav.nav-mobile.nav-solid,
   .nav.nav-mobile.nav-overlay {
+    background: transparent !important;
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+    border-bottom-color: transparent !important;
+  }
+
+  .nav.nav-mobile.nav-solid {
     background: var(--maroma-site-bg) !important;
     backdrop-filter: none !important;
     -webkit-backdrop-filter: none !important;

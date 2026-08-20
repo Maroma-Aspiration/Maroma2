@@ -148,7 +148,13 @@ html[data-maroma-viewport-mobile] .maroma-nav-shell--mobile {
       backdrop-filter 0.35s var(--ease);
   }
 
-  .site-header-responsive .nav.nav-mobile.nav-overlay,
+  .site-header-responsive .nav.nav-mobile.nav-overlay {
+    background: transparent;
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+    border-bottom-color: transparent;
+  }
+
   .site-header-responsive .nav.nav-mobile.nav-solid {
     background: var(--maroma-site-bg);
     backdrop-filter: none;
@@ -156,7 +162,11 @@ html[data-maroma-viewport-mobile] .maroma-nav-shell--mobile {
     border-bottom-color: transparent;
   }
 
-  .site-header-responsive .nav.nav-mobile.nav-overlay::before,
+  .site-header-responsive .nav.nav-mobile.nav-overlay::before {
+    background: transparent;
+    opacity: 1;
+  }
+
   .site-header-responsive .nav.nav-mobile.nav-solid::before,
   .site-header-responsive .nav.nav-mobile.nav-lift::before {
     background: var(--maroma-site-bg);
