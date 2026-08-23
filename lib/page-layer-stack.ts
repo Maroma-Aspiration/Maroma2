@@ -7,6 +7,7 @@ export type PageShellStackInput = {
   heroBackgroundStackZ: number;
   heroMediaStackZ: number;
   heroCopyStackZ: number;
+  heroPromoStackZ: number;
   heroRitualBandStackZ: number;
   heroRitualStackZ: number;
   lovedFloralsStackZ: number;
@@ -22,16 +23,17 @@ export function stackDepthToPaintZ(stackZ: number): number {
   return clampHeroLayerDepth(stackZ, 1) * 10;
 }
 
-/** Hero section shell — highest of in-hero layers (background, media, copy). */
+/** Hero section shell — highest of in-hero layers (background, media, copy, promo). */
 export function heroShellStackZ(input: Pick<
   PageShellStackInput,
-  "heroBackgroundStackZ" | "heroMediaStackZ" | "heroCopyStackZ"
+  "heroBackgroundStackZ" | "heroMediaStackZ" | "heroCopyStackZ" | "heroPromoStackZ"
 >): number {
   return clampHeroLayerDepth(
     Math.max(
       clampHeroLayerDepth(input.heroBackgroundStackZ, 1),
       clampHeroLayerDepth(input.heroMediaStackZ, 1),
-      clampHeroLayerDepth(input.heroCopyStackZ, 1)
+      clampHeroLayerDepth(input.heroCopyStackZ, 1),
+      clampHeroLayerDepth(input.heroPromoStackZ, 1)
     ),
     1
   );
@@ -79,6 +81,26 @@ export function resolvePageShellPaintZ(input: PageShellStackInput): PageShellPai
   }
 
   return { hero, "ritual-band": ritualBand, rituals, loved };
+}
+
+/** Where the collections / loved overlap band paints vs the hero shell (florals vs promo strip). */
+export function resolveLovedOverlapPaintZ(input: {
+  heroPaintZ: number;
+  lovedPaintZ: number;
+  heroPromoStackZ: number;
+  heroMediaStackZ: number;
+  lovedFloralsStackZ: number;
+}): number {
+  const promoDepth = clampHeroLayerDepth(input.heroPromoStackZ, 1);
+  const mediaDepth = clampHeroLayerDepth(input.heroMediaStackZ, 1);
+  const floralsDepth = clampHeroLayerDepth(input.lovedFloralsStackZ, 1);
+  const heroForegroundDepth = Math.max(promoDepth, mediaDepth);
+
+  if (floralsDepth <= heroForegroundDepth) {
+    return Math.max(0, input.heroPaintZ - 1);
+  }
+
+  return Math.max(input.lovedPaintZ, input.heroPaintZ + 1);
 }
 
 export function pageShellStackCssVars(

@@ -43,7 +43,13 @@ export function SiteFooter() {
           : { href: loginHref, label: "Login" };
 
   return (
-    <footer className="site-footer" aria-label="Site">
+    <footer
+      className="site-footer"
+      aria-label="Site"
+      data-review="Site footer"
+      data-review-id="site-footer"
+      data-review-files="app/components/SiteFooter.tsx"
+    >
       <div className="site-footer-grid">
         <div>
           <strong>Maroma</strong>
@@ -65,7 +71,7 @@ export function SiteFooter() {
         </nav>
         <nav aria-label="Company">
           <h2>Company</h2>
-          <Link href="/#about">About</Link>
+          <Link href="/about">About</Link>
           <Link href="/blog">Journal</Link>
           <Link href="/newsletter/archive">Past newsletters</Link>
           <Link href={accountLink.href}>{accountLink.label}</Link>

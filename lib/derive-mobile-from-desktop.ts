@@ -33,6 +33,9 @@ export type DesktopLayoutSource = {
   eyebrowPos: XY;
   headlinePos: XY;
   heroActionsPos: XY;
+  heroPromoBannerTopCm: number;
+  heroPromoBannerPos: XY;
+  heroPromoBannerWidthPct: number;
   headlineSizeRem: number;
   heroCopyWidthVw: number;
   heroCopyOffsetY: string;
@@ -70,6 +73,10 @@ function scalePxOffset(value: number): number {
   return Math.round(value * Y_SCALE);
 }
 
+function scaleTopCmToMobile(cm: number): number {
+  return Math.round(cm * Y_SCALE * 10) / 10;
+}
+
 /** Derive mobile render layout — media layers use mobile defaults; px nudges scale from desktop. */
 export function deriveMobileFromDesktop(source: DesktopLayoutSource): ResolvedHeroMobileLayout {
   return {
@@ -82,6 +89,9 @@ export function deriveMobileFromDesktop(source: DesktopLayoutSource): ResolvedHe
     eyebrowPos: scalePxToMobile(source.eyebrowPos),
     headlinePos: scalePxToMobile(source.headlinePos),
     heroActionsPos: scalePxToMobile(source.heroActionsPos),
+    heroPromoBannerTopCm: scaleTopCmToMobile(source.heroPromoBannerTopCm),
+    heroPromoBannerPos: scalePxToMobile(source.heroPromoBannerPos),
+    heroPromoBannerWidthPct: source.heroPromoBannerWidthPct,
     headlineSizeRem: deriveMobileHeadlineSizeRem(source.headlineSizeRem),
     heroCopyWidthVw: Math.min(source.heroCopyWidthVw, 92),
     lovedDividerOffsetY: scalePxOffset(source.lovedDividerOffsetY),

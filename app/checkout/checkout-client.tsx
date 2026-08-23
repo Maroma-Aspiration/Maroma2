@@ -217,7 +217,12 @@ export default function CheckoutClient() {
 
   if (cart.length === 0 && step !== 3) {
     return (
-      <main className="maroma-commerce-page maroma-basket-page">
+      <main
+        className="maroma-commerce-page maroma-basket-page"
+        data-review="Checkout empty basket"
+        data-review-id="checkout-empty"
+        data-review-files="app/checkout/checkout-client.tsx"
+      >
         <div className="maroma-commerce-shell">
           <section className="maroma-basket-empty">
             <div className="maroma-basket-empty-card">
@@ -242,7 +247,12 @@ export default function CheckoutClient() {
   }
 
   return (
-    <main className="maroma-commerce-page">
+    <main
+      className="maroma-commerce-page"
+      data-review="Checkout"
+      data-review-id="checkout-page"
+      data-review-files="app/checkout/checkout-client.tsx"
+    >
       <div className={`maroma-commerce-shell${step === 3 ? " maroma-checkout-confirm" : ""}`}>
         {step !== 3 ? (
           <Link href="/cart" className="maroma-checkout-back-link">

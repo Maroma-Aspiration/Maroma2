@@ -6,6 +6,7 @@
       "heroTitle": "Love Your Skin",
       "heroTagline": "Because your skin deserves to feel happy, balanced, and naturally glowing.",
       "objectPosition": "82% 71%",
+      "cardObjectPosition": "76% 40%",
       "minHeight": "clamp(220px, 34vw, 400px)",
       "maxHeight": "min(48vh, 440px)"
     },
@@ -15,6 +16,7 @@
       "heroTitle": "Body Care",
       "heroTagline": "Body washes, soaps, oils, and nourishing care essentials.",
       "objectPosition": "82% 65%",
+      "cardObjectPosition": "64% 55%",
       "minHeight": "clamp(220px, 34vw, 400px)",
       "maxHeight": "min(48vh, 440px)"
     },
@@ -24,6 +26,7 @@
       "heroTitle": "Hair Care",
       "heroTagline": "Shampoos, conditioners, and hair rituals made with natural ingredients.",
       "objectPosition": "82% 0%",
+      "cardObjectPosition": "70% 42%",
       "minHeight": "clamp(220px, 34vw, 400px)",
       "maxHeight": "min(48vh, 440px)"
     },

@@ -29,7 +29,12 @@ export default function SpecialPage() {
   return (
     <div className="special-page-container">
       <main className={`special-content ${isVisible ? "is-visible" : ""}`}>
-        <div className="special-hero">
+        <div
+          className="special-hero"
+          data-review="Special finder"
+          data-review-id="special-hero"
+          data-review-files="app/special/page.tsx"
+        >
           <span className="special-eyebrow">Personalized Selection</span>
           
           <div className="assistant-container">

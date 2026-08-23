@@ -16,6 +16,7 @@ import { CartProvider } from "../context/CartContext";
 import { CurrencyProvider } from "../context/CurrencyContext";
 import { AdminBar } from "./components/AdminBar";
 import { JsonLd } from "./components/JsonLd";
+import { ReviewFeedbackShell } from "./components/review-feedback/review-feedback-shell";
 import { SiteFooter } from "./components/SiteFooter";
 import { SiteHeader } from "./components/SiteHeader";
 import { SlowNetworkAlert } from "./components/SlowNetworkAlert";
@@ -100,7 +101,7 @@ export default async function RootLayout({
       <body className="antialiased">
         <style
           dangerouslySetInnerHTML={{
-            __html: `.site-header .nav.nav-overlay,.site-header .nav.nav-overlay::before,.site-header .nav-end{background:transparent!important}.hero{--hero-nav-lift:calc(88px + var(--admin-bar-height,0px) + var(--nav-bottom-gap,2mm))}.hero-artboard{margin-top:calc(-1 * var(--hero-nav-lift));padding-top:var(--hero-nav-lift)}.site-header .brand-logo{width:160px!important;height:22px!important;max-height:22px!important;object-fit:contain}.site-header .nav-experiences-link img,.site-header .nav-experiences-logo{width:132px!important;height:25px!important;max-width:132px!important;object-fit:contain}.site-header .spa-cta-wrap .spa-book-logo{width:86px!important;height:36px!important;max-height:36px!important;object-fit:contain}.site-header .nav-links{overflow:hidden;min-width:0}`,
+            __html: `.site-header .nav.nav-overlay,.site-header .nav.nav-overlay::before,.site-header .nav-end{background:transparent!important}.hero{--hero-nav-lift:calc(88px + var(--admin-bar-height,0px) + var(--nav-bottom-gap,2mm))}.hero-artboard{margin-top:calc(-1 * var(--hero-nav-lift));padding-top:var(--hero-nav-lift)}.site-header .brand-logo{width:160px!important;height:22px!important;max-height:22px!important;object-fit:contain}.site-header .nav-experiences-link img,.site-header .nav-experiences-logo{width:132px!important;height:25px!important;max-width:132px!important;object-fit:contain}.site-header .spa-cta-wrap .spa-book-logo{width:86px!important;height:36px!important;max-height:36px!important;object-fit:contain}.site-header .maroma-nav-shell--desktop .brand{margin-right:10px;flex-shrink:0}.site-header .maroma-nav-shell--desktop .nav-end{flex-shrink:0}`,
           }}
         />
         <JsonLd data={[organizationJsonLd(), websiteJsonLd()]} />
@@ -121,6 +122,7 @@ export default async function RootLayout({
         <ViewportRootSync />
         <ShopHashScroll />
         <Script src="https://elfsightcdn.com/platform.js" strategy="afterInteractive" />
+        <ReviewFeedbackShell>
         <AdminBar />
         <SlowNetworkAlert />
         <CurrencyProvider>
@@ -130,6 +132,7 @@ export default async function RootLayout({
             <SiteFooter />
           </CartProvider>
         </CurrencyProvider>
+        </ReviewFeedbackShell>
       </body>
     </html>
   );

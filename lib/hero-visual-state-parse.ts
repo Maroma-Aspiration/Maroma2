@@ -1,6 +1,7 @@
 import {
   clampHeroLayerDepth,
   HERO_LAYER_DEPTH_MAX,
+  HERO_LAYER_DEPTH_MIN,
   migrateLegacyStackZ,
   normalizeRitualStackZ,
   RITUAL_CAROUSEL_STACK_REV,
@@ -43,6 +44,9 @@ export const defaultHeroVisualState: HeroVisualState = {
   eyebrowPos: { x: 0, y: 0 },
   eyebrowPosRatio: { x: 0, y: 0 },
   heroActionsPos: { x: 0, y: 0 },
+  heroPromoBannerTopCm: 15,
+  heroPromoBannerPos: { x: 0, y: 0 },
+  heroPromoBannerWidthPct: 100,
   heroCopyWidthVw: 46,
   primarySettings: {
     visible: true,
@@ -99,6 +103,7 @@ export const defaultHeroVisualState: HeroVisualState = {
   ritualBandOpacity: 0.94,
   ritualBandColor: "#ffffff",
   heroCopyStackZ: 9,
+  heroPromoStackZ: 7,
   lovedFloralsStackZ: 1,
   lovedWashStackZ: 2,
   lovedBandStackZ: 3,
@@ -122,6 +127,8 @@ const clampXY = (value: XY): XY => ({
 
 const clampOpacity = (value: number): number => Math.max(0, Math.min(1, Number(value) || 0));
 const clampCopyWidth = (value: number): number => Math.max(24, Math.min(92, Number(value) || 46));
+const clampPromoTopCm = (value: number): number => Math.max(0, Math.min(40, Number(value) || 15));
+const clampPromoWidthPct = (value: number): number => Math.max(40, Math.min(100, Number(value) || 100));
 const clampHeadlineSize = (value: number): number => Math.max(2.2, Math.min(7, Number(value) || 5.28));
 const clampDividerOffset = (value: number): number => Math.max(-500, Math.min(500, Number(value) || 0));
 const clampFlowOffset = (value: number): number => Math.max(-800, Math.min(800, Number(value) || 0));
@@ -200,6 +207,7 @@ const POSITION_LOCK_KEYS: HeroPositionLockKey[] = [
   "headline",
   "eyebrow",
   "actions",
+  "promo-banner",
   "rituals",
   "ritual-band",
   "loved-section",
@@ -255,6 +263,15 @@ const parseMobileOverrides = (value: unknown, base?: HeroMobileOverrides): HeroM
   }
   if (raw.heroActionsPos && typeof raw.heroActionsPos === "object") {
     next.heroActionsPos = clampXY(raw.heroActionsPos as XY);
+  }
+  if (typeof raw.heroPromoBannerTopCm === "number") {
+    next.heroPromoBannerTopCm = clampPromoTopCm(raw.heroPromoBannerTopCm);
+  }
+  if (raw.heroPromoBannerPos && typeof raw.heroPromoBannerPos === "object") {
+    next.heroPromoBannerPos = clampXY(raw.heroPromoBannerPos as XY);
+  }
+  if (typeof raw.heroPromoBannerWidthPct === "number") {
+    next.heroPromoBannerWidthPct = clampPromoWidthPct(raw.heroPromoBannerWidthPct);
   }
   if (typeof raw.headlineSizeRem === "number") {
     next.headlineSizeRem = clampHeadlineSize(raw.headlineSizeRem);
@@ -313,6 +330,13 @@ export const parseHeroVisualState = (value: unknown, base?: HeroVisualState): He
   const eyebrowPos = clampXY((raw.eyebrowPos as XY) ?? b.eyebrowPos);
   const eyebrowPosRatio = clampXY((raw.eyebrowPosRatio as XY) ?? b.eyebrowPosRatio);
   const heroActionsPos = clampXY((raw.heroActionsPos as XY) ?? b.heroActionsPos);
+  const heroPromoBannerTopCm = clampPromoTopCm(
+    (raw.heroPromoBannerTopCm as number) ?? b.heroPromoBannerTopCm
+  );
+  const heroPromoBannerPos = clampXY((raw.heroPromoBannerPos as XY) ?? b.heroPromoBannerPos);
+  const heroPromoBannerWidthPct = clampPromoWidthPct(
+    (raw.heroPromoBannerWidthPct as number) ?? b.heroPromoBannerWidthPct
+  );
   const heroCopyWidthVw = clampCopyWidth((raw.heroCopyWidthVw as number) ?? b.heroCopyWidthVw);
 
   const primarySettings = clampLayerSettings({
@@ -439,6 +463,14 @@ export const parseHeroVisualState = (value: unknown, base?: HeroVisualState): He
     heroCopyStackZ <= heroMediaStackZ
       ? Math.min(HERO_LAYER_DEPTH_MAX, heroMediaStackZ + 1)
       : heroCopyStackZ;
+  const heroPromoStackZDefault = Math.max(
+    heroBackgroundStackZ,
+    Math.max(HERO_LAYER_DEPTH_MIN, heroMediaStackZ - 1)
+  );
+  const heroPromoStackZ = clampStackZ(
+    (raw.heroPromoStackZ as number) ?? b.heroPromoStackZ ?? heroPromoStackZDefault,
+    heroPromoStackZDefault
+  );
   const heroRitualBandStackZ = clampStackZ(
     (raw.heroRitualBandStackZ as number) ?? b.heroRitualBandStackZ ?? d.heroRitualBandStackZ,
     d.heroRitualBandStackZ
@@ -518,6 +550,9 @@ export const parseHeroVisualState = (value: unknown, base?: HeroVisualState): He
     eyebrowPos,
     eyebrowPosRatio,
     heroActionsPos,
+    heroPromoBannerTopCm,
+    heroPromoBannerPos,
+    heroPromoBannerWidthPct,
     heroCopyWidthVw,
     primarySettings,
     overlayLayer,
@@ -560,6 +595,7 @@ export const parseHeroVisualState = (value: unknown, base?: HeroVisualState): He
     ritualBandColor,
     ritualCarouselScale,
     heroCopyStackZ: heroCopyAboveMediaStackZ,
+    heroPromoStackZ,
     lovedFloralsStackZ,
     lovedWashStackZ,
     lovedBandStackZ,

@@ -9,10 +9,14 @@ import type {
 import type { NewsletterCanvas } from "./story-types";
 import {
   archiveCanvasFingerprint,
+  archiveIssueDisplayTitle,
+  assignUniqueArchiveThumbnails,
   buildArchiveSlug,
   pickThumbnailFromCanvas,
   presentArchiveIssue,
 } from "./newsletter-archive-utils";
+import { canvasContentScore, issueMonthFromCanvas } from "./newsletter-restore-issue";
+import { readTestSnapshots } from "./newsletter-test-snapshot-storage";
 
 const storageDir = path.join(process.cwd(), "data");
 const storagePath = path.join(storageDir, "newsletter-archive.json");
@@ -21,6 +25,66 @@ const hasKvConfig = Boolean(process.env.KV_REST_API_URL && process.env.KV_REST_A
 const MAX_ISSUES = 120;
 
 const defaultState: NewsletterArchiveState = { issues: [] };
+
+const MONTH_IN_TITLE_RE =
+  /\b(january|february|march|april|may|june|july|august|september|october|november|december)\b/i;
+
+/** One public card per newsletter edition (e.g. May 2026, June 2026). */
+function archiveListingDedupeKey(issue: NewsletterArchiveIssue): string {
+  const editionMonth =
+    issueMonthFromCanvas(issue.canvas, issue.subject) ??
+    archiveIssueDisplayTitle(issue).toLowerCase().match(MONTH_IN_TITLE_RE)?.[1]?.toLowerCase() ??
+    null;
+  const year = issue.sentAt.slice(0, 4);
+  if (editionMonth && year.length === 4) return `edition:${year}-${editionMonth}`;
+
+  const fingerprint = archiveCanvasFingerprint(issue.canvas);
+  if (fingerprint) return `fp:${fingerprint}`;
+  return `id:${issue.id.trim() || issue.slug.trim() || issue.sentAt}`;
+}
+
+function pickPreferredArchiveIssue(
+  existing: NewsletterArchiveIssue,
+  candidate: NewsletterArchiveIssue
+): NewsletterArchiveIssue {
+  const existingSent = existing.recipientCount > 0;
+  const candidateSent = candidate.recipientCount > 0;
+  if (existingSent !== candidateSent) {
+    return candidateSent ? candidate : existing;
+  }
+  if (existing.recipientCount !== candidate.recipientCount) {
+    return existing.recipientCount > candidate.recipientCount ? existing : candidate;
+  }
+  const existingScore = canvasContentScore(existing.canvas);
+  const candidateScore = canvasContentScore(candidate.canvas);
+  if (existingScore !== candidateScore) {
+    return existingScore > candidateScore ? existing : candidate;
+  }
+  return existing.sentAt >= candidate.sentAt ? existing : candidate;
+}
+
+function dedupeArchiveIssues(issues: NewsletterArchiveIssue[]): NewsletterArchiveIssue[] {
+  const byKey = new Map<string, NewsletterArchiveIssue>();
+  for (const issue of issues) {
+    const key = archiveListingDedupeKey(issue);
+    const existing = byKey.get(key);
+    byKey.set(key, existing ? pickPreferredArchiveIssue(existing, issue) : issue);
+  }
+  return Array.from(byKey.values())
+    .sort((a, b) => b.sentAt.localeCompare(a.sentAt))
+    .slice(0, MAX_ISSUES);
+}
+
+function isPublishableArchiveIssue(issue: NewsletterArchiveIssue): boolean {
+  if (canvasContentScore(issue.canvas) >= 8) return true;
+  const elements = issue.canvas?.elements ?? [];
+  const hasStoryGrid = elements.some(
+    (el) => el.kind === "story-grid" && (el.stories?.length ?? 0) > 0
+  );
+  const hasStorySections = elements.some((el) => /^migrated-st-\d+$/.test(el.id));
+  if (hasStoryGrid || hasStorySections) return true;
+  return canvasContentScore(issue.canvas) >= 4;
+}
 
 function normalizeCanvas(raw: unknown): NewsletterCanvas | null {
   if (!raw || typeof raw !== "object") return null;
@@ -76,16 +140,7 @@ function parseArchiveState(value: unknown): NewsletterArchiveState {
     .map((item) => normalizeIssue(item as Partial<NewsletterArchiveIssue>))
     .filter(Boolean) as NewsletterArchiveIssue[];
 
-  const bySlug = new Map<string, NewsletterArchiveIssue>();
-  for (const issue of issues) {
-    bySlug.set(issue.slug, issue);
-  }
-
-  const deduped = Array.from(bySlug.values())
-    .sort((a, b) => b.sentAt.localeCompare(a.sentAt))
-    .slice(0, MAX_ISSUES);
-
-  return { issues: deduped };
+  return { issues: dedupeArchiveIssues(issues) };
 }
 
 export async function readNewsletterArchive(): Promise<NewsletterArchiveState> {
@@ -121,20 +176,64 @@ export async function writeNewsletterArchive(state: NewsletterArchiveState): Pro
 }
 
 function uniqueIssuesForListing(issues: NewsletterArchiveIssue[]): NewsletterArchiveIssue[] {
-  const seen = new Set<string>();
-  const unique: NewsletterArchiveIssue[] = [];
-  for (const issue of issues) {
-    const fingerprint = archiveCanvasFingerprint(issue.canvas);
-    if (seen.has(fingerprint)) continue;
-    seen.add(fingerprint);
-    unique.push(issue);
+  return dedupeArchiveIssues(issues.filter(isPublishableArchiveIssue));
+}
+
+async function allIssuesForPublicListing(): Promise<NewsletterArchiveIssue[]> {
+  await compactArchiveStorage();
+  const [{ issues }, testSnapshots] = await Promise.all([readNewsletterArchive(), readTestSnapshots()]);
+  return uniqueIssuesForListing([...issues, ...testSnapshots]);
+}
+
+const archiveCompactKey = "maroma:newsletter-archive-compacted-v1";
+
+/** Rewrite KV once with edition-based dedupe after test-send merge bloated the store. */
+async function compactArchiveStorage(): Promise<void> {
+  if (!hasKvConfig) return;
+  try {
+    if (await kv.get(archiveCompactKey)) return;
+  } catch {
+    return;
   }
-  return unique;
+
+  let rawIssues: NewsletterArchiveIssue[] = [];
+  try {
+    const stored = await kv.get<{ issues?: unknown[] }>(archiveKvKey);
+    if (stored?.issues && Array.isArray(stored.issues)) {
+      rawIssues = stored.issues
+        .map((item) => normalizeIssue(item as Partial<NewsletterArchiveIssue>))
+        .filter(Boolean) as NewsletterArchiveIssue[];
+    }
+  } catch {
+    return;
+  }
+
+  if (rawIssues.length === 0) {
+    try {
+      await kv.set(archiveCompactKey, { skipped: "empty", at: new Date().toISOString() });
+    } catch {
+      // ignore
+    }
+    return;
+  }
+
+  const compacted = dedupeArchiveIssues(rawIssues);
+  await writeNewsletterArchive({ issues: compacted });
+
+  try {
+    await kv.set(archiveCompactKey, {
+      before: rawIssues.length,
+      after: compacted.length,
+      at: new Date().toISOString(),
+    });
+  } catch {
+    // compact write still succeeded
+  }
 }
 
 export async function listArchiveSummaries(): Promise<NewsletterArchiveSummary[]> {
-  const { issues } = await readNewsletterArchive();
-  return uniqueIssuesForListing(issues).map((issue) => {
+  const issues = assignUniqueArchiveThumbnails(await allIssuesForPublicListing());
+  return issues.map((issue) => {
     const presented = presentArchiveIssue(issue);
     return {
       id: presented.id,
@@ -151,8 +250,8 @@ export async function listArchiveSummaries(): Promise<NewsletterArchiveSummary[]
 export async function getArchiveIssueBySlug(slug: string): Promise<NewsletterArchiveIssue | null> {
   const key = slug.trim();
   if (!key) return null;
-  const { issues } = await readNewsletterArchive();
-  const issue = issues.find((item) => item.slug === key) ?? null;
+  const [{ issues }, testSnapshots] = await Promise.all([readNewsletterArchive(), readTestSnapshots()]);
+  const issue = [...issues, ...testSnapshots].find((item) => item.slug === key) ?? null;
   return issue ? presentArchiveIssue(issue) : null;
 }
 

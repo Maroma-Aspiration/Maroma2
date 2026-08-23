@@ -9,6 +9,7 @@ function isPreviewExempt(pathname: string): boolean {
   return pathname === "/preview-access" ||
     pathname === "/admin/install" ||
     pathname === "/api/preview-access" ||
+    pathname === "/api/promos" ||
     pathname.startsWith("/_next/") ||
     pathname === "/favicon.ico" ||
     pathname === "/robots.txt" ||
@@ -69,6 +70,12 @@ function requiresAdmin(pathname: string, method: string): boolean {
     return true;
   }
   if (pathname.startsWith("/api/category-banners/upload")) {
+    return true;
+  }
+  if (pathname.startsWith("/api/site-media-gallery/upload")) {
+    return true;
+  }
+  if (pathname === "/api/site-media-gallery" && method !== "GET") {
     return true;
   }
   if (pathname === "/api/category-banners" && method !== "GET") {

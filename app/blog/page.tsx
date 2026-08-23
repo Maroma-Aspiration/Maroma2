@@ -3,6 +3,7 @@ import { unstable_noStore as noStore } from "next/cache";
 import { formatStoryDate, truncateStoryExcerpt } from "../../lib/story-format";
 import { buildCurrentIssuePreview } from "../../lib/newsletter-current-issue";
 import { listArchiveSummaries } from "../../lib/newsletter-archive-storage";
+import { getJournalStories } from "../../lib/journal-stories";
 import { readStoriesState } from "../../lib/story-storage";
 import { resolveStoryThumbnailUrl } from "../../lib/story-thumbnail";
 import { JournalSubscribeForm } from "./journal-subscribe-form";
@@ -19,7 +20,7 @@ export default async function BlogPage() {
   noStore();
   const [state, issues] = await Promise.all([readStoriesState(), listArchiveSummaries()]);
   const currentIssue = buildCurrentIssuePreview(state);
-  const stories = state.stories.filter((story) => story.kind !== "divider" && story.kind !== "text");
+  const stories = await getJournalStories(state);
 
   const cards = await Promise.all(
     stories.map(async (story, index) => {
@@ -30,7 +31,12 @@ export default async function BlogPage() {
 
   return (
     <main className="stories-page">
-      <section className="stories-hero">
+      <section
+        className="stories-hero"
+        data-review="Journal hero"
+        data-review-id="journal-hero"
+        data-review-files="app/blog/page.tsx,app/blog/journal-subscribe-form.tsx"
+      >
         <h1 className="stories-hero-title">Welcome to The Maroma Journal</h1>
         <p className="stories-hero-subhead">Stories and Events from the World of Maroma</p>
         <p className="stories-hero-cta">
@@ -39,7 +45,12 @@ export default async function BlogPage() {
         <JournalSubscribeForm />
       </section>
 
-      <section className="stories-grid">
+      <section
+        className="stories-grid"
+        data-review="Journal stories"
+        data-review-id="journal-stories"
+        data-review-files="app/blog/page.tsx"
+      >
         {cards.length === 0 ? (
           <article className="story-card">
             <h2>No stories yet</h2>
@@ -72,6 +83,9 @@ export default async function BlogPage() {
         <div className="stories-hero">
           <p className="stories-eyebrow">Maroma Newsletter</p>
           <h2 className="stories-hero-title">Past newsletters</h2>
+          <p className="stories-hero-subhead">
+            <Link href="/newsletter/archive">View full archive</Link>
+          </p>
         </div>
         <div className="stories-grid newsletter-archive-grid">
         {currentIssue ? (

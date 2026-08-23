@@ -74,7 +74,12 @@ export default function RitualsPage() {
   return (
     <div className="rituals-page-container">
       <main className={`rituals-content ${isVisible ? "is-visible" : ""}`}>
-        <header className="rituals-hero">
+        <header
+          className="rituals-hero"
+          data-review="Rituals overview"
+          data-review-id="rituals-hero"
+          data-review-files="app/rituals/page.tsx"
+        >
           <span className="rituals-eyebrow">The Art of Wellbeing</span>
           <h1 className="rituals-title">Maroma Rituals</h1>
           <p className="rituals-subtitle">Transforming daily care into sacred moments of presence.</p>
@@ -96,7 +101,12 @@ export default function RitualsPage() {
           </nav>
         </div>
 
-        <section className="rituals-display">
+        <section
+          className="rituals-display"
+          data-review="Ritual details"
+          data-review-id="rituals-display"
+          data-review-files="app/rituals/page.tsx"
+        >
           {rituals.filter(r => r.id === activeTab).map((ritual) => (
             <div className="ritual-featured-card" key={ritual.id}>
               <div className="ritual-visual-group">

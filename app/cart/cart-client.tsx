@@ -40,7 +40,12 @@ export default function CartClient() {
     );
 
   return (
-    <main className="maroma-commerce-page maroma-basket-page">
+    <main
+      className="maroma-commerce-page maroma-basket-page"
+      data-review="Basket"
+      data-review-id="cart-page"
+      data-review-files="app/cart/cart-client.tsx,context/CartContext.tsx"
+    >
       <div className="maroma-commerce-shell">
         <header className="maroma-commerce-hero">
           <span className="maroma-commerce-eyebrow">Ritual Selection</span>

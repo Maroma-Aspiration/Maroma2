@@ -1,28 +1,29 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useState } from "react";
 import { parseYouTubeVideoId } from "../../lib/youtube-embed";
 import type { HomepageContent } from "../../lib/homepage-content-types";
+import { defaultHomepageContent } from "../../lib/homepage-content-types";
+import "../about/about-page.css";
 
 export function HomepageStorySections() {
-  const [content, setContent] = useState<HomepageContent | null>(null);
+  const [content, setContent] = useState<HomepageContent>(() => defaultHomepageContent());
 
   useEffect(() => {
     let cancelled = false;
     void fetch("/api/homepage-content", { cache: "no-store" })
       .then((res) => res.json())
       .then((data: { content?: HomepageContent }) => {
-        if (!cancelled) setContent(data.content ?? null);
+        if (!cancelled && data.content) setContent(data.content);
       })
       .catch(() => {
-        if (!cancelled) setContent(null);
+        // keep defaults so About still renders
       });
     return () => {
       cancelled = true;
     };
   }, []);
-
-  if (!content) return null;
 
   const placesWithImages = content.places.filter((place) => place.images.length > 0);
   const videos = content.videos.filter((video) => video.url.trim());
@@ -30,11 +31,41 @@ export function HomepageStorySections() {
 
   return (
     <>
-      <section className="home-story-section" id="about">
-        <div className="home-story-inner">
-          <span className="eyebrow">Maison</span>
-          <h2>{content.aboutTitle}</h2>
-          <p>{content.aboutBody}</p>
+      <section
+        className="home-about-teaser"
+        id="about"
+        data-review="Homepage about teaser"
+        data-review-id="home-about"
+        data-review-files="app/components/HomepageStorySections.tsx"
+      >
+        <div className="home-about-teaser-inner">
+          <p className="about-eyebrow">Maison · Since 1976</p>
+          <h2>{content.aboutTitle || "Every scent tells a story"}</h2>
+          <p>
+            {content.aboutBody ||
+              "Botanical care, natural perfume, and home rituals crafted in Auroville, India. Fair Trade, vegan, and made with the community that has shaped fragrance here for decades."}
+          </p>
+          <div className="home-about-pillars">
+            <Link href="/about#story">
+              <strong>Our story</strong>
+              <span>From incense under thatch to a global maison of botanical care.</span>
+            </Link>
+            <Link href="/about#founders">
+              <strong>The founders</strong>
+              <span>Paul and Laura, craft and voice, joined in Auroville.</span>
+            </Link>
+            <Link href="/about#values">
+              <strong>Mission &amp; vision</strong>
+              <span>Quality, earth-friendly practice, and the Auroville Charter.</span>
+            </Link>
+            <Link href="/about#fair-trade">
+              <strong>Fair Trade</strong>
+              <span>People before machines. Ten principles we live by.</span>
+            </Link>
+          </div>
+          <Link href="/about" className="button primary">
+            Read the full story
+          </Link>
         </div>
       </section>
 

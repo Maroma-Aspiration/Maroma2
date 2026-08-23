@@ -1,4 +1,5 @@
 import { pickThumbnailFromCanvas } from "./newsletter-archive-utils";
+import { canvasContentScore, isFreshNewsletterDraft } from "./newsletter-restore-issue";
 import type { NewsletterBlock, StoriesState } from "./story-types";
 
 export type CurrentIssuePreview = {
@@ -49,6 +50,8 @@ function pickCurrentIssueThumbnail(state: StoriesState): string | undefined {
 }
 
 export function buildCurrentIssuePreview(state: StoriesState): CurrentIssuePreview | null {
+  if (isFreshNewsletterDraft(state)) return null;
+
   const canvas = state.newsletterCanvas;
   const hasCanvas = canvas?.enabled !== false && (canvas?.elements?.length ?? 0) > 0;
   const hasLegacyContent =
@@ -58,6 +61,7 @@ export function buildCurrentIssuePreview(state: StoriesState): CurrentIssuePrevi
     (state.stories?.length ?? 0) > 0;
 
   if (!hasCanvas && !hasLegacyContent) return null;
+  if (hasCanvas && canvasContentScore(canvas) < 8) return null;
 
   return {
     title: buildCurrentIssueTitle(state),

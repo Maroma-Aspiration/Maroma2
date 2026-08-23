@@ -12,4 +12,6 @@ export type StoreLocation = {
   website: string;
   lat: number | null;
   lng: number | null;
+  /** Extra terms for search (city nicknames, country codes, etc.). */
+  searchTerms?: string[];
 };

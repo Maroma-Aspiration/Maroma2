@@ -613,22 +613,13 @@ export function SiteHeader({ initialNav, initialViewportIsMobile = false }: Site
     </Link>
   );
 
-  const desktopNavLinks = navItems.map((item) => item === "Maroma Experiences" ? (
-    <a
-      key={item}
-      href={MAROMA_EXPERIENCES_URL}
-      target="_blank"
-      rel="noopener noreferrer"
-      className="nav-experiences-link"
-      aria-label="Visit Maroma Experiences"
-    >
-      <NavImg src="/nav-maroma-experiences.png" alt="Maroma Experiences" width={132} height={25} />
-    </a>
-  ) : (
-    <Link key={item} href={item === "Newsletter" ? "/blog" : getNavHref(item)}>
-      {item}
-    </Link>
-  ));
+  const desktopNavLinks = navItems
+    .filter((item) => item !== "Maroma Experiences")
+    .map((item) => (
+      <Link key={item} href={item === "Newsletter" ? "/blog" : getNavHref(item)}>
+        {item}
+      </Link>
+    ));
 
   const navStateClass = `${scrolled ? "nav-solid" : "nav-overlay"}${navLiftUp ? " nav-lift" : ""}`;
 
@@ -636,6 +627,9 @@ export function SiteHeader({ initialNav, initialViewportIsMobile = false }: Site
     return (
       <header
         className={`site-header site-header-responsive site-header-b2b${scrolled ? " site-header-solid" : ""}${navLiftUp ? " site-header-lift" : ""}`}
+        data-review="Site header"
+        data-review-id="site-header-b2b"
+        data-review-files="app/components/SiteHeader.tsx"
       >
         <nav className={`nav nav-b2b ${navStateClass}`}>
           <Link href="/?skipIntro=1" className="brand" aria-label={`${brand} home`}>
@@ -656,6 +650,9 @@ export function SiteHeader({ initialNav, initialViewportIsMobile = false }: Site
   return (
     <header
       className={`site-header site-header-responsive${scrolled ? " site-header-solid" : ""}${navLiftUp ? " site-header-lift" : ""}`}
+      data-review="Site header"
+      data-review-id="site-header"
+      data-review-files="app/components/SiteHeader.tsx"
     >
       {isMobileNav ? (
         <div className="maroma-nav-shell maroma-nav-shell--mobile">
@@ -742,6 +739,15 @@ export function SiteHeader({ initialNav, initialViewportIsMobile = false }: Site
             </Link>
             <div className="nav-links">{desktopNavLinks}</div>
             <div className="nav-end">
+              <a
+                href={MAROMA_EXPERIENCES_URL}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="nav-experiences-link"
+                aria-label="Visit Maroma Experiences"
+              >
+                <NavImg src="/nav-maroma-experiences.png" alt="Maroma Experiences" width={132} height={25} />
+              </a>
               <div className="spa-cta-wrap">
                 <NavImg src="/nav-spa-logo.png" alt="Maroma Spa" className="spa-book-logo" width={86} height={36} />
                 <a

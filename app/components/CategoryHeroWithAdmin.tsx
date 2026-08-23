@@ -260,7 +260,13 @@ export function CategoryHeroWithAdmin({
 
   if (!imageUrl) {
     return (
-      <header className={`category-hero ${heroMods}`} data-category-slug={slug}>
+      <header
+        className={`category-hero ${heroMods}`}
+        data-category-slug={slug}
+        data-review="Category hero"
+        data-review-id="category-hero"
+        data-review-files="app/components/CategoryHeroWithAdmin.tsx,app/[slug]/page.tsx"
+      >
         <div className="category-hero-copy">
           {wideCover ? heroCopy : (
             <>
@@ -275,7 +281,13 @@ export function CategoryHeroWithAdmin({
 
   return (
     <>
-      <header className={`category-hero ${heroMods}`} data-category-slug={slug}>
+      <header
+        className={`category-hero ${heroMods}`}
+        data-category-slug={slug}
+        data-review="Category hero"
+        data-review-id="category-hero"
+        data-review-files="app/components/CategoryHeroWithAdmin.tsx,app/[slug]/page.tsx"
+      >
         {wideCover ? (
           <div
             className="category-hero-wide-media category-banner-admin-target"

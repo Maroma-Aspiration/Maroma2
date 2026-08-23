@@ -4,6 +4,7 @@ import { listArchiveSummaries } from "../lib/newsletter-archive-storage";
 import { ARCHIVE_INDEX_URL, archiveIssueUrl, SITE_URL } from "../lib/newsletter-archive-seo";
 import { readLiveStorefrontCatalog } from "../lib/product-catalog-admin";
 import { hasDisplayImage } from "../lib/product-image";
+import { getJournalStories } from "../lib/journal-stories";
 import { readStoriesState } from "../lib/story-storage";
 
 export const dynamic = "force-dynamic";
@@ -18,10 +19,12 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
 
   const staticPages: MetadataRoute.Sitemap = [
     { url: SITE_URL, changeFrequency: "weekly", priority: 1 },
+    { url: `${SITE_URL}/about`, changeFrequency: "monthly", priority: 0.85 },
     { url: `${SITE_URL}/blog`, changeFrequency: "weekly", priority: 0.9 },
     { url: `${SITE_URL}/newsletter`, changeFrequency: "weekly", priority: 0.9 },
     { url: ARCHIVE_INDEX_URL, changeFrequency: "weekly", priority: 0.85 },
     { url: `${SITE_URL}/search`, changeFrequency: "weekly", priority: 0.5 },
+    { url: `${SITE_URL}/shop`, changeFrequency: "weekly", priority: 0.9 },
     { url: `${SITE_URL}/gifting/build-your-set`, changeFrequency: "monthly", priority: 0.6 },
     { url: `${SITE_URL}/rituals`, changeFrequency: "monthly", priority: 0.6 },
     { url: `${SITE_URL}/privacy`, changeFrequency: "yearly", priority: 0.3 },
@@ -51,7 +54,9 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     priority: 0.75,
   }));
 
-  const blogPages: MetadataRoute.Sitemap = (state.stories ?? [])
+  const journalStories = await getJournalStories(state);
+
+  const blogPages: MetadataRoute.Sitemap = journalStories
     .filter((story) => story.slug?.trim())
     .map((story) => ({
       url: `${SITE_URL}/blog/${story.slug}`,

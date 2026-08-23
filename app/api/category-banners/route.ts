@@ -17,6 +17,7 @@ type PostBody = {
   slug?: string;
   patch?: CategoryBannerOverride;
   reset?: boolean;
+  resetCard?: boolean;
 };
 
 export async function POST(request: Request) {
@@ -33,6 +34,23 @@ export async function POST(request: Request) {
       delete store.banners[slug];
       await writeCategoryBannerStore(store);
       return NextResponse.json({ ok: true, banners: store.banners });
+    }
+
+    if (body.resetCard === true) {
+      const prev = store.banners[slug];
+      if (prev) {
+        const {
+          cardLabel: _cl,
+          cardDescription: _cd,
+          cardImageUrl: _ci,
+          cardObjectPosition: _cp,
+          cardBackgroundScale: _cs,
+          ...rest
+        } = prev;
+        store.banners[slug] = { ...rest, updatedAt: new Date().toISOString() };
+      }
+      await writeCategoryBannerStore(store);
+      return NextResponse.json({ ok: true, banner: store.banners[slug] ?? null });
     }
 
     const patch = body.patch ?? {};
@@ -54,6 +72,21 @@ export async function POST(request: Request) {
     }
     if (typeof merged.maxHeight === "string") {
       merged.maxHeight = merged.maxHeight.trim();
+    }
+    if (typeof merged.cardLabel === "string") {
+      merged.cardLabel = merged.cardLabel.trim();
+    }
+    if (typeof merged.cardDescription === "string") {
+      merged.cardDescription = merged.cardDescription.trim();
+    }
+    if (typeof merged.cardImageUrl === "string") {
+      merged.cardImageUrl = merged.cardImageUrl.trim();
+    }
+    if (typeof merged.cardObjectPosition === "string") {
+      merged.cardObjectPosition = merged.cardObjectPosition.trim();
+    }
+    if (merged.cardBackgroundScale !== undefined) {
+      merged.cardBackgroundScale = Math.min(300, Math.max(50, Math.round(merged.cardBackgroundScale)));
     }
 
     store.banners[slug] = merged;

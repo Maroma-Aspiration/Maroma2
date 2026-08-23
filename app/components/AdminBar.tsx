@@ -1,6 +1,7 @@
 import { cookies } from "next/headers";
 import { isAdminUiHidden } from "../../lib/admin-ui-visible";
 import { getSessionSecret, SESSION_COOKIE, verifySessionPayload } from "../../lib/auth-session";
+import { isReviewModeEnabled } from "../../lib/review-feedback";
 
 export async function AdminBar() {
   if (isAdminUiHidden()) {
@@ -23,8 +24,10 @@ export async function AdminBar() {
     { href: "/admin/gift-3d", label: "3D products" },
     { href: "/admin/b2b", label: "B2B" },
     { href: "/admin/site", label: "Site" },
+    { href: "/admin/media", label: "Media" },
     { href: "/admin/orders", label: "Orders" },
     { href: "/admin/users", label: "Manage users" },
+    ...(isReviewModeEnabled() ? [{ href: "/review", label: "Review export" }] : []),
   ];
 
   return (

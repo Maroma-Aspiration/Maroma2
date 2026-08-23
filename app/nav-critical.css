@@ -13,9 +13,20 @@
   display: flex;
   align-items: center;
   flex-wrap: nowrap;
-  overflow: hidden;
   min-width: 0;
   flex: 1 1 auto;
+}
+
+/* Desktop: keep link row visible; clip only on mobile carousel shell */
+html:not(.maroma-viewport-mobile):not([data-maroma-viewport-mobile]) .maroma-nav-shell--desktop .nav-links {
+  overflow: visible;
+  justify-content: center;
+}
+
+html.maroma-viewport-mobile .maroma-nav-shell--mobile .nav-links,
+html[data-maroma-viewport-mobile] .maroma-nav-shell--mobile .nav-links {
+  overflow-x: auto;
+  overflow-y: hidden;
 }
 
 .site-header .nav-end {
@@ -32,8 +43,12 @@
   background: transparent !important;
 }
 
+:root {
+  --header-clearance: calc(88px + var(--admin-bar-height, 0px) + var(--nav-bottom-gap, 2mm));
+}
+
 .hero {
-  --hero-nav-lift: calc(88px + var(--admin-bar-height, 0px) + var(--nav-bottom-gap, 2mm));
+  --hero-nav-lift: var(--header-clearance);
 }
 
 .hero-artboard {

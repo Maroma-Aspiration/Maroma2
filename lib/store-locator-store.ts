@@ -1,45 +1,15 @@
 import { readJsonKv, writeJsonKv } from "./json-kv-store";
+import { defaultStoreLocations } from "./store-locator-defaults";
+import { sortStoreLocations } from "./store-locator-search";
 import type { StoreLocation } from "./store-locator-types";
 
 export type { StoreLocation } from "./store-locator-types";
+export { defaultStoreLocations } from "./store-locator-defaults";
 
 type LocatorStore = { locations: StoreLocation[] };
 
 const KEY = "maroma:store-locator";
 const FILE = "store-locator.json";
-
-export const defaultStoreLocations = (): StoreLocation[] => [
-  {
-    id: "auroville-hq",
-    name: "Maroma Auroville",
-    kind: "outlet",
-    address: "Kuilapalayam, Auroville",
-    city: "Auroville",
-    region: "Tamil Nadu",
-    country: "India",
-    postalCode: "605101",
-    phone: "",
-    email: "info@maroma.com",
-    website: "https://www.maroma.com",
-    lat: 12.0067,
-    lng: 79.8106,
-  },
-  {
-    id: "maroma-spa",
-    name: "Maroma Spa",
-    kind: "spa",
-    address: "Auroville",
-    city: "Auroville",
-    region: "Tamil Nadu",
-    country: "India",
-    postalCode: "605101",
-    phone: "",
-    email: "",
-    website: "https://www.themaromaspa.com",
-    lat: 12.0067,
-    lng: 79.8106,
-  },
-];
 
 function parseLocation(raw: unknown): StoreLocation | null {
   if (!raw || typeof raw !== "object") return null;
@@ -48,6 +18,9 @@ function parseLocation(raw: unknown): StoreLocation | null {
   const name = typeof row.name === "string" ? row.name.trim() : "";
   if (!id || !name) return null;
   const kind = row.kind;
+  const searchTerms = Array.isArray(row.searchTerms)
+    ? row.searchTerms.filter((term): term is string => typeof term === "string" && term.trim().length > 0)
+    : undefined;
   return {
     id,
     name,
@@ -70,13 +43,29 @@ function parseLocation(raw: unknown): StoreLocation | null {
     website: typeof row.website === "string" ? row.website : "",
     lat: typeof row.lat === "number" && Number.isFinite(row.lat) ? row.lat : null,
     lng: typeof row.lng === "number" && Number.isFinite(row.lng) ? row.lng : null,
+    searchTerms,
   };
 }
 
+/** Keep admin edits while ensuring the public catalog includes all default locations. */
+function mergeWithDefaultCatalog(stored: StoreLocation[]): StoreLocation[] {
+  const byId = new Map<string, StoreLocation>();
+  for (const location of stored) {
+    byId.set(location.id, location);
+  }
+  for (const location of defaultStoreLocations()) {
+    if (!byId.has(location.id)) {
+      byId.set(location.id, location);
+    }
+  }
+  return sortStoreLocations(Array.from(byId.values()));
+}
+
 export async function readStoreLocator(): Promise<LocatorStore> {
-  const stored = await readJsonKv<LocatorStore>(KEY, FILE, { locations: defaultStoreLocations() });
+  const fallback = { locations: defaultStoreLocations() };
+  const stored = await readJsonKv<LocatorStore>(KEY, FILE, fallback);
   const locations = (stored.locations ?? []).map(parseLocation).filter((l): l is StoreLocation => Boolean(l));
-  return { locations: locations.length ? locations : defaultStoreLocations() };
+  return { locations: mergeWithDefaultCatalog(locations.length ? locations : defaultStoreLocations()) };
 }
 
 export async function writeStoreLocator(store: LocatorStore): Promise<void> {
@@ -100,6 +89,7 @@ export async function upsertStoreLocation(input: Partial<StoreLocation> & { name
     website: input.website ?? existing?.website ?? "",
     lat: input.lat === undefined ? existing?.lat ?? null : input.lat,
     lng: input.lng === undefined ? existing?.lng ?? null : input.lng,
+    searchTerms: input.searchTerms ?? existing?.searchTerms,
   };
   store.locations = existing
     ? store.locations.map((l) => (l.id === location.id ? location : l))

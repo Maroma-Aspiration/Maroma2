@@ -149,7 +149,13 @@ export default async function CategoryPage({ params }: CategoryPageProps) {
         ) : null}
       </section>
 
-      <section className="product-listing-section" aria-label={`${category.label} products`}>
+      <section
+        className="product-listing-section"
+        aria-label={`${category.label} products`}
+        data-review="Category product listing"
+        data-review-id="category-listing"
+        data-review-files="app/[slug]/page.tsx,app/components/ProductListingWithFilters.tsx"
+      >
         <ProductListingWithFilters products={items} categorySlug={params.slug} />
       </section>
     </main>

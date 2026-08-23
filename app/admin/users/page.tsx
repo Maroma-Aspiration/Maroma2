@@ -206,12 +206,6 @@ export default function AdminUsersPage() {
 
   return (
     <main className="admin" style={{ maxWidth: 920, margin: "0 auto", padding: "2rem 1rem" }}>
-      <nav className="admin-top-nav" aria-label="Admin sections">
-        <a href="/?skipIntro=1">Site editor</a>
-        <a href="/newsletter?edit=1">Newsletter editor</a>
-        <a href="/admin/products">Products</a>
-        <a href="/admin/users">Manage Users</a>
-      </nav>
       <header className="admin-header">
         <div>
           <h1>Manage Users</h1>

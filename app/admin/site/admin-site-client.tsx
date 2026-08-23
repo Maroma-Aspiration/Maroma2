@@ -3,11 +3,13 @@
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { SignOutButton } from "../../components/SignOutButton";
-import type { PromoBanner, PromoAnimation, PromoMediaKind } from "../../../lib/promo-types";
+import { PromoBannerAdminPanel } from "../../components/PromoBannerAdminPanel";
+import type { PromoBanner } from "../../../lib/promo-types";
 import type { HomepageContent } from "../../../lib/homepage-content-types";
 import { defaultHomepageContent } from "../../../lib/homepage-content-types";
 import type { StoreLocation } from "../../../lib/store-locator-types";
 import type { ProductReview } from "../../../lib/reviews-types";
+import "./admin-promo-banners.css";
 
 async function uploadFile(file: File): Promise<string> {
   const form = new FormData();
@@ -22,18 +24,6 @@ export default function AdminSiteClient() {
   const [tab, setTab] = useState<"promos" | "homepage" | "stores" | "reviews">("promos");
   const [status, setStatus] = useState("");
   const [banners, setBanners] = useState<PromoBanner[]>([]);
-  const [promo, setPromo] = useState({
-    title: "",
-    body: "",
-    mediaUrl: "",
-    mediaKind: "none" as PromoMediaKind,
-    animation: "marquee" as PromoAnimation,
-    ctaLabel: "",
-    ctaHref: "",
-    startsAt: "",
-    endsAt: "",
-    active: true,
-  });
   const [home, setHome] = useState<HomepageContent>(defaultHomepageContent());
   const [locations, setLocations] = useState<StoreLocation[]>([]);
   const [location, setLocation] = useState({
@@ -75,10 +65,15 @@ export default function AdminSiteClient() {
 
   return (
     <main className="login-page">
-      <section className="login-card" style={{ maxWidth: 960, width: "100%" }}>
+      <section
+        className="login-card admin-site-card"
+        style={{ maxWidth: tab === "promos" ? 1180 : 960, width: "100%" }}
+      >
         <p className="login-eyebrow">Admin</p>
         <h1 className="login-title">Site content</h1>
-        <p className="login-reason">{status || "Promotions, homepage, stores, reviews."}</p>
+        <p className={`login-reason${status === "Published!" ? " promo-admin-status-success" : ""}`}>
+          {status || "Promotions, homepage, stores, reviews."}
+        </p>
         <div className="login-actions-row" style={{ marginBottom: 16 }}>
           <Link href="/admin/orders" className="button secondary">
             Orders
@@ -102,94 +97,11 @@ export default function AdminSiteClient() {
         </div>
 
         {tab === "promos" ? (
-          <div>
-            <h2>Homepage banners</h2>
-            <p>Schedule text, image or video. Animation presets: marquee, fade, slide, pulse.</p>
-            <input placeholder="Title" value={promo.title} onChange={(e) => setPromo((p) => ({ ...p, title: e.target.value }))} />
-            <textarea placeholder="Message" value={promo.body} onChange={(e) => setPromo((p) => ({ ...p, body: e.target.value }))} />
-            <select
-              value={promo.mediaKind}
-              onChange={(e) => setPromo((p) => ({ ...p, mediaKind: e.target.value as PromoMediaKind }))}
-            >
-              <option value="none">Text only</option>
-              <option value="image">Image</option>
-              <option value="video">Video</option>
-            </select>
-            <input
-              type="file"
-              accept={promo.mediaKind === "video" ? "video/*" : "image/*"}
-              onChange={(e) => {
-                const file = e.target.files?.[0];
-                if (!file) return;
-                void uploadFile(file)
-                  .then((url) => setPromo((p) => ({ ...p, mediaUrl: url })))
-                  .catch((err) => setStatus(err instanceof Error ? err.message : "Upload failed"));
-              }}
-            />
-            <select
-              value={promo.animation}
-              onChange={(e) => setPromo((p) => ({ ...p, animation: e.target.value as PromoAnimation }))}
-            >
-              <option value="marquee">Marquee</option>
-              <option value="fade">Fade</option>
-              <option value="slide">Slide</option>
-              <option value="pulse">Pulse</option>
-            </select>
-            <input placeholder="CTA label" value={promo.ctaLabel} onChange={(e) => setPromo((p) => ({ ...p, ctaLabel: e.target.value }))} />
-            <input placeholder="CTA link" value={promo.ctaHref} onChange={(e) => setPromo((p) => ({ ...p, ctaHref: e.target.value }))} />
-            <label>
-              Starts
-              <input type="datetime-local" value={promo.startsAt} onChange={(e) => setPromo((p) => ({ ...p, startsAt: e.target.value }))} />
-            </label>
-            <label>
-              Ends
-              <input type="datetime-local" value={promo.endsAt} onChange={(e) => setPromo((p) => ({ ...p, endsAt: e.target.value }))} />
-            </label>
-            <label>
-              <input
-                type="checkbox"
-                checked={promo.active}
-                onChange={(e) => setPromo((p) => ({ ...p, active: e.target.checked }))}
-              />
-              Active
-            </label>
-            <button
-              type="button"
-              className="button primary button-sage"
-              onClick={async () => {
-                const res = await fetch("/api/promos", {
-                  method: "POST",
-                  headers: { "Content-Type": "application/json" },
-                  body: JSON.stringify(promo),
-                });
-                const data = (await res.json()) as { error?: string };
-                setStatus(data.error || "Banner saved.");
-                await load();
-              }}
-            >
-              Save banner
-            </button>
-            <ul>
-              {banners.map((banner) => (
-                <li key={banner.id}>
-                  {banner.title} {banner.active ? "(on)" : "(off)"} {banner.startsAt}–{banner.endsAt}
-                  <button
-                    type="button"
-                    onClick={async () => {
-                      await fetch("/api/promos", {
-                        method: "POST",
-                        headers: { "Content-Type": "application/json" },
-                        body: JSON.stringify({ deleteId: banner.id }),
-                      });
-                      await load();
-                    }}
-                  >
-                    Delete
-                  </button>
-                </li>
-              ))}
-            </ul>
-          </div>
+          <PromoBannerAdminPanel
+            banners={banners}
+            onRefresh={load}
+            onStatus={setStatus}
+          />
         ) : null}
 
         {tab === "homepage" ? (

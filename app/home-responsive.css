@@ -72,7 +72,46 @@ html[data-maroma-viewport-mobile] .maroma-nav-shell--mobile {
     align-items: center;
     gap: 8px;
     flex: 0 0 auto;
+    flex-shrink: 0;
     margin-right: 5mm;
+  }
+
+  html:not(.maroma-viewport-mobile) .maroma-nav-shell--desktop .brand {
+    margin-right: 10px;
+    flex-shrink: 0;
+  }
+
+  html:not(.maroma-viewport-mobile) .maroma-nav-shell--desktop .nav-links {
+    overflow: visible;
+    gap: clamp(6px, 0.85vw, 18px);
+    font-size: clamp(0.58rem, 0.55rem + 0.12vw, 0.7rem);
+  }
+
+  html:not(.maroma-viewport-mobile) .maroma-nav-shell--desktop .nav-experiences-link {
+    display: inline-flex;
+    align-items: center;
+    flex-shrink: 0;
+  }
+
+  html:not(.maroma-viewport-mobile) .maroma-nav-shell--desktop .nav-experiences-link img {
+    width: clamp(96px, 9vw, 132px) !important;
+    height: auto !important;
+    max-height: 25px !important;
+  }
+
+  html:not(.maroma-viewport-mobile) .maroma-nav-shell--desktop .spa-cta-wrap .spa-book-logo {
+    width: clamp(68px, 6.5vw, 86px) !important;
+    max-height: 32px !important;
+  }
+
+  html:not(.maroma-viewport-mobile) .maroma-nav-shell--desktop .spa-book-btn {
+    padding: 5px 10px;
+    font-size: 0.54rem;
+  }
+
+  html:not(.maroma-viewport-mobile) .maroma-nav-shell--desktop .nav {
+    padding-inline: clamp(12px, 3vw, 6vw);
+    gap: clamp(8px, 1vw, 14px);
   }
 
   html:not(.maroma-viewport-mobile) .maroma-nav-shell--desktop .spa-cta-wrap {
@@ -92,7 +131,7 @@ html[data-maroma-viewport-mobile] .maroma-nav-shell--mobile {
   }
 
   html:not(.maroma-viewport-mobile) .hero {
-    --hero-nav-lift: calc(88px + var(--admin-bar-height, 0px) + var(--nav-bottom-gap));
+    --hero-nav-lift: var(--header-clearance);
   }
 }
 
@@ -1312,15 +1351,17 @@ body.admin-mobile-preview-active .page.maroma.is-mobile-document-flow .hero-ritu
     margin: 0 auto;
   }
 
-  .page.maroma:not(.is-mobile-layout):not(.is-mobile-document-flow) .scroller-section.scroller-loved-for-a-reason,
-  .page.maroma:not(.is-mobile-layout):not(.is-mobile-document-flow) .scroller-loved-for-a-reason {
+  .page.maroma:not(.is-mobile-layout):not(.is-mobile-document-flow)
+    .scroller-section.scroller-loved-for-a-reason:not(.home-collections-section),
+  .page.maroma:not(.is-mobile-layout):not(.is-mobile-document-flow)
+    .scroller-loved-for-a-reason:not(.home-collections-section) {
     --loved-flow-offset-y: 0px;
     margin-top: clamp(24px, 4vw, 40px) !important;
     padding-top: 0 !important;
   }
 
   .page.maroma:not(.is-mobile-layout):not(.is-mobile-document-flow)
-    .scroller-loved-for-a-reason
+    .scroller-loved-for-a-reason:not(.home-collections-section)
     .scroller-header {
     padding-top: clamp(32px, 5vw, 48px);
     margin-top: 0 !important;

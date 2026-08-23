@@ -38,7 +38,6 @@ import {
 } from "./canvas-montage";
 import {
   DEFAULT_STORY_SPACING_GAPS,
-  STORY_BODY_TO_CTA_GAP,
   gapBetweenStoryElements,
   type StorySpacingGaps,
 } from "./story-spacing-gaps";
@@ -55,16 +54,16 @@ const MASTHEAD_LAYER_IDS = new Set([
 
 const MISSION_LAYER_IDS = new Set(["migrated-mission-hd", "migrated-mission"]);
 
-/** ~1mm gap between masthead banner and hero (same scale as story spacing). */
-const MASTHEAD_IMAGE_GAP_PX = Math.round(STORY_BODY_TO_CTA_GAP / 35);
-/** ~2mm gap from masthead hero to mission text on mobile. */
-const MASTHEAD_MOBILE_BODY_GAP_PX = Math.round((STORY_BODY_TO_CTA_GAP / 35) * 2);
+/** 2mm between masthead banner and hero (96dpi). */
+const MASTHEAD_IMAGE_GAP_PX = Math.round((2 * 96) / 25.4);
+/** Comfortable space from masthead to the first text block. */
+const MASTHEAD_MOBILE_BODY_GAP_PX = 16;
 const MASTHEAD_MOBILE_PORTRAIT_PX = Math.round(72 * 0.66 * 1.2);
 const MASTHEAD_DESKTOP_PORTRAIT_PX = Math.round((MASTHEAD_PORTRAIT_SIZE / CANVAS_W) * EMAIL_W);
-/** Typical stacked-email width on phone — for portrait overlap math. */
+/** Typical stacked-email width on phone — for portrait overlay math. */
 const MASTHEAD_MOBILE_EMAIL_W = 390;
-/** ~1mm gap below masthead hero before mission text (mobile). */
-const MASTHEAD_MOBILE_HERO_TEXT_GAP_PX = MASTHEAD_IMAGE_GAP_PX;
+/** Gap below masthead hero before mission text (mobile). */
+const MASTHEAD_MOBILE_HERO_TEXT_GAP_PX = 16;
 
 /** Extra breathing room below story images in stacked email (px, pre-scale). */
 const EMAIL_IMAGE_GAP_EXTRA = 12;
@@ -399,7 +398,8 @@ function stackedEmailMarginBottom(
     gap = Math.max(gap, gaps.aboveButton + EMAIL_CTA_GAP_EXTRA);
   }
 
-  return scale(gap);
+  // Never collapse to zero: stacked archive blocks must not overlap.
+  return scale(Math.max(gap, 16));
 }
 
 /** Flat list of elements rendered in stacked email (for margin lookup). */
@@ -516,10 +516,17 @@ function mobileEmailCss(preserveDesktopLayout = false): string {
       .email-masthead-table {
         margin-bottom: ${mobileHeroTextGap}px !important;
       }
+      .email-layer-text,
+      .email-layer-story-grid,
+      .email-mission-block {
+        overflow: visible !important;
+        height: auto !important;
+      }
       .email-story-grid-inner {
         display: grid !important;
         grid-template-columns: 1fr !important;
         gap: 16px !important;
+        align-items: start !important;
       }
       .email-story-card {
         display: flex !important;
@@ -814,7 +821,7 @@ function renderVisualStoryGrid(
       const excerptHtml = s.excerpt
         ? `<p style="margin:0;font-size:${px(scaleFont(12))};line-height:1.5;color:${textColor};opacity:0.78;flex:1;">${esc(s.excerpt)}</p>`
         : "";
-      return `<div class="email-story-card" style="border-radius:${cardRadius};overflow:hidden;box-shadow:0 4px 22px rgba(0,0,0,0.18),0 1px 4px rgba(0,0,0,0.10);display:flex;flex-direction:column;background:${cardBg};">
+      return `<div class="email-story-card" style="border-radius:${cardRadius};overflow:hidden;box-shadow:0 4px 22px rgba(0,0,0,0.18),0 1px 4px rgba(0,0,0,0.10);display:flex;flex-direction:column;min-width:0;background:${cardBg};">
         ${imgHtml}
         <div style="padding:${px(scale(14))} ${px(scale(16))} ${px(scale(16))};display:flex;flex-direction:column;gap:${px(scale(10))};flex:1;">
           <p style="margin:0;font-size:${px(scaleFont(14))};font-weight:700;line-height:1.35;color:${textColor};">${esc(s.title)}</p>
@@ -824,38 +831,15 @@ function renderVisualStoryGrid(
     })
     .join("");
 
-  const gridStyle = `display:grid;grid-template-columns:repeat(${cols},1fr);gap:${px(gap)};`;
+  const gridStyle = `display:grid;grid-template-columns:repeat(${cols},minmax(0,1fr));gap:${px(Math.max(gap, 16))};align-items:start;`;
 
   return `<div ${shell}>${heading}<div class="email-story-grid-inner" style="${gridStyle}">${cards}</div></div>`;
 }
 
-/** Table-based masthead: banner → portrait on seam → hero (natural image heights, no absolute coords). */
-function mastheadImageRadius(el: CanvasImageEl, allElements: CanvasEl[]): string {
-  if (isCircleImage(el)) return "border-radius:50%;";
-  const brCss = montageImageBorderRadius(el, allElements, scale);
-  return brCss ? `border-radius:${brCss};` : "border-radius:14px;";
-}
-
-/**
- * Pull portrait up from below the hero so its top matches the editor.
- * Prefer offset vs hero.y — email banner/hero use height:auto and often don't match canvas crop heights.
- */
-function portraitPullFromHero(
-  portrait: CanvasImageEl | undefined,
-  hero: CanvasImageEl | undefined,
-  heroEmailH: number,
-  imageGap: number,
-): number {
-  if (!portrait) return Math.round(heroEmailH / 2);
-  if (!hero) return 0;
-  const aboveHeroCanvas = Math.max(0, hero.y - portrait.y);
-  return Math.max(0, Math.round(heroEmailH + imageGap + scale(aboveHeroCanvas)));
-}
-
+/** Table-based masthead: banner → 2mm gap → hero, with portrait on the seam. */
 function renderEmailMastheadTable(
   elements: CanvasEl[],
   ctx: RenderCtx,
-  allElements: CanvasEl[],
 ): string {
   const top = elements.find((e) => e.id === "migrated-top" && e.kind === "image") as
     | CanvasImageEl
@@ -873,7 +857,7 @@ function renderEmailMastheadTable(
   const banner = top ?? logo;
   if (!banner && !hero && !portrait) return "";
 
-  const imageGap = 0;
+  const imageGap = MASTHEAD_IMAGE_GAP_PX;
   const portraitPx = Math.round(
     ((portrait?.w || MASTHEAD_PORTRAIT_SIZE) / CANVAS_W) * EMAIL_W,
   );
@@ -889,9 +873,6 @@ function renderEmailMastheadTable(
   const heroHMobile =
     hero?.w && hero?.h ? Math.round((hero.h / hero.w) * MASTHEAD_MOBILE_EMAIL_W) : 0;
 
-  const portraitPullDesktop = portraitPullFromHero(portrait, hero, heroH, imageGap);
-  const portraitPullMobile = portraitPullFromHero(portrait, hero, heroHMobile, imageGap);
-
   const bannerSrc = banner?.src ? resolveImageSrc(banner.src, ctx) : "";
   const heroSrc = hero?.src ? resolveImageSrc(hero.src, ctx) : "";
   const portraitSrc = portrait?.src ? resolveImageSrc(portrait.src, ctx) : "";
@@ -901,7 +882,6 @@ function renderEmailMastheadTable(
     hero && hero.borderRadius > 0
       ? `border-radius:${Math.round((hero.borderRadius / CANVAS_W) * EMAIL_W)}px;`
       : "border-radius:0;";
-  // Edit window: drop shadow only — no aqua outline on the portrait.
   const portraitShadow = "box-shadow:0 10px 32px rgba(0,0,0,0.42);";
 
   const bannerRow = bannerSrc
@@ -914,53 +894,51 @@ function renderEmailMastheadTable(
       </tr>`
     : "";
 
-  const portraitImg = portraitSrc
-    ? `<div class="email-masthead-portrait-wrap" style="margin:-${portraitPullDesktop}px auto 0 auto;width:${portraitPx}px;height:${portraitPx}px;max-width:${portraitPx}px;border-radius:50%;overflow:hidden;position:relative;z-index:10;line-height:0;font-size:0;border:0;outline:none;${portraitShadow}">
+  const imageGapRow =
+    bannerSrc && heroSrc
+      ? `<tr>
+          <td class="email-masthead-image-gap" height="${imageGap}" style="height:2mm;max-height:2mm;font-size:0;line-height:0;mso-line-height-rule:exactly;">&nbsp;</td>
+        </tr>`
+      : "";
+
+  const portraitOverlay = portraitSrc
+    ? `<div class="email-masthead-portrait-wrap" style="position:absolute;left:50%;top:0;transform:translate(-50%,-50%);width:${portraitPx}px;height:${portraitPx}px;max-width:${portraitPx}px;margin:0;border-radius:50%;overflow:hidden;z-index:10;line-height:0;font-size:0;border:0;outline:none;${portraitShadow}">
         <img class="email-img-el email-masthead-portrait-img" src="${esc(portraitSrc)}" alt=""
           width="${portraitPx}" height="${portraitPx}"
           style="display:block;width:${portraitPx}px;height:${portraitPx}px;max-width:${portraitPx}px;border:0;outline:none;border-radius:50%;object-fit:cover;object-position:center center;" />
       </div>`
     : "";
 
-  const heroPortraitBlock =
-    heroSrc || portraitImg
-      ? `<table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%"
-          style="width:100%;border-collapse:collapse;margin:0;padding:0;">
-          ${
-            heroSrc
-              ? `<tr>
-                  <td class="email-masthead-hero-cell" align="center" style="padding:0;line-height:0;font-size:0;mso-line-height-rule:exactly;">
-                    <img class="email-img-el email-masthead-hero-img" src="${esc(heroSrc)}" alt="" width="${EMAIL_W}" ${heroH ? `height="${heroH}"` : ""}
-                      style="display:block;width:100%;max-width:100%;${heroH ? `height:${heroH}px;` : "height:auto;"}object-fit:cover;object-position:center center;border:0;outline:none;position:relative;z-index:1;${heroBr}" />
-                  </td>
-                </tr>`
-              : ""
-          }
-          ${
-            portraitImg
-              ? `<tr>
-                  <td align="center" style="padding:0;line-height:0;font-size:0;mso-line-height-rule:exactly;">
-                    ${portraitImg}
-                  </td>
-                </tr>`
-              : ""
-          }
-          <tr>
-            <td class="email-masthead-hero-text-gap" height="${MASTHEAD_MOBILE_HERO_TEXT_GAP_PX}" style="height:${MASTHEAD_MOBILE_HERO_TEXT_GAP_PX}px;font-size:0;line-height:0;mso-line-height-rule:exactly;">&nbsp;</td>
-          </tr>
-        </table>`
+  const heroRow = heroSrc
+    ? `<tr>
+        <td class="email-masthead-hero-cell" align="center" style="padding:0;line-height:0;font-size:0;mso-line-height-rule:exactly;position:relative;overflow:visible;">
+          <img class="email-img-el email-masthead-hero-img" src="${esc(heroSrc)}" alt="" width="${EMAIL_W}" ${heroH ? `height="${heroH}"` : ""}
+            style="display:block;width:100%;max-width:100%;${heroH ? `height:${heroH}px;` : "height:auto;"}object-fit:cover;object-position:center center;border:0;outline:none;position:relative;z-index:1;${heroBr}" />
+          ${portraitOverlay}
+        </td>
+      </tr>`
+    : portraitOverlay
+      ? `<tr>
+          <td align="center" style="padding:0;line-height:0;font-size:0;mso-line-height-rule:exactly;overflow:visible;">
+            <div class="email-masthead-portrait-wrap" style="margin:0 auto;width:${portraitPx}px;height:${portraitPx}px;max-width:${portraitPx}px;border-radius:50%;overflow:hidden;position:relative;z-index:10;line-height:0;font-size:0;border:0;outline:none;${portraitShadow}">
+              <img class="email-img-el email-masthead-portrait-img" src="${esc(portraitSrc)}" alt=""
+                width="${portraitPx}" height="${portraitPx}"
+                style="display:block;width:${portraitPx}px;height:${portraitPx}px;max-width:${portraitPx}px;border:0;outline:none;border-radius:50%;object-fit:cover;object-position:center center;" />
+            </div>
+          </td>
+        </tr>`
       : "";
 
-  const heroRow = heroPortraitBlock
+  const afterHeroGap = heroSrc
     ? `<tr>
-        <td align="center" style="padding:0;line-height:0;font-size:0;mso-line-height-rule:exactly;">
-          ${heroPortraitBlock}
-        </td>
+        <td class="email-masthead-hero-text-gap" height="${MASTHEAD_MOBILE_HERO_TEXT_GAP_PX}" style="height:${MASTHEAD_MOBILE_HERO_TEXT_GAP_PX}px;font-size:0;line-height:0;mso-line-height-rule:exactly;">&nbsp;</td>
       </tr>`
     : "";
 
-  const portraitMobileCss = portraitSrc
-    ? `<style type="text/css">
+  const portraitMobileCss = `<style type="text/css">
+    .email-masthead-table { overflow:visible; }
+    .email-masthead-hero-cell { position:relative; overflow:visible; }
+    .email-masthead-image-gap { height:2mm; max-height:2mm; font-size:0; line-height:0; }
     @media only screen and (max-width:620px) {
       .email-masthead-table .email-masthead-banner-img {
         ${bannerHMobile ? `height:${bannerHMobile}px !important;` : ""}
@@ -976,7 +954,10 @@ function renderEmailMastheadTable(
         width:${mobilePortraitPx}px !important;
         height:${mobilePortraitPx}px !important;
         max-width:${mobilePortraitPx}px !important;
-        margin-top:-${portraitPullMobile}px !important;
+        margin:0 !important;
+        left:50% !important;
+        top:0 !important;
+        transform:translate(-50%,-50%) !important;
       }
       .email-masthead-table .email-masthead-portrait-img {
         width:${mobilePortraitPx}px !important;
@@ -997,14 +978,19 @@ function renderEmailMastheadTable(
         height:${MASTHEAD_MOBILE_HERO_TEXT_GAP_PX}px !important;
         max-height:${MASTHEAD_MOBILE_HERO_TEXT_GAP_PX}px !important;
       }
+      .email-masthead-table .email-masthead-image-gap {
+        height:2mm !important;
+        max-height:2mm !important;
+      }
     }
-  </style>`
-    : "";
+  </style>`;
 
   return `${portraitMobileCss}<table class="email-masthead-table email-layer email-layer--masthead" role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%"
-    style="width:100%;max-width:100%;border-collapse:collapse;margin:0 0 ${bodyGap} 0;padding:0;">
+    style="width:100%;max-width:100%;border-collapse:collapse;margin:0 0 ${bodyGap} 0;padding:0;overflow:visible;">
     ${bannerRow}
+    ${imageGapRow}
     ${heroRow}
+    ${afterHeroGap}
   </table>`;
 }
 
@@ -1205,7 +1191,7 @@ function renderVisualEmailBody(
   }
 
   if (stackedEmailLayout) {
-    const masthead = renderEmailMastheadTable(elements, ctx, elements);
+    const masthead = renderEmailMastheadTable(elements, ctx);
     if (masthead) layers.push(masthead);
     const mission = renderEmailMissionBlock(elements, ctx, stackedMarginById);
     if (mission) layers.push(mission);
@@ -1394,6 +1380,24 @@ export function canvasToEmailHtml(
       padding-left: 20px; padding-right: 20px; box-sizing: border-box;
     }
     a[x-apple-data-detectors] { color: inherit !important; text-decoration: none !important; font-size: inherit !important; }
+    ${
+      preserveDesktopLayout
+        ? ""
+        : `
+    .email-canvas-root .email-layer-text,
+    .email-canvas-root .email-layer-story-grid,
+    .email-canvas-root .email-mission-block,
+    .email-canvas-root .email-layer-cta,
+    .email-canvas-root .email-layer-divider {
+      position: relative !important;
+      height: auto !important;
+      overflow: visible !important;
+    }
+    .email-story-grid-inner { align-items: start; }
+    .email-masthead-hero-cell { position: relative; overflow: visible; }
+    .email-masthead-image-gap { height: 2mm !important; max-height: 2mm !important; line-height: 0; font-size: 0; }
+`
+    }
     ${mobileEmailCss(preserveDesktopLayout)}
   </style>
 </head>

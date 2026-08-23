@@ -4,6 +4,7 @@ import { unstable_noStore as noStore } from "next/cache";
 import { notFound } from "next/navigation";
 import { JsonLd } from "../../components/JsonLd";
 import { formatStoryDate, splitBodyToParagraphs } from "../../../lib/story-format";
+import { getJournalStoryBySlug } from "../../../lib/journal-stories";
 import { readStoriesState } from "../../../lib/story-storage";
 import { getStoryThumbnailUrl, resolveStoryThumbnailUrl } from "../../../lib/story-thumbnail";
 import { articleJsonLd, breadcrumbJsonLd, buildPageMetadata } from "../../../lib/site-seo";
@@ -19,12 +20,12 @@ type StoryPageProps = {
 export async function generateMetadata({ params }: StoryPageProps): Promise<Metadata> {
   noStore();
   const state = await readStoriesState();
-  const storyIndex = state.stories.findIndex((item) => item.slug === params.slug);
-  const story = storyIndex >= 0 ? state.stories[storyIndex] : undefined;
+  const match = await getJournalStoryBySlug(state, params.slug);
+  const story = match?.story;
   if (!story) {
     return { title: "Story not found | Maroma" };
   }
-  const image = getStoryThumbnailUrl(story, state, storyIndex) || undefined;
+  const image = getStoryThumbnailUrl(story, state, match.index) || undefined;
   return buildPageMetadata({
     title: `${story.title} | Maroma Journal`,
     description: story.excerpt || story.title,
@@ -37,8 +38,9 @@ export async function generateMetadata({ params }: StoryPageProps): Promise<Meta
 export default async function StoryPage({ params }: StoryPageProps) {
   noStore();
   const state = await readStoriesState();
-  const storyIndex = state.stories.findIndex((item) => item.slug === params.slug);
-  const story = storyIndex >= 0 ? state.stories[storyIndex] : undefined;
+  const match = await getJournalStoryBySlug(state, params.slug);
+  const story = match?.story;
+  const storyIndex = match?.index ?? -1;
   if (!story) {
     notFound();
   }

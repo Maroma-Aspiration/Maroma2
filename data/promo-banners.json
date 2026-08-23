@@ -1,0 +1,19 @@
+{
+  "banners": [
+    {
+      "id": "82c76986-b34e-48a3-835d-a0f98f361966",
+      "title": "Published! test banner",
+      "body": "Automated publish verification",
+      "mediaUrl": "",
+      "mediaKind": "none",
+      "animation": "fade",
+      "ctaLabel": "",
+      "ctaHref": "",
+      "startsAt": "",
+      "endsAt": "",
+      "active": true,
+      "createdAt": "2026-08-21T09:56:21.749Z",
+      "updatedAt": "2026-08-21T09:56:21.749Z"
+    }
+  ]
+}

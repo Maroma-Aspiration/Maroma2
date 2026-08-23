@@ -32,6 +32,9 @@ export type HeroMobileOverrides = {
   eyebrowPos?: XY;
   headlinePos?: XY;
   heroActionsPos?: XY;
+  heroPromoBannerTopCm?: number;
+  heroPromoBannerPos?: XY;
+  heroPromoBannerWidthPct?: number;
   headlineSizeRem?: number;
   heroCopyWidthVw?: number;
   lovedDividerOffsetY?: number;
@@ -59,6 +62,12 @@ export type HeroVisualState = {
   eyebrowPos: XY;
   eyebrowPosRatio: XY;
   heroActionsPos: XY;
+  /** Vertical offset below hero copy anchor (% + copy offset). */
+  heroPromoBannerTopCm: number;
+  /** Fine-tune promo strip position (px). */
+  heroPromoBannerPos: XY;
+  /** Promo strip width as % of artboard. */
+  heroPromoBannerWidthPct: number;
   heroCopyWidthVw: number;
   primarySettings: HeroLayerSettings;
   overlayLayer: HeroOverlayLayer;
@@ -116,6 +125,8 @@ export type HeroVisualState = {
   heroRitualBandStackZ: number;
   ritualCarouselScale: number;
   heroCopyStackZ: number;
+  /** Promo strip stacking vs other hero layers (1–10). */
+  heroPromoStackZ: number;
   /** Loved section veil/content stacking (1–10; mapped to z-index inside the section). */
   lovedFloralsStackZ: number;
   lovedWashStackZ: number;
@@ -138,6 +149,7 @@ export type HeroPositionLockKey =
   | "headline"
   | "eyebrow"
   | "actions"
+  | "promo-banner"
   | "rituals"
   | "ritual-band"
   | "loved-section"

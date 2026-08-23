@@ -29,6 +29,14 @@ import type {
 
 const STORY_SECTION_RE = /^migrated-(sdiv|st|si|sb|cta)-\d+$/;
 
+function storySlugFromTitle(title: string, fallback: string): string {
+  return title
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-|-$/g, "")
+    .slice(0, 80) || fallback;
+}
+
 function storyFrameCanvasHeight(frame?: StoryImageFrame | null, width = 660): number {
   const f = normalizeStoryImageFrame(frame);
   const maxPx = f.maxHeightPx > 0 ? f.maxHeightPx : 360;
@@ -120,11 +128,7 @@ export function extractStoriesFromCanvasElements(elements: CanvasEl[]): StoryRec
 
     const title = st ? plainTextFromHtml(st.html) : "";
     const body = sb?.html ?? "";
-    const slug = title
-      .toLowerCase()
-      .replace(/[^a-z0-9]+/g, "-")
-      .replace(/^-|-$/g, "")
-      .slice(0, 80) || `story-${i}`;
+    const slug = storySlugFromTitle(title, `story-${i}`);
 
     stories.push({
       id: `restored-story-${i}`,
@@ -144,6 +148,55 @@ export function extractStoriesFromCanvasElements(elements: CanvasEl[]): StoryRec
   }
 
   return stories;
+}
+
+/** TOP STORIES cards when full story sections are not on the canvas yet. */
+export function extractStoriesFromStoryGrid(elements: CanvasEl[]): StoryRecord[] {
+  const grid = elements.find(
+    (e): e is CanvasStoryGridEl => e.id === "migrated-story-grid" && e.kind === "story-grid",
+  );
+  if (!grid?.stories?.length) return [];
+
+  const now = new Date().toISOString();
+  return grid.stories
+    .map((card, i) => {
+      const title = card.title?.trim() ?? "";
+      if (!title) return null;
+      const excerpt = card.excerpt?.trim() ?? "";
+      const slug = storySlugFromTitle(title, `story-${i}`);
+      return {
+        id: card.storyId?.trim() || `grid-story-${i}`,
+        kind: "story" as const,
+        slug,
+        title,
+        excerpt,
+        body: excerpt ? `<p>${excerpt}</p>` : "",
+        imageUrl: card.imageUrl?.trim() ?? "",
+        sourceUrl: "",
+        source: "manual" as const,
+        ctaUrl: "",
+        ctaLabel: "Read more →",
+        publishedAt: now,
+        updatedAt: now,
+      };
+    })
+    .filter(Boolean) as StoryRecord[];
+}
+
+export function resolveStoriesFromCanvas(state: StoriesState): StoryRecord[] {
+  const canvas = state.newsletterCanvas;
+  if (!canvas?.enabled) return [];
+  const elements = canvas.elements ?? [];
+  const fromSections = extractStoriesFromCanvasElements(elements);
+  if (fromSections.length > 0) return fromSections;
+  return extractStoriesFromStoryGrid(elements);
+}
+
+export function getPublishableStories(state: StoriesState): StoryRecord[] {
+  const saved = (state.stories ?? []).filter((story) => !story.kind || story.kind === "story");
+  const withTitle = saved.filter((story) => story.title?.trim());
+  if (withTitle.length > 0) return withTitle;
+  return resolveStoriesFromCanvas(state).filter((story) => story.title?.trim());
 }
 
 function appendStorySections(
@@ -302,8 +355,8 @@ export function reconcileNewsletterCanvasState(state: StoriesState): StoriesStat
   const hasGrid = elements.some((e) => e.id === "migrated-story-grid");
   const hasSections = canvasHasIndividualStorySections({ ...canvas, elements });
 
-  if (stories.length === 0 && hasSections) {
-    stories = extractStoriesFromCanvasElements(elements);
+  if (stories.length === 0) {
+    stories = resolveStoriesFromCanvas({ ...state, newsletterCanvas: { ...canvas, elements } });
   }
 
   if (hasGrid && !hasSections && stories.length > 0) {

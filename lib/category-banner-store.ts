@@ -1,30 +1,36 @@
-import { promises as fs } from "fs";
-import path from "path";
+import { readJsonKv, writeJsonKv } from "./json-kv-store";
 import { defaultWideBannerLayout } from "./category-banner-defaults";
-import type { CategoryBannerStore, ResolvedCategoryBanner } from "./category-banner-types";
+import type {
+  CategoryBannerOverride,
+  CategoryBannerStore,
+  ResolvedCategoryBanner,
+  ResolvedCategoryCard,
+} from "./category-banner-types";
 import type { CatalogCategory } from "./catalog-categories";
 
-export type { CategoryBannerOverride, CategoryBannerStore, ResolvedCategoryBanner } from "./category-banner-types";
+export type {
+  CategoryBannerOverride,
+  CategoryBannerStore,
+  ResolvedCategoryBanner,
+  ResolvedCategoryCard,
+} from "./category-banner-types";
 export { defaultWideBannerLayout } from "./category-banner-defaults";
 
-const storePath = path.join(process.cwd(), "data", "category-banner-overrides.json");
+const KV_KEY = "maroma:category-banner-overrides";
+const FILE_NAME = "category-banner-overrides.json";
+
+const emptyStore = (): CategoryBannerStore => ({ banners: {} });
 
 export async function readCategoryBannerStore(): Promise<CategoryBannerStore> {
-  try {
-    const raw = await fs.readFile(storePath, "utf8");
-    const parsed = JSON.parse(raw) as CategoryBannerStore;
-    if (!parsed.banners || typeof parsed.banners !== "object") {
-      return { banners: {} };
-    }
-    return parsed;
-  } catch {
-    return { banners: {} };
+  const store = await readJsonKv<CategoryBannerStore>(KV_KEY, FILE_NAME, emptyStore());
+  if (!store.banners || typeof store.banners !== "object") {
+    return emptyStore();
   }
+  return store;
 }
 
 export async function writeCategoryBannerStore(store: CategoryBannerStore): Promise<void> {
-  await fs.mkdir(path.dirname(storePath), { recursive: true });
-  await fs.writeFile(storePath, JSON.stringify(store, null, 2), "utf8");
+  await writeJsonKv(KV_KEY, FILE_NAME, store);
 }
 
 export async function resolveCategoryBanner(
@@ -45,4 +51,13 @@ export async function resolveCategoryBanner(
     maxHeight: o.maxHeight ?? defaultWideBannerLayout.maxHeight,
     thumbMaxWidth: o.thumbMaxWidth ?? 280
   };
+}
+
+export async function resolveCategoryCard(
+  slug: string,
+  category: Pick<CatalogCategory, "bannerImage" | "label" | "description">
+): Promise<ResolvedCategoryCard> {
+  const store = await readCategoryBannerStore();
+  const { resolveCategoryCardFromOverride } = await import("./resolve-category-card");
+  return resolveCategoryCardFromOverride(slug, category, store.banners[slug]);
 }

@@ -803,7 +803,12 @@ export default function GiftBuilderClient() {
 
   return (
     <main className={`gift-builder-page${step === "build" ? " is-loadout" : ""}`}>
-      <header className="gift-builder-hero">
+      <header
+        className="gift-builder-hero"
+        data-review="Gift builder intro"
+        data-review-id="gift-builder-hero"
+        data-review-files="app/gifting/build-your-set/gift-builder-client.tsx"
+      >
         <Link href="/gifting" className="gift-builder-back">
           ← Back to gifting
         </Link>
@@ -872,7 +877,13 @@ export default function GiftBuilderClient() {
           )}
 
           {step === "build" && selectedBox && (
-            <section className="gift-builder-loadout" aria-label="Gift set loadout">
+            <section
+              className="gift-builder-loadout"
+              aria-label="Gift set loadout"
+              data-review="Gift set loadout"
+              data-review-id="gift-builder-loadout"
+              data-review-files="app/gifting/build-your-set/gift-builder-client.tsx"
+            >
               <div className="gift-builder-loadout-toolbar">
                 <div>
                   <span className={`gift-builder-track-badge gift-builder-track-badge--${activeTrack}`}>

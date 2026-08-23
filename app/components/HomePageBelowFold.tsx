@@ -3,7 +3,6 @@
 import { memo, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { ProductListingWithFilters } from "./ProductListingWithFilters";
-import { PromoBannerStrip } from "./PromoBannerStrip";
 import { HomepageStorySections } from "./HomepageStorySections";
 import { catalogCategories } from "../../lib/catalog-categories";
 import type { ProductRecord } from "../../lib/product-types";
@@ -45,8 +44,14 @@ export const HomePageBelowFold = memo(function HomePageBelowFold({
 
   return (
     <>
-      <PromoBannerStrip />
-      <section className="product-database" id="shop" aria-label="Searchable product database">
+      <section
+        className="product-database"
+        id="shop"
+        aria-label="Searchable product database"
+        data-review="Homepage shop search"
+        data-review-id="home-shop"
+        data-review-files="app/components/HomePageBelowFold.tsx,app/components/ProductListingWithFilters.tsx"
+      >
         <div className="product-database-head" id="shop-search">
           <div>
             <span className="eyebrow scroll-zoom">Shop database</span>

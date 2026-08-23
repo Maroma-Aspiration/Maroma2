@@ -28,27 +28,58 @@ function isUsableImageUrl(url: string | undefined): url is string {
   return src.length > 0 && !src.startsWith("data:");
 }
 
-export function pickThumbnailFromCanvas(canvas: NewsletterCanvas | undefined): string | undefined {
+const THUMBNAIL_MASTHEAD_IDS = ["migrated-top", "migrated-hero", "migrated-portrait"] as const;
+
+/** Ordered image candidates for archive cards — masthead first, then story grid, then other art. */
+export function collectThumbnailCandidatesFromCanvas(canvas: NewsletterCanvas | undefined): string[] {
   const elements = canvas?.elements ?? [];
+  const urls: string[] = [];
+  const add = (url: string | undefined) => {
+    if (!isUsableImageUrl(url)) return;
+    const trimmed = url.trim();
+    if (!urls.includes(trimmed)) urls.push(trimmed);
+  };
+
+  for (const id of THUMBNAIL_MASTHEAD_IDS) {
+    const el = elements.find((item) => item.id === id && item.kind === "image");
+    if (el && el.kind === "image") add(el.src);
+  }
 
   for (const el of elements) {
     if (el.kind !== "story-grid") continue;
-    for (const story of el.stories ?? []) {
-      if (isUsableImageUrl(story.imageUrl)) return story.imageUrl.trim();
-    }
+    for (const story of el.stories ?? []) add(story.imageUrl);
   }
 
   for (const el of elements) {
     if (el.kind !== "image" || MASTHEAD_OVERLAY_IDS.has(el.id)) continue;
-    if (isUsableImageUrl(el.src)) return el.src.trim();
+    add(el.src);
   }
 
   for (const el of elements) {
     if (el.kind !== "image") continue;
-    if (isUsableImageUrl(el.src)) return el.src.trim();
+    add(el.src);
   }
 
-  return undefined;
+  return urls;
+}
+
+export function pickThumbnailFromCanvas(canvas: NewsletterCanvas | undefined): string | undefined {
+  return collectThumbnailCandidatesFromCanvas(canvas)[0];
+}
+
+/** Prefer masthead art so duplicate months do not all reuse the first TOP STORIES image. */
+export function assignUniqueArchiveThumbnails<T extends { thumbnailUrl?: string; canvas: NewsletterCanvas }>(
+  issues: T[]
+): T[] {
+  const used = new Set<string>();
+  return issues.map((issue) => {
+    const candidates = collectThumbnailCandidatesFromCanvas(issue.canvas);
+    const stored = issue.thumbnailUrl?.trim();
+    const ordered = stored && candidates.includes(stored) ? [stored, ...candidates.filter((u) => u !== stored)] : candidates;
+    const thumb = ordered.find((url) => !used.has(url)) ?? ordered[0];
+    if (thumb) used.add(thumb);
+    return { ...issue, thumbnailUrl: thumb || issue.thumbnailUrl };
+  });
 }
 
 export function plainTextFromHtml(html: string | undefined): string {
@@ -168,4 +199,12 @@ export function extractEmailBodyContent(fullHtml: string): string {
   const bodyMatch = fullHtml.match(/<body[^>]*>([\s\S]*)<\/body>/i);
   if (!bodyMatch) return fullHtml;
   return bodyMatch[1].trim();
+}
+
+export function extractEmailStylesAndBody(fullHtml: string): { styles: string; body: string } {
+  const styles = fullHtml.match(/<style[^>]*>([\s\S]*?)<\/style>/i)?.[1]?.trim() ?? "";
+  return {
+    styles,
+    body: extractEmailBodyContent(fullHtml),
+  };
 }

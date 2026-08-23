@@ -40,6 +40,9 @@ export type ResolvedHeroMobileLayout = {
   eyebrowPos: XY;
   headlinePos: XY;
   heroActionsPos: XY;
+  heroPromoBannerTopCm: number;
+  heroPromoBannerPos: XY;
+  heroPromoBannerWidthPct: number;
   headlineSizeRem: number;
   heroCopyWidthVw: number;
   lovedDividerOffsetY: number;
@@ -62,6 +65,9 @@ const DEFAULTS: ResolvedHeroMobileLayout = {
   eyebrowPos: { x: 0, y: 0 },
   headlinePos: { x: 0, y: 0 },
   heroActionsPos: { x: 0, y: 0 },
+  heroPromoBannerTopCm: 8,
+  heroPromoBannerPos: { x: 0, y: 0 },
+  heroPromoBannerWidthPct: 100,
   headlineSizeRem: 3.8,
   heroCopyWidthVw: 92,
   lovedDividerOffsetY: 0,
@@ -175,6 +181,26 @@ export function resolveHeroMobileLayout(
         typeof o.heroActionsPos?.y === "number" ? o.heroActionsPos.y : DEFAULTS.heroActionsPos.y
       ),
     },
+    heroPromoBannerTopCm:
+      typeof o.heroPromoBannerTopCm === "number"
+        ? Math.min(40, Math.max(0, o.heroPromoBannerTopCm))
+        : DEFAULTS.heroPromoBannerTopCm,
+    heroPromoBannerPos: {
+      x: clampMobilePx(
+        typeof o.heroPromoBannerPos?.x === "number"
+          ? o.heroPromoBannerPos.x
+          : DEFAULTS.heroPromoBannerPos.x
+      ),
+      y: clampMobilePx(
+        typeof o.heroPromoBannerPos?.y === "number"
+          ? o.heroPromoBannerPos.y
+          : DEFAULTS.heroPromoBannerPos.y
+      ),
+    },
+    heroPromoBannerWidthPct:
+      typeof o.heroPromoBannerWidthPct === "number"
+        ? Math.min(100, Math.max(40, o.heroPromoBannerWidthPct))
+        : DEFAULTS.heroPromoBannerWidthPct,
     headlineSizeRem:
       typeof o.headlineSizeRem === "number"
         ? Math.min(8, Math.max(1, o.headlineSizeRem))
@@ -240,6 +266,9 @@ export function mergeHeroMobileOverrides(
     heroActionsPos: patch.heroActionsPos
       ? { ...base?.heroActionsPos, ...patch.heroActionsPos }
       : base?.heroActionsPos,
+    heroPromoBannerPos: patch.heroPromoBannerPos
+      ? { ...base?.heroPromoBannerPos, ...patch.heroPromoBannerPos }
+      : base?.heroPromoBannerPos,
     ritualBandLayout: patch.ritualBandLayout
       ? { ...base?.ritualBandLayout, ...patch.ritualBandLayout }
       : base?.ritualBandLayout,

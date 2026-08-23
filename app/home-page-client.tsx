@@ -5,13 +5,21 @@ import Script from "next/script";
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore, type CSSProperties } from "react";
 import { HomePageBelowFold } from "./components/HomePageBelowFold";
 import { HomeCollections } from "./components/HomeCollections";
+import { HeroPromoBanner } from "./components/PromoBannerStrip";
 import { HeroVideoMedia } from "./components/HeroVideoMedia";
 import { isYouTubeUrl } from "../lib/youtube-embed";
 import { MobilePreviewFrame } from "./components/MobilePreviewFrame";
 import { RitualFaceTeaser } from "./components/RitualFaceTeaser";
 import { SiteHeader } from "./components/SiteHeader";
 import { SignOutButton } from "./components/SignOutButton";
+import type { CategoryBannerStore } from "../lib/category-banner-types";
 import type { ProductRecord } from "../lib/product-types";
+import type { PromoBanner } from "../lib/promo-types";
+import { normalizePromoStripFields, PROMO_STRIP_DEFAULTS } from "../lib/promo-strip-utils";
+import {
+  PROMO_PREVIEW_MESSAGE,
+  readPromoPreviewPayload,
+} from "../lib/promo-preview-storage";
 import { isAdminUiHidden } from "../lib/admin-ui-visible";
 import { useAdminSession, setAdminDragPreference, ADMIN_DRAG_STORAGE_KEY } from "../lib/use-admin-session";
 import {
@@ -61,6 +69,7 @@ import {
 } from "../lib/hero-layer-depth";
 import {
   pageShellStackCssVars,
+  resolveLovedOverlapPaintZ,
   resolvePageShellPaintZ,
 } from "../lib/page-layer-stack";
 import { contentStorageKey, siteContent, type SiteContent } from "./content";
@@ -113,6 +122,9 @@ type HeroVisualApiState = {
   eyebrowPos?: { x: number; y: number };
   eyebrowPosRatio?: { x: number; y: number };
   heroActionsPos?: { x: number; y: number };
+  heroPromoBannerTopCm?: number;
+  heroPromoBannerPos?: { x: number; y: number };
+  heroPromoBannerWidthPct?: number;
   heroCopyWidthVw?: number;
   primarySettings?: HeroLayerSettings;
   overlayLayer?: HeroOverlayLayer;
@@ -154,6 +166,7 @@ type HeroVisualApiState = {
   ritualBandColor?: string;
   ritualCarouselScale?: number;
   heroCopyStackZ?: number;
+  heroPromoStackZ?: number;
   lovedFloralsStackZ?: number;
   lovedWashStackZ?: number;
   lovedBandStackZ?: number;
@@ -168,8 +181,11 @@ type HeroVisualApiState = {
 type HomePageClientProps = {
   initialHeroVisual: HeroVisualState;
   initialSiteContent: SiteContent;
+  initialPromoBanners?: PromoBanner[];
+  initialCategoryBanners?: CategoryBannerStore;
   initialViewportIsMobile?: boolean;
   initialSkipIntro?: boolean;
+  initialPromoPreview?: boolean;
   initialProductSearch?: string;
 };
 
@@ -216,22 +232,72 @@ const imageHasTransparency = (image: HTMLImageElement): boolean => {
 export default function HomePageClient({
   initialHeroVisual,
   initialSiteContent,
+  initialPromoBanners = [],
+  initialCategoryBanners,
   initialViewportIsMobile = false,
   initialSkipIntro = false,
+  initialPromoPreview = false,
   initialProductSearch = "",
 }: HomePageClientProps) {
   const [introPhase, setIntroPhase] = useState<"playing" | "fading" | "skip-fading" | "done">(
-    initialSkipIntro ? "done" : "playing"
+    initialSkipIntro || initialPromoPreview ? "done" : "playing"
   );
   const [introVideoReady, setIntroVideoReady] = useState(false);
   const introFinishTimerRef = useRef<number | null>(null);
   const introScrollRevealRef = useRef(0);
   const introScrollHoldRef = useRef(0);
   const [content, setContent] = useState<SiteContent>(initialSiteContent);
+  const [livePromoBanners, setLivePromoBanners] = useState<PromoBanner[]>(() => {
+    if (initialPromoPreview && typeof window !== "undefined") {
+      const payload = readPromoPreviewPayload();
+      if (payload?.banners?.length) return payload.banners;
+    }
+    return initialPromoBanners;
+  });
+
+  useEffect(() => {
+    setLivePromoBanners(initialPromoBanners);
+  }, [initialPromoBanners]);
+
+  useEffect(() => {
+    if (!initialPromoPreview) return undefined;
+
+    document.documentElement.classList.add("is-promo-preview");
+
+    const applyPreviewBanners = () => {
+      const payload = readPromoPreviewPayload();
+      if (payload?.banners?.length) {
+        setLivePromoBanners(payload.banners);
+      }
+    };
+
+    applyPreviewBanners();
+
+    const onMessage = (event: MessageEvent) => {
+      if (event.origin !== window.location.origin) return;
+      if (event.data?.type !== PROMO_PREVIEW_MESSAGE) return;
+      applyPreviewBanners();
+    };
+
+    window.addEventListener("message", onMessage);
+    window.parent.postMessage({ type: "maroma:promo-preview-ready" }, window.location.origin);
+
+    return () => {
+      document.documentElement.classList.remove("is-promo-preview");
+      window.removeEventListener("message", onMessage);
+    };
+  }, [initialPromoPreview]);
   const [heroLayout, setHeroLayout] = useState<HeroMediaLayout>(initialHeroVisual.heroLayout || { x: 0, y: 0, width: 100, height: 80 });
   const [headlinePos, setHeadlinePos] = useState(initialHeroVisual.headlinePos);
   const [headlineSizeRem, setHeadlineSizeRem] = useState(initialHeroVisual.headlineSizeRem);
   const [heroActionsPos, setHeroActionsPos] = useState(initialHeroVisual.heroActionsPos);
+  const [heroPromoBannerTopCm, setHeroPromoBannerTopCm] = useState(
+    initialHeroVisual.heroPromoBannerTopCm
+  );
+  const [heroPromoBannerPos, setHeroPromoBannerPos] = useState(initialHeroVisual.heroPromoBannerPos);
+  const [heroPromoBannerWidthPct, setHeroPromoBannerWidthPct] = useState(
+    initialHeroVisual.heroPromoBannerWidthPct
+  );
   const [ritualCarouselPos, setRitualCarouselPos] = useState(initialHeroVisual.ritualCarouselPos);
   const [ritualCarouselPosPct, setRitualCarouselPosPct] = useState(
     initialHeroVisual.ritualCarouselPosPct ?? HERO_RITUAL_DEFAULT_POS_PCT
@@ -258,7 +324,7 @@ export default function HomePageClient({
   const [floatingPanelMinimized, setFloatingPanelMinimized] = useState(false);
   const [adminDragEnabled, setAdminDragEnabled] = useState(false);
   const { isAdminUser, sessionReady, refreshSession } = useAdminSession();
-  const showFloatingAdmin = sessionReady && isAdminUser && !isAdminUiHidden();
+  const showFloatingAdmin = sessionReady && isAdminUser && !isAdminUiHidden() && !initialPromoPreview;
   const [saveStatus, setSaveStatus] = useState<"idle" | "saving" | "saved" | "error">("idle");
   const [bgColors, setBgColors] = useState<string[]>(initialHeroVisual.bgColors || ["#dbe3d0", "#cbd5c0", "#d6deca"]);
   const [bgAngle, setBgAngle] = useState<number>(initialHeroVisual.bgAngle || 135);
@@ -347,6 +413,7 @@ export default function HomePageClient({
     initialHeroVisual.ritualCarouselScale ?? 1
   );
   const [heroCopyStackZ, setHeroCopyStackZ] = useState(initialHeroVisual.heroCopyStackZ ?? 9);
+  const [heroPromoStackZ, setHeroPromoStackZ] = useState(initialHeroVisual.heroPromoStackZ ?? 7);
   const [lovedFloralsStackZ, setLovedFloralsStackZ] = useState(initialHeroVisual.lovedFloralsStackZ ?? 1);
   const [lovedWashStackZ, setLovedWashStackZ] = useState(initialHeroVisual.lovedWashStackZ ?? 2);
   const [lovedBandStackZ, setLovedBandStackZ] = useState(initialHeroVisual.lovedBandStackZ ?? 3);
@@ -415,6 +482,9 @@ export default function HomePageClient({
       eyebrowPos,
       headlinePos,
       heroActionsPos,
+      heroPromoBannerTopCm,
+      heroPromoBannerPos,
+      heroPromoBannerWidthPct,
       headlineSizeRem,
       heroCopyWidthVw,
       heroCopyOffsetY,
@@ -433,6 +503,9 @@ export default function HomePageClient({
       eyebrowPos,
       headlinePos,
       heroActionsPos,
+      heroPromoBannerTopCm,
+      heroPromoBannerPos,
+      heroPromoBannerWidthPct,
       headlineSizeRem,
       heroCopyWidthVw,
       heroCopyOffsetY,
@@ -460,6 +533,7 @@ export default function HomePageClient({
     | "headline"
     | "eyebrow"
     | "actions"
+    | "promo-banner"
     | "ritual-band"
     | "rituals"
     | "loved-florals"
@@ -490,6 +564,10 @@ export default function HomePageClient({
   const heroActionsDragStart = useRef<{ x: number; y: number } | null>(null);
   const heroActionsBaseRef = useRef({ x: 0, y: 0 });
   const heroActionsPosRef = useRef(initialHeroVisual.heroActionsPos);
+  const heroPromoDragStart = useRef<{ x: number; y: number } | null>(null);
+  const heroPromoBaseRef = useRef({ x: 0, y: 0, topCm: initialHeroVisual.heroPromoBannerTopCm });
+  const heroPromoBannerPosRef = useRef(initialHeroVisual.heroPromoBannerPos);
+  const heroPromoBannerTopCmRef = useRef(initialHeroVisual.heroPromoBannerTopCm);
   const floatingPanelDragStart = useRef<{ x: number; y: number } | null>(null);
   const floatingPanelBase = useRef({ x: 0, y: 0 });
   const floatingPanelRef = useRef<HTMLDivElement | null>(null);
@@ -498,6 +576,7 @@ export default function HomePageClient({
   const adminMobilePreviewFrameRef = useRef<HTMLDivElement | null>(null);
   const headlineElRef = useRef<HTMLHeadingElement | null>(null);
   const heroActionsElRef = useRef<HTMLDivElement | null>(null);
+  const heroPromoElRef = useRef<HTMLDivElement | null>(null);
   const ritualDragStart = useRef<{ x: number; y: number } | null>(null);
   const ritualBasePct = useRef(HERO_RITUAL_DEFAULT_POS_PCT);
   const ritualBandDragStart = useRef<{ x: number; y: number } | null>(null);
@@ -576,6 +655,13 @@ export default function HomePageClient({
     if (data.heroLayout) setHeroLayout(data.heroLayout);
     if (data.headlinePos) setHeadlinePos(data.headlinePos);
     if (data.heroActionsPos) setHeroActionsPos(data.heroActionsPos);
+    if (typeof data.heroPromoBannerTopCm === "number") {
+      setHeroPromoBannerTopCm(data.heroPromoBannerTopCm);
+    }
+    if (data.heroPromoBannerPos) setHeroPromoBannerPos(data.heroPromoBannerPos);
+    if (typeof data.heroPromoBannerWidthPct === "number") {
+      setHeroPromoBannerWidthPct(data.heroPromoBannerWidthPct);
+    }
     if (data.eyebrowPos) setEyebrowPos(data.eyebrowPos);
     if (data.ritualCarouselPos) setRitualCarouselPos(data.ritualCarouselPos);
     if (data.ritualCarouselPosPct) setRitualCarouselPosPct(data.ritualCarouselPosPct);
@@ -632,6 +718,9 @@ export default function HomePageClient({
     if (typeof data.ritualCarouselScale === "number") setRitualCarouselScale(data.ritualCarouselScale);
     if (typeof data.heroCopyStackZ === "number") {
       setHeroCopyStackZ(clampHeroLayerDepth(data.heroCopyStackZ, heroCopyStackZ));
+    }
+    if (typeof data.heroPromoStackZ === "number") {
+      setHeroPromoStackZ(clampHeroLayerDepth(data.heroPromoStackZ, heroPromoStackZ));
     }
     if (typeof data.lovedFloralsStackZ === "number") setLovedFloralsStackZ(data.lovedFloralsStackZ);
     if (typeof data.lovedWashStackZ === "number") setLovedWashStackZ(data.lovedWashStackZ);
@@ -1169,6 +1258,14 @@ export default function HomePageClient({
     heroActionsPosRef.current = heroActionsPos;
   }, [heroActionsPos]);
 
+  useEffect(() => {
+    heroPromoBannerPosRef.current = heroPromoBannerPos;
+  }, [heroPromoBannerPos]);
+
+  useEffect(() => {
+    heroPromoBannerTopCmRef.current = heroPromoBannerTopCm;
+  }, [heroPromoBannerTopCm]);
+
 
   const clearSavedVisualPositions = useCallback(() => {
     try {
@@ -1452,6 +1549,83 @@ export default function HomePageClient({
     }
   };
 
+  const handleHeroPromoPointerDown = (event: React.PointerEvent<HTMLDivElement>) => {
+    if (!canEditLayout && !canEditMobilePreview) {
+      return;
+    }
+    if (adminEditLayer !== "promo-banner") {
+      return;
+    }
+    event.preventDefault();
+    event.stopPropagation();
+    heroPromoDragStart.current = { x: event.clientX, y: event.clientY };
+    heroPromoBaseRef.current = persistLayoutToMobile
+      ? {
+          x: mobileEffective.heroPromoBannerPos.x,
+          y: mobileEffective.heroPromoBannerPos.y,
+          topCm: mobileEffective.heroPromoBannerTopCm,
+        }
+      : {
+          x: heroPromoBannerPosRef.current.x,
+          y: heroPromoBannerPosRef.current.y,
+          topCm: heroPromoBannerTopCmRef.current,
+        };
+    setLayoutDragging(true);
+    event.currentTarget.setPointerCapture(event.pointerId);
+  };
+
+  const handleHeroPromoPointerMove = (event: React.PointerEvent<HTMLDivElement>) => {
+    if (!heroPromoDragStart.current || (!canEditLayout && !canEditMobilePreview)) {
+      return;
+    }
+    if (adminEditLayer !== "promo-banner") {
+      return;
+    }
+    event.preventDefault();
+    // Vertical-only drag: keep X fixed, move Y with the pointer.
+    const dy = event.clientY - heroPromoDragStart.current.y;
+    const nextPos = {
+      x: heroPromoBaseRef.current.x,
+      y: heroPromoBaseRef.current.y + dy,
+    };
+    heroPromoBannerPosRef.current = nextPos;
+    if (persistLayoutToMobile) {
+      setHeroMobileOverrides((prev) =>
+        mergeHeroMobileOverrides(prev, {
+          heroPromoBannerPos: nextPos,
+        })
+      );
+    } else {
+      setHeroPromoBannerPos(nextPos);
+    }
+  };
+
+  const handleHeroPromoPointerUp = (event: React.PointerEvent<HTMLDivElement>) => {
+    if (!canEditLayout && !canEditMobilePreview) {
+      return;
+    }
+    if (!heroPromoDragStart.current) {
+      return;
+    }
+    heroPromoDragStart.current = null;
+    setLayoutDragging(false);
+    if (event.currentTarget.hasPointerCapture(event.pointerId)) {
+      event.currentTarget.releasePointerCapture(event.pointerId);
+    }
+    if (persistLayoutToMobile) {
+      applyMobilePatch({
+        heroPromoBannerPos: heroPromoBannerPosRef.current,
+      });
+    } else {
+      void persistHeroVisualPatch({
+        heroPromoBannerPos: {
+          x: heroPromoBannerPosRef.current.x,
+          y: heroPromoBannerPosRef.current.y,
+        },
+      });
+    }
+  };
+
   const setEyebrowXFromPx = useCallback((nextX: number) => {
     if (persistLayoutToMobile) {
       applyMobilePatch({ eyebrowPos: { ...mobileEffective.eyebrowPos, x: nextX } });
@@ -1491,6 +1665,9 @@ export default function HomePageClient({
       heroLayout,
       headlinePos: headlinePosRef.current,
       heroActionsPos: heroActionsPosRef.current,
+      heroPromoBannerTopCm: heroPromoBannerTopCmRef.current,
+      heroPromoBannerPos: heroPromoBannerPosRef.current,
+      heroPromoBannerWidthPct,
       ritualCarouselPos,
       ritualCarouselPosPct,
       eyebrowPos,
@@ -1528,6 +1705,7 @@ export default function HomePageClient({
       ritualBandColor,
       ritualCarouselScale,
       heroCopyStackZ,
+      heroPromoStackZ,
       lovedFloralsStackZ,
       lovedWashStackZ,
       lovedBandStackZ,
@@ -2408,6 +2586,13 @@ export default function HomePageClient({
   const eyebrowRenderPos = showMobileLayout ? mobileEffective.eyebrowPos : eyebrowPos;
   const headlineRenderPos = showMobileLayout ? mobileEffective.headlinePos : headlinePos;
   const heroActionsRenderPos = showMobileLayout ? mobileEffective.heroActionsPos : heroActionsPos;
+  const heroPromoRenderPos = showMobileLayout ? mobileEffective.heroPromoBannerPos : heroPromoBannerPos;
+  const heroPromoTopCmForRender = showMobileLayout
+    ? mobileEffective.heroPromoBannerTopCm
+    : heroPromoBannerTopCm;
+  const heroPromoWidthPctForRender = showMobileLayout
+    ? mobileEffective.heroPromoBannerWidthPct
+    : heroPromoBannerWidthPct;
   const ritualPositionPct = showMobileLayout
     ? mobileEffective.ritualCarouselPosPct
     : ritualCarouselPosPct;
@@ -2448,6 +2633,7 @@ export default function HomePageClient({
     adminDragEnabled && adminEditLayer === "headline" ? "is-editing-headline" : "",
     adminDragEnabled && adminEditLayer === "eyebrow" ? "is-editing-eyebrow" : "",
     adminDragEnabled && adminEditLayer === "actions" ? "is-editing-actions" : "",
+    adminDragEnabled && adminEditLayer === "promo-banner" ? "is-editing-promo-banner" : "",
     layoutDragging ? "is-layout-dragging" : "",
   ]
     .filter(Boolean)
@@ -2492,7 +2678,13 @@ export default function HomePageClient({
         }
       : {};
   const artboardStackStyle = {
+    ["--hero-copy-offset-y" as string]: showMobileLayout ? mobileEffective.heroCopyOffsetY : heroCopyOffsetY,
+    ["--hero-promo-top-offset" as string]: `${heroPromoTopCmForRender}cm`,
+    ["--hero-promo-nudge-x" as string]: `${heroPromoRenderPos.x}px`,
+    ["--hero-promo-nudge-y" as string]: `${heroPromoRenderPos.y}px`,
+    ["--hero-promo-width-pct" as string]: `${heroPromoWidthPctForRender}%`,
     ["--hero-z-background" as string]: heroBackgroundStackZ,
+    ["--hero-z-promo" as string]: heroPromoStackZ,
     ["--hero-z-media" as string]: heroMediaStackZ,
     ["--hero-z-copy" as string]: heroCopyStackZ,
     ["--hero-z-rituals" as string]: heroRitualStackZ,
@@ -2512,6 +2704,13 @@ export default function HomePageClient({
 
   const editHeadlinePos = persistLayoutToMobile ? mobileEffective.headlinePos : headlinePos;
   const editHeroActionsPos = persistLayoutToMobile ? mobileEffective.heroActionsPos : heroActionsPos;
+  const editHeroPromoPos = persistLayoutToMobile ? mobileEffective.heroPromoBannerPos : heroPromoBannerPos;
+  const editHeroPromoTopCm = persistLayoutToMobile
+    ? mobileEffective.heroPromoBannerTopCm
+    : heroPromoBannerTopCm;
+  const editHeroPromoWidthPct = persistLayoutToMobile
+    ? mobileEffective.heroPromoBannerWidthPct
+    : heroPromoBannerWidthPct;
   const editPrimaryLayout = persistLayoutToMobile ? mobileEffective.layout : heroMediaLayout;
   const editOverlayLayout = persistLayoutToMobile ? mobileEffective.overlayLayout : heroOverlayLayer.layout;
   const editBackgroundLayout = persistLayoutToMobile ? mobileEffective.backgroundLayout : heroLayout;
@@ -2561,6 +2760,96 @@ export default function HomePageClient({
     setHeroActionsPos(next);
     void persistHeroVisualPatch({ heroActionsPos: next });
   };
+
+  const setHeroPromoPosAndSave = (next: { x: number; y: number }) => {
+    heroPromoBannerPosRef.current = next;
+    if (persistLayoutToMobile) {
+      applyMobilePatch({ heroPromoBannerPos: next });
+      return;
+    }
+    setHeroPromoBannerPos(next);
+    void persistHeroVisualPatch({ heroPromoBannerPos: next });
+  };
+
+  const setHeroPromoTopCmAndSave = (nextTopCm: number) => {
+    const clamped = Math.max(0, Math.min(40, nextTopCm));
+    heroPromoBannerTopCmRef.current = clamped;
+    if (persistLayoutToMobile) {
+      applyMobilePatch({ heroPromoBannerTopCm: clamped });
+      return;
+    }
+    setHeroPromoBannerTopCm(clamped);
+    void persistHeroVisualPatch({ heroPromoBannerTopCm: clamped });
+  };
+
+  const setHeroPromoWidthPctAndSave = (nextWidthPct: number) => {
+    const clamped = Math.max(40, Math.min(100, nextWidthPct));
+    if (persistLayoutToMobile) {
+      applyMobilePatch({ heroPromoBannerWidthPct: clamped });
+      return;
+    }
+    setHeroPromoBannerWidthPct(clamped);
+    void persistHeroVisualPatch({ heroPromoBannerWidthPct: clamped });
+  };
+
+  const editPromoStrip = livePromoBanners[0]
+    ? normalizePromoStripFields(livePromoBanners[0])
+    : PROMO_STRIP_DEFAULTS;
+
+  const patchLivePromoStrip = useCallback(
+    (patch: Partial<PromoBanner>) => {
+      const banner = livePromoBanners[0];
+      if (!banner) return;
+      const nextBanner: PromoBanner = { ...banner, ...patch };
+      setLivePromoBanners([nextBanner, ...livePromoBanners.slice(1)]);
+      void fetch("/api/promos", {
+        method: "POST",
+        credentials: "same-origin",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(nextBanner),
+      }).catch(() => {
+        /* keep optimistic UI */
+      });
+    },
+    [livePromoBanners]
+  );
+
+  const snapPromoBetweenHeadlineAndActions = useCallback(() => {
+    const artboard = heroArtboardRef.current;
+    const headline = headlineElRef.current;
+    const actions = heroActionsElRef.current;
+    const promo = heroPromoElRef.current;
+    if (!artboard || !headline || !actions || !promo) {
+      return;
+    }
+    const artboardRect = artboard.getBoundingClientRect();
+    const headlineRect = headline.getBoundingClientRect();
+    const actionsRect = actions.getBoundingClientRect();
+    const promoRect = promo.getBoundingClientRect();
+    const targetCenterY = (headlineRect.bottom + actionsRect.top) / 2;
+    const promoTopPx = targetCenterY - promoRect.height / 2 - artboardRect.top;
+    const anchorPct = showMobileLayout ? 0.22 : 0.14;
+    const copyOffsetRaw = showMobileLayout ? mobileEffective.heroCopyOffsetY : heroCopyOffsetY;
+    let copyOffsetPx = 0;
+    const trimmed = copyOffsetRaw.trim();
+    const cmMatch = trimmed.match(/^([\d.]+)cm$/);
+    const pxMatch = trimmed.match(/^([\d.]+)px$/);
+    if (cmMatch) {
+      copyOffsetPx = parseFloat(cmMatch[1]) * 37.7952755906;
+    } else if (pxMatch) {
+      copyOffsetPx = parseFloat(pxMatch[1]);
+    }
+    const baseTopPx = artboardRect.height * anchorPct + copyOffsetPx;
+    const remainderPx = promoTopPx - baseTopPx - heroPromoRenderPos.y;
+    const remainderCm = remainderPx / 37.7952755906;
+    setHeroPromoTopCmAndSave(remainderCm);
+  }, [
+    heroCopyOffsetY,
+    heroPromoRenderPos.y,
+    mobileEffective.heroCopyOffsetY,
+    setHeroPromoTopCmAndSave,
+    showMobileLayout,
+  ]);
 
   const centerMobileLayerInFrame = useCallback(
     (
@@ -2829,6 +3118,7 @@ export default function HomePageClient({
     heroRitualStackZ?: number;
     heroRitualBandStackZ?: number;
     heroCopyStackZ?: number;
+    heroPromoStackZ?: number;
     lovedFloralsStackZ?: number;
     lovedWashStackZ?: number;
     lovedBandStackZ?: number;
@@ -2861,6 +3151,11 @@ export default function HomePageClient({
       setHeroCopyStackZ(clamped);
       patch.heroCopyStackZ = clamped;
     }
+    if (typeof next.heroPromoStackZ === "number") {
+      const clamped = clampHeroLayerDepth(next.heroPromoStackZ, heroPromoStackZ);
+      setHeroPromoStackZ(clamped);
+      patch.heroPromoStackZ = clamped;
+    }
     if (typeof next.lovedFloralsStackZ === "number") {
       const clamped = clampHeroLayerDepth(next.lovedFloralsStackZ, lovedFloralsStackZ);
       setLovedFloralsStackZ(clamped);
@@ -2890,6 +3185,7 @@ export default function HomePageClient({
     background: heroBackgroundStackZ,
     media: heroMediaStackZ,
     copy: heroCopyStackZ,
+    promo: heroPromoStackZ,
     ritualBand: heroRitualBandStackZ,
     rituals: heroRitualStackZ,
   });
@@ -2904,6 +3200,7 @@ export default function HomePageClient({
   const stackOrderLayerKey = (layer: StackOrderLayerId): keyof ReturnType<typeof heroStackValues> | keyof ReturnType<typeof lovedStackValues> => {
     if (layer === "background") return "background";
     if (layer === "headline" || layer === "eyebrow" || layer === "actions") return "copy";
+    if (layer === "promo-banner") return "promo";
     if (layer === "ritual-band") return "ritualBand";
     if (layer === "rituals") return "rituals";
     if (layer === "loved-florals") return "florals";
@@ -2938,6 +3235,7 @@ export default function HomePageClient({
     if (key === "background") patch.heroBackgroundStackZ = nextZ;
     if (key === "media") patch.heroMediaStackZ = nextZ;
     if (key === "copy") patch.heroCopyStackZ = nextZ;
+    if (key === "promo") patch.heroPromoStackZ = nextZ;
     if (key === "ritualBand") patch.heroRitualBandStackZ = nextZ;
     if (key === "rituals") patch.heroRitualStackZ = nextZ;
     setHeroStackZAndSave(patch);
@@ -2986,10 +3284,7 @@ export default function HomePageClient({
   };
 
   const renderMediaZSlider = (kind: HeroLayerId) => {
-    const z = clampHeroLayerDepth(
-      kind === "primary" ? heroPrimarySettings.zIndex : heroOverlayLayer.zIndex,
-      HERO_LAYER_DEPTH_MIN
-    );
+    const z = heroMediaStackZ;
     return (
       <label className="floating-admin-z-slider">
         Stack depth (1 = back, 10 = front)
@@ -3001,10 +3296,23 @@ export default function HomePageClient({
           value={z}
           onChange={(e) => {
             const nextZ = clampHeroLayerDepth(Number(e.target.value), z);
-            if (kind === "primary") {
-              setPrimarySettingsAndSave({ ...heroPrimarySettings, zIndex: nextZ });
-            } else {
-              setOverlayLayerAndSave({ ...heroOverlayLayer, zIndex: nextZ });
+            setHeroStackZAndSave({ heroMediaStackZ: nextZ });
+            if (kind === "primary" && hasOverlayMedia) {
+              setPrimarySettingsAndSave({
+                ...heroPrimarySettings,
+                zIndex: clampHeroLayerDepth(
+                  Math.max(nextZ, heroOverlayLayer.zIndex + 1),
+                  heroPrimarySettings.zIndex
+                ),
+              });
+            } else if (kind === "overlay" && nextZ >= heroPrimarySettings.zIndex) {
+              setOverlayLayerAndSave({
+                ...heroOverlayLayer,
+                zIndex: clampHeroLayerDepth(
+                  Math.min(nextZ, heroPrimarySettings.zIndex - 1),
+                  heroOverlayLayer.zIndex
+                ),
+              });
             }
           }}
         />
@@ -3302,7 +3610,8 @@ export default function HomePageClient({
     if (
       heroMediaStackZ < heroCopyStackZ ||
       heroMediaStackZ < heroRitualStackZ ||
-      heroMediaStackZ < heroBackgroundStackZ
+      heroMediaStackZ < heroBackgroundStackZ ||
+      heroMediaStackZ < heroPromoStackZ
     ) {
       setHeroStackZAndSave({ heroMediaStackZ: heroMediaStackZ + 1 });
       return;
@@ -3344,7 +3653,8 @@ export default function HomePageClient({
     if (
       heroMediaStackZ > heroCopyStackZ ||
       heroMediaStackZ > heroRitualStackZ ||
-      heroMediaStackZ > heroBackgroundStackZ
+      heroMediaStackZ > heroBackgroundStackZ ||
+      heroMediaStackZ > heroPromoStackZ
     ) {
       if (heroMediaStackZ > HERO_LAYER_DEPTH_MIN) {
         setHeroStackZAndSave({ heroMediaStackZ: heroMediaStackZ - 1 });
@@ -3367,11 +3677,7 @@ export default function HomePageClient({
   };
 
   const moveMediaLayerToFront = (kind: HeroLayerId) => {
-    const frontStackZ = clampHeroLayerDepth(
-      Math.max(heroMediaStackZ, heroCopyStackZ, heroRitualStackZ, heroBackgroundStackZ),
-      heroMediaStackZ
-    );
-    setHeroStackZAndSave({ heroMediaStackZ: frontStackZ });
+    setHeroStackZAndSave({ heroMediaStackZ: HERO_LAYER_DEPTH_MAX });
     if (kind === "primary") {
       const nextZ = hasOverlayMedia
         ? clampHeroLayerDepth(heroOverlayLayer.zIndex + 1, HERO_LAYER_DEPTH_MAX)
@@ -3383,11 +3689,7 @@ export default function HomePageClient({
   };
 
   const moveMediaLayerToBack = (kind: HeroLayerId) => {
-    const backStackZ = clampHeroLayerDepth(
-      Math.min(heroMediaStackZ, heroCopyStackZ, heroRitualStackZ, heroBackgroundStackZ),
-      HERO_LAYER_DEPTH_MIN
-    );
-    setHeroStackZAndSave({ heroMediaStackZ: backStackZ });
+    setHeroStackZAndSave({ heroMediaStackZ: HERO_LAYER_DEPTH_MIN });
     if (kind === "primary") {
       setPrimarySettingsAndSave({ ...heroPrimarySettings, zIndex: HERO_LAYER_DEPTH_MIN });
       return;
@@ -3413,6 +3715,12 @@ export default function HomePageClient({
           To front
         </button>
       </div>
+      {kind === "primary" ? (
+        <span className="floating-admin-hint" style={{ fontSize: "0.72rem" }}>
+          Stack depth {heroMediaStackZ} · promo {heroPromoStackZ}. Higher than promo moves product above the
+          strip. Match or exceed florals depth ({lovedFloralsStackZ}) to tuck florals behind the hero.
+        </span>
+      ) : null}
     </div>
   );
 
@@ -3454,7 +3762,7 @@ export default function HomePageClient({
   };
 
   const primaryMediaPointerEvents =
-    hasHeroMedia && adminDragEnabled && adminEditLayer === "overlay" ? "none" : "auto";
+    adminDragEnabled && adminEditLayer === "primary" ? "auto" : "none";
   const overlayMediaPointerEvents =
     adminDragEnabled && adminEditLayer === "overlay" ? "auto" : "none";
 
@@ -3510,6 +3818,7 @@ export default function HomePageClient({
     heroBackgroundStackZ,
     heroMediaStackZ,
     heroCopyStackZ,
+    heroPromoStackZ,
     heroRitualBandStackZ,
     heroRitualStackZ,
     lovedFloralsStackZ,
@@ -3517,8 +3826,16 @@ export default function HomePageClient({
     lovedBandStackZ,
     lovedContentStackZ,
   });
+  const lovedOverlapPaintZ = resolveLovedOverlapPaintZ({
+    heroPaintZ: pageShellPaintZ.hero,
+    lovedPaintZ: pageShellPaintZ.loved,
+    heroPromoStackZ,
+    heroMediaStackZ,
+    lovedFloralsStackZ,
+  });
   const pageStackStyle = {
     ...pageShellStackCssVars(pageShellPaintZ),
+    ["--page-layer-z-loved-overlap" as string]: String(lovedOverlapPaintZ),
     ...(useMobileDocumentFlow
       ? {
           ["--mobile-design-width" as string]: `${MOBILE_DESIGN_WIDTH_PX}px`,
@@ -3665,6 +3982,9 @@ export default function HomePageClient({
         className={`hero ${hasAnyHeroVisualLayer ? "hero-bg" : ""}${showMobileLayout ? " hero-mobile-layout" : ""}`}
         id="hero"
         ref={heroSectionRef}
+        data-review="Homepage hero"
+        data-review-id="home-hero"
+        data-review-files="app/home-page-client.tsx,app/components/HeroVideoMedia.tsx"
         data-page-layer-z={pageShellPaintZ.hero}
         style={
           showMobileLayout
@@ -3718,6 +4038,26 @@ export default function HomePageClient({
           </div>
         ) : null}
         {useMobileDocumentFlow && !mobileNudgeActive ? renderHeroOverlayFrame() : null}
+        <HeroPromoBanner
+          initialBanners={livePromoBanners}
+          editable={adminDragEnabled && adminEditLayer === "promo-banner"}
+          bannerRef={heroPromoElRef}
+          onPointerDown={
+            adminDragEnabled && (canEditLayout || canEditMobilePreview)
+              ? handleHeroPromoPointerDown
+              : undefined
+          }
+          onPointerMove={
+            adminDragEnabled && (canEditLayout || canEditMobilePreview)
+              ? handleHeroPromoPointerMove
+              : undefined
+          }
+          onPointerUp={
+            adminDragEnabled && (canEditLayout || canEditMobilePreview)
+              ? handleHeroPromoPointerUp
+              : undefined
+          }
+        />
         <div className="hero-copy">
           <div style={showMobileLayout ? { width: "100%", maxWidth: "100%" } : { width: `${copyWidth}vw`, maxWidth: "100%" }}>
           {eyebrowVisible ? (
@@ -3888,13 +4228,15 @@ export default function HomePageClient({
       {lovedSectionVisible ? (
         <HomeCollections
           className="scroller-loved-for-a-reason"
-          pageLayerZ={pageShellPaintZ.loved}
+          initialCategoryBanners={initialCategoryBanners}
+          pageLayerZ={lovedOverlapPaintZ}
           adminPositionEditable={(canEditLayout || canEditMobilePreview) && adminEditLayer === "loved-section"}
           onAdminPositionPointerDown={handleLovedSectionDragDown}
           onAdminPositionPointerMove={handleLovedSectionDragMove}
           onAdminPositionPointerUp={handleLovedSectionDragUp}
           sectionStyle={{
             ...lovedStackStyle,
+            zIndex: lovedOverlapPaintZ,
             "--loved-flow-offset-y": showMobileLayout ? "0px" : `${lovedFlowOffsetPx}px`,
             "--loved-divider-offset-y": `${lovedDividerForRender}px`,
             "--loved-floral-offset-y": `${lovedFloralOffsetForRender}px`,
@@ -3916,7 +4258,7 @@ export default function HomePageClient({
     </>
   );
 
-  const pageTail = !adminMobilePreviewActive ? (
+  const pageTail = !adminMobilePreviewActive && !initialPromoPreview ? (
     <HomePageBelowFold
       brand={brand}
       products={products}
@@ -3928,7 +4270,7 @@ export default function HomePageClient({
 
   const pageContent = (
     <div
-      className={`page maroma${showMobileLayout ? " is-mobile-layout" : ""}${useMobileDocumentFlow ? " is-mobile-document-flow" : ""}${persistLayoutToMobile && useMobileDocumentFlow ? " is-mobile-edit-active" : ""}${adminMobilePreviewActive ? " is-admin-mobile-preview" : ""}`}
+      className={`page maroma${showMobileLayout ? " is-mobile-layout" : ""}${useMobileDocumentFlow ? " is-mobile-document-flow" : ""}${persistLayoutToMobile && useMobileDocumentFlow ? " is-mobile-edit-active" : ""}${adminMobilePreviewActive ? " is-admin-mobile-preview" : ""}${initialPromoPreview ? " is-promo-preview-page" : ""}`}
       style={{
         ...pageStackStyle,
         ...(introPhase !== "done"
@@ -4120,6 +4462,7 @@ export default function HomePageClient({
                   <option value="headline">Headline</option>
                   <option value="eyebrow">Eyebrow</option>
                   <option value="actions">Hero actions row</option>
+                  <option value="promo-banner">Promo banner strip</option>
                   <option value="ritual-band">Carousel band (behind tiles)</option>
                   <option value="rituals">Ritual carousel</option>
                   <option value="loved-section">Loved section (position)</option>
@@ -4446,6 +4789,175 @@ export default function HomePageClient({
                   {renderStackLayerOrderButtons("actions")}
                 </>
               )}
+              {adminEditLayer === "promo-banner" && (
+                <>
+                  <p className="floating-admin-hint">
+                    Drag the promo strip up/down on the page (CTAs are locked while editing this layer), or use the
+                    Y / Top offset sliders. Width still uses the width slider. Click Save All Changes when done.
+                  </p>
+                  <label>
+                    Top offset (cm){" "}
+                    <input
+                      type="range"
+                      min={0}
+                      max={40}
+                      step={0.1}
+                      value={editHeroPromoTopCm}
+                      onChange={(e) => setHeroPromoTopCmAndSave(Number(e.target.value))}
+                    />{" "}
+                    <span>{editHeroPromoTopCm.toFixed(1)}cm</span>
+                  </label>
+                  <label>
+                    X{" "}
+                    <input
+                      type="range"
+                      min={-1000}
+                      max={1000}
+                      step={1}
+                      value={editHeroPromoPos.x}
+                      onChange={(e) =>
+                        setHeroPromoPosAndSave({ ...editHeroPromoPos, x: Number(e.target.value) })
+                      }
+                    />{" "}
+                    <span>{Math.round(editHeroPromoPos.x)}px</span>
+                  </label>
+                  <label>
+                    Y{" "}
+                    <input
+                      type="range"
+                      min={-1000}
+                      max={1000}
+                      step={1}
+                      value={editHeroPromoPos.y}
+                      onChange={(e) =>
+                        setHeroPromoPosAndSave({ ...editHeroPromoPos, y: Number(e.target.value) })
+                      }
+                    />{" "}
+                    <span>{Math.round(editHeroPromoPos.y)}px</span>
+                  </label>
+                  <label>
+                    Width (%){" "}
+                    <input
+                      type="range"
+                      min={40}
+                      max={100}
+                      step={1}
+                      value={editHeroPromoWidthPct}
+                      onChange={(e) => setHeroPromoWidthPctAndSave(Number(e.target.value))}
+                    />{" "}
+                    <span>{Math.round(editHeroPromoWidthPct)}%</span>
+                  </label>
+                  <button type="button" className="button secondary" onClick={snapPromoBetweenHeadlineAndActions}>
+                    Snap between headline and CTAs
+                  </button>
+                  {renderCentreButtons(
+                    () => setHeroPromoPosAndSave({ ...editHeroPromoPos, x: 0 }),
+                    () => setHeroPromoPosAndSave({ ...editHeroPromoPos, y: 0 }),
+                  )}
+                  {renderStackLayerOrderButtons("promo-banner")}
+                  <p className="floating-admin-hint" style={{ gridColumn: "1 / -1" }}>
+                    Florals tuck behind this strip when their stack depth is lower than promo stack
+                    depth (edit Layer 1: Loved florals vs this layer).
+                  </p>
+                  {livePromoBanners[0] ? (
+                    <>
+                      <label>
+                        Strip opacity{" "}
+                        <input
+                          type="range"
+                          min={0.05}
+                          max={1}
+                          step={0.01}
+                          value={editPromoStrip.stripOpacity}
+                          onChange={(e) =>
+                            patchLivePromoStrip({ stripOpacity: Number(e.target.value) })
+                          }
+                        />{" "}
+                        <span>{editPromoStrip.stripOpacity.toFixed(2)}</span>
+                      </label>
+                      <label>
+                        Marquee start (cm from product right){" "}
+                        <input
+                          type="range"
+                          min={-5}
+                          max={25}
+                          step={0.1}
+                          value={editPromoStrip.heroMarqueeStartOffsetCm}
+                          onChange={(e) =>
+                            patchLivePromoStrip({ heroMarqueeStartOffsetCm: Number(e.target.value) })
+                          }
+                        />{" "}
+                        <span>{editPromoStrip.heroMarqueeStartOffsetCm.toFixed(1)}cm</span>
+                      </label>
+                      <label>
+                        Marquee start fine-tune (px){" "}
+                        <input
+                          type="range"
+                          min={-600}
+                          max={600}
+                          step={1}
+                          value={editPromoStrip.heroMarqueeStartOffsetPx}
+                          onChange={(e) =>
+                            patchLivePromoStrip({ heroMarqueeStartOffsetPx: Number(e.target.value) })
+                          }
+                        />{" "}
+                        <span>{editPromoStrip.heroMarqueeStartOffsetPx}px</span>
+                      </label>
+                      <p className="floating-admin-hint" style={{ fontSize: "0.72rem" }}>
+                        Text holds still while you adjust start position. Higher cm moves the whole
+                        message left; lower cm moves it right (emerges later from behind the product).
+                        Use ↻ on the strip to preview the scroll.
+                      </p>
+                      <label>
+                        Strip height{" "}
+                        <input
+                          type="range"
+                          min={48}
+                          max={160}
+                          step={1}
+                          value={editPromoStrip.stripHeightPx}
+                          onChange={(e) =>
+                            patchLivePromoStrip({ stripHeightPx: Number(e.target.value) })
+                          }
+                        />{" "}
+                        <span>{editPromoStrip.stripHeightPx}px</span>
+                      </label>
+                      <label>
+                        Gift offset (cm){" "}
+                        <input
+                          type="range"
+                          min={-10}
+                          max={20}
+                          step={0.1}
+                          value={editPromoStrip.mediaOffsetXCm}
+                          onChange={(e) =>
+                            patchLivePromoStrip({ mediaOffsetXCm: Number(e.target.value) })
+                          }
+                        />{" "}
+                        <span>{editPromoStrip.mediaOffsetXCm.toFixed(1)}cm</span>
+                      </label>
+                      <label className="floating-admin-toggle-row">
+                        <input
+                          type="checkbox"
+                          checked={editPromoStrip.marqueeForceScroll}
+                          onChange={(e) =>
+                            patchLivePromoStrip({ marqueeForceScroll: e.target.checked })
+                          }
+                        />{" "}
+                        Always scroll message
+                      </label>
+                      <p className="floating-admin-hint" style={{ gridColumn: "1 / -1" }}>
+                        <Link href="/admin/site">Edit banner content, frames, and schedule</Link>
+                      </p>
+                    </>
+                  ) : (
+                    <p className="floating-admin-hint" style={{ gridColumn: "1 / -1" }}>
+                      No live banner.{" "}
+                      <Link href="/admin/site">Create one in Site admin</Link>
+                    </p>
+                  )}
+                </>
+              )}
               {adminEditLayer === "loved-section" && (
                 <>
                 <label>
@@ -4498,6 +5010,11 @@ export default function HomePageClient({
                     <span>{lovedFloralOpacity.toFixed(2)}</span>
                   </label>
                   {renderStackLayerOrderButtons("loved-florals")}
+                  <p className="floating-admin-hint" style={{ gridColumn: "1 / -1" }}>
+                    Stack depth lower than the promo strip (Layer: Promo banner strip) tucks florals
+                    behind the teal banner. Raise florals depth above promo depth to paint over the
+                    strip.
+                  </p>
                 </>
               )}
               {adminEditLayer === "loved-wash" && (

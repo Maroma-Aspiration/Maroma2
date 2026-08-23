@@ -162,7 +162,12 @@ export default async function ProductPage({ params, searchParams }: Props) {
           Admin preview · This product is not yet published on the storefront.
         </div>
       ) : null}
-      <div className="product-pdp-layout">
+      <div
+        className="product-pdp-layout"
+        data-review="Product details"
+        data-review-id="pdp-layout"
+        data-review-files="app/product/[id]/page.tsx,app/components/ProductPdpBuyRow.tsx,app/components/ProductPdpGallery.tsx"
+      >
         <h1 className="product-pdp-title">{displayName}</h1>
         <ProductPdpGallery images={gallery} productName={displayName} ready3d={gift3dReady} />
 
