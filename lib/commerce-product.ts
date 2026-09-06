@@ -7,6 +7,7 @@ import { getAvailableStock, readStockStore } from "./commerce-stock";
 import { DEFAULT_STOCK } from "./commerce-config";
 import type { CommerceProduct } from "./commerce-types";
 import type { ProductRecord } from "./product-types";
+import { productPriceState } from "./product-pricing";
 
 let catalogCache: { at: number; products: ProductRecord[] } | null = null;
 const CATALOG_TTL_MS = 30_000;
@@ -61,7 +62,8 @@ export async function resolveCommerceProduct(productId: string): Promise<Commerc
   const product = catalog.find((entry) => entry.id === id);
   if (!product) return null;
 
-  const price = parseInrPriceNumber(product.price);
+  const priceState = productPriceState(product);
+  const price = parseInrPriceNumber(priceState.active);
   if (price === null) return null;
 
   const stock = await getAvailableStock(id);
@@ -72,9 +74,11 @@ export async function resolveCommerceProduct(productId: string): Promise<Commerc
     sku: product.sku || product.id,
     name: product.name,
     price,
+    originalPrice: priceState.onSale ? parseInrPriceNumber(priceState.regular) ?? undefined : undefined,
     image: getDisplayImageUrl(product) ?? product.imageUrl ?? "",
     active: published && stock > 0,
     stock,
+    ukAndChannelIslandsRestricted: product.ukAndChannelIslandsRestricted === true,
   };
 }
 
@@ -120,7 +124,8 @@ export async function resolveCommerceProducts(
 
     const product = byId.get(id);
     if (!product) continue;
-    const price = parseInrPriceNumber(product.price);
+    const priceState = productPriceState(product);
+    const price = parseInrPriceNumber(priceState.active);
     if (price === null) continue;
     const stock = stockFor(id, stockStore.stock);
     const published = isProductPublished(catalogEdits.edits[id]);
@@ -129,9 +134,11 @@ export async function resolveCommerceProducts(
       sku: product.sku || product.id,
       name: product.name,
       price,
+      originalPrice: priceState.onSale ? parseInrPriceNumber(priceState.regular) ?? undefined : undefined,
       image: getDisplayImageUrl(product) ?? product.imageUrl ?? "",
       active: published && stock > 0,
       stock,
+      ukAndChannelIslandsRestricted: product.ukAndChannelIslandsRestricted === true,
     });
   }
 

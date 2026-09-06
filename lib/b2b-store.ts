@@ -116,7 +116,12 @@ function normalizeCompany(raw: unknown): B2bCompany | null {
     statusRaw === "pending" || statusRaw === "paused" || statusRaw === "active"
       ? statusRaw
       : "active";
-  const program: B2bProgram = row.program === "white_label" ? "white_label" : "custom";
+  const program: B2bProgram =
+    row.program === "white_label"
+      ? "white_label"
+      : row.program === "branded"
+        ? "branded"
+        : "custom";
   const discountPct = Number(row.whiteLabelDiscountPercent);
   const minSpend = Number(row.whiteLabelMinSpendInr);
 
@@ -129,13 +134,13 @@ function normalizeCompany(raw: unknown): B2bCompany | null {
     status,
     program,
     whiteLabelDiscountPercent:
-      program === "white_label"
+      program === "white_label" || program === "branded"
         ? Number.isFinite(discountPct) && discountPct > 0
           ? discountPct
           : WHITE_LABEL_DISCOUNT_RATE * 100
         : undefined,
     whiteLabelMinSpendInr:
-      program === "white_label"
+      program === "white_label" || program === "branded"
         ? Number.isFinite(minSpend) && minSpend > 0
           ? minSpend
           : WHITE_LABEL_MIN_SPEND_INR

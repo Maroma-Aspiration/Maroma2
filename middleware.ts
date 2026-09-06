@@ -72,6 +72,9 @@ function requiresAdmin(pathname: string, method: string): boolean {
   if (pathname.startsWith("/api/category-banners/upload")) {
     return true;
   }
+  if (pathname.startsWith("/api/promo-strip-background/upload")) {
+    return true;
+  }
   if (pathname.startsWith("/api/site-media-gallery/upload")) {
     return true;
   }
@@ -297,5 +300,9 @@ export async function middleware(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/((?!.*\\..*).*)"]
+  // Skip static files and media uploads. Large multipart bodies that pass through
+  // middleware often never reach the Node upload route on Vercel.
+  matcher: [
+    "/((?!.*\\..*|api/category-banners/upload|api/promo-strip-background/upload|api/site-media-gallery/upload|api/products/upload|api/upload-canvas-image).*)",
+  ],
 };

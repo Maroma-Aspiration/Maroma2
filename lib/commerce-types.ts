@@ -27,6 +27,7 @@ export type CartItemView = {
   quantity: number;
   variant?: string;
   maxQuantity: number;
+  ukAndChannelIslandsRestricted?: boolean;
 };
 
 export type CartTotals = {
@@ -49,11 +50,14 @@ export type CommerceProduct = {
   sku: string;
   name: string;
   price: number;
+  /** Regular price shown alongside an active sale price. */
+  originalPrice?: number;
   image: string;
   active: boolean;
   stock: number;
   /** True for curated ritual bundles not in the main catalogue JSON. */
   virtual?: boolean;
+  ukAndChannelIslandsRestricted?: boolean;
 };
 
 export type StockStore = {

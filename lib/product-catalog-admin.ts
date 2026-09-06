@@ -32,6 +32,7 @@ export type AdminProductSummary = {
   name: string;
   sku: string;
   price: string;
+  salePrice?: string;
   priceNumber: number | null;
   imageUrl: string | null;
   primaryCategory: string;
@@ -67,6 +68,7 @@ export function applyCatalogEdit(
     name: edit.name ?? product.name,
     sku: edit.sku ?? product.sku,
     price: edit.price ?? product.price,
+    salePrice: edit.salePrice ?? product.salePrice,
     shortDescription: edit.shortDescription ?? product.shortDescription,
     description: edit.description ?? product.description,
     categories: edit.categories ?? product.categories,
@@ -142,6 +144,7 @@ export function toAdminProductSummary(
     name: decodeBasicHtmlEntities(product.name),
     sku: product.sku || product.id,
     price: product.price,
+    salePrice: product.salePrice,
     priceNumber: parseInrPriceNumber(product.price),
     imageUrl: getDisplayImageUrl(product),
     primaryCategory,
@@ -309,6 +312,8 @@ export type ProductCatalogPatch = {
   name?: string;
   sku?: string;
   price?: string;
+  /** Empty string clears a sale; otherwise it must be lower than the regular price. */
+  salePrice?: string;
   shortDescription?: string;
   description?: string;
   categories?: string[];
@@ -325,6 +330,12 @@ export function validateProductCatalogPatch(patch: ProductCatalogPatch): string 
   if (patch.price !== undefined) {
     const price = parseInrPriceNumber(patch.price);
     if (price === null) return "Enter a valid price.";
+  }
+  if (patch.salePrice !== undefined && patch.salePrice !== "") {
+    const salePrice = parseInrPriceNumber(patch.salePrice);
+    if (salePrice === null || salePrice <= 0) return "Enter a valid sale price, or leave it blank to remove the sale.";
+    const regularPrice = parseInrPriceNumber(patch.price ?? "");
+    if (regularPrice !== null && salePrice >= regularPrice) return "Sale price must be lower than the regular price.";
   }
   if (patch.stock !== undefined) {
     if (!Number.isFinite(patch.stock) || patch.stock < 0) {

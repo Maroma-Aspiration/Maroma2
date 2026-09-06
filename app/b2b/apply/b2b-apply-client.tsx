@@ -10,6 +10,11 @@ export default function B2bApplyClient() {
   const [phone, setPhone] = useState("");
   const [country, setCountry] = useState("");
   const [website, setWebsite] = useState("");
+  const [gstNumber, setGstNumber] = useState("");
+  const [companyType, setCompanyType] = useState("");
+  const [companyAddress, setCompanyAddress] = useState("");
+  const [instagramUrl, setInstagramUrl] = useState("");
+  const [linkedinUrl, setLinkedinUrl] = useState("");
   const [message, setMessage] = useState("");
   const [status, setStatus] = useState("");
   const [done, setDone] = useState(false);
@@ -19,7 +24,7 @@ export default function B2bApplyClient() {
     const res = await fetch("/api/b2b/apply", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ companyName, contactName, email, phone, country, website, message }),
+      body: JSON.stringify({ companyName, contactName, email, phone, country, website, gstNumber, companyType, companyAddress, instagramUrl, linkedinUrl, message }),
     });
     const data = (await res.json()) as { error?: string };
     if (!res.ok) {
@@ -32,11 +37,10 @@ export default function B2bApplyClient() {
   return (
     <main className="login-page">
       <section className="login-card" style={{ maxWidth: 640, width: "100%" }}>
-        <p className="login-eyebrow">Wholesale</p>
-        <h1 className="login-title">White-label application</h1>
+        <p className="login-eyebrow">Maroma partnerships</p>
+        <h1 className="login-title">B2B application</h1>
         <p className="login-reason">
-          Approved partners receive the full Maroma catalogue at 35% off, with a minimum order of
-          ₹15,000.
+          Tell us about your White Label, retail, distribution or corporate gifting opportunity.
         </p>
         {done ? (
           <p>Thank you. We will review your application and email you if it is approved.</p>
@@ -53,7 +57,12 @@ export default function B2bApplyClient() {
             <input required type="email" placeholder="Email" value={email} onChange={(e) => setEmail(e.target.value)} />
             <input placeholder="Phone" value={phone} onChange={(e) => setPhone(e.target.value)} />
             <input placeholder="Country" value={country} onChange={(e) => setCountry(e.target.value)} />
+            <input placeholder="GST number (if applicable)" value={gstNumber} onChange={(e) => setGstNumber(e.target.value)} />
+            <input placeholder="Company type (retailer, distributor, hotel, etc.)" value={companyType} onChange={(e) => setCompanyType(e.target.value)} />
+            <textarea rows={3} placeholder="Company address" value={companyAddress} onChange={(e) => setCompanyAddress(e.target.value)} />
             <input placeholder="Website" value={website} onChange={(e) => setWebsite(e.target.value)} />
+            <input placeholder="Instagram URL" value={instagramUrl} onChange={(e) => setInstagramUrl(e.target.value)} />
+            <input placeholder="LinkedIn URL" value={linkedinUrl} onChange={(e) => setLinkedinUrl(e.target.value)} />
             <textarea
               rows={4}
               placeholder="Tell us about your business"

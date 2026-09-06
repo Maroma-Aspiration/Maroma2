@@ -183,6 +183,7 @@ export async function buildCartView(cart: CartRecord): Promise<CartView> {
       quantity,
       variant: line.variant,
       maxQuantity: Math.min(product.stock, MAX_LINE_QUANTITY),
+      ukAndChannelIslandsRestricted: product.ukAndChannelIslandsRestricted === true,
     });
   }
 

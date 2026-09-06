@@ -10,6 +10,11 @@ export type B2bApplication = {
   phone: string;
   country: string;
   website: string;
+  gstNumber: string;
+  companyType: string;
+  companyAddress: string;
+  instagramUrl: string;
+  linkedinUrl: string;
   message: string;
   status: B2bApplicationStatus;
   createdAt: string;
@@ -43,6 +48,11 @@ function parseApplication(raw: unknown): B2bApplication | null {
     phone: typeof row.phone === "string" ? row.phone.trim() : "",
     country: typeof row.country === "string" ? row.country.trim() : "",
     website: typeof row.website === "string" ? row.website.trim() : "",
+    gstNumber: typeof row.gstNumber === "string" ? row.gstNumber.trim() : "",
+    companyType: typeof row.companyType === "string" ? row.companyType.trim() : "",
+    companyAddress: typeof row.companyAddress === "string" ? row.companyAddress.trim() : "",
+    instagramUrl: typeof row.instagramUrl === "string" ? row.instagramUrl.trim() : "",
+    linkedinUrl: typeof row.linkedinUrl === "string" ? row.linkedinUrl.trim() : "",
     message: typeof row.message === "string" ? row.message.trim() : "",
     status,
     createdAt: typeof row.createdAt === "string" ? row.createdAt : new Date().toISOString(),
@@ -66,6 +76,11 @@ export async function submitB2bApplication(input: {
   phone: string;
   country: string;
   website: string;
+  gstNumber: string;
+  companyType: string;
+  companyAddress: string;
+  instagramUrl: string;
+  linkedinUrl: string;
   message: string;
 }): Promise<B2bApplication> {
   const email = input.email.trim().toLowerCase();
@@ -87,6 +102,11 @@ export async function submitB2bApplication(input: {
     phone: input.phone.trim().slice(0, 40),
     country: input.country.trim().slice(0, 80),
     website: input.website.trim().slice(0, 200),
+    gstNumber: input.gstNumber.trim().slice(0, 40),
+    companyType: input.companyType.trim().slice(0, 100),
+    companyAddress: input.companyAddress.trim().slice(0, 500),
+    instagramUrl: input.instagramUrl.trim().slice(0, 200),
+    linkedinUrl: input.linkedinUrl.trim().slice(0, 200),
     message: input.message.trim().slice(0, 2000),
     status: "pending",
     createdAt: new Date().toISOString(),

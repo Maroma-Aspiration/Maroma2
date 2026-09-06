@@ -6,8 +6,10 @@ import { ProductPdpBuyRow } from "../../components/ProductPdpBuyRow";
 import { ProductPdpGallery } from "../../components/ProductPdpGallery";
 import { ProductReviews } from "../../components/ProductReviews";
 import { ProductAdminToolbar } from "../../components/ProductAdminToolbar";
+import { ProductIngredientGallery } from "../../components/ProductIngredientGallery";
 import { JsonLd } from "../../components/JsonLd";
 import { CurrencyPrice } from "../../components/CurrencyPrice";
+import { CurrencySelector } from "../../components/CurrencySelector";
 import { decodeBasicHtmlEntities } from "../../../lib/decode-html-entities";
 import { derivePdpSections } from "../../../lib/pdp-sections";
 import { deriveProductPdpCopy, stripIndiaOnlyFromProductName } from "../../../lib/product-sale-region";
@@ -20,6 +22,7 @@ import { getAvailableStock } from "../../../lib/commerce-stock";
 import { categoryBySlug } from "../../../lib/catalog-categories";
 import { readGift3dAssetsStore, toPublicGift3dAssets } from "../../../lib/gift-3d-assets-store";
 import { isGift3dPreviewProduct } from "../../../lib/gift-builder-catalog";
+import { isGiftingProduct } from "../../../lib/product-gifting";
 import {
   auditProductSeoFacts,
   breadcrumbJsonLd,
@@ -29,6 +32,7 @@ import {
   truncateMetaDescription,
 } from "../../../lib/site-seo";
 import type { ProductRecord } from "../../../lib/product-types";
+import { productPriceState } from "../../../lib/product-pricing";
 
 export const runtime = "nodejs";
 
@@ -84,7 +88,9 @@ function SuggestedCard({ product }: { product: ProductRecord }) {
       </div>
       <div className="product-pdp-suggestion-copy">
         <p className="product-pdp-suggestion-name">{displayName}</p>
-        <p className="product-pdp-suggestion-price"><CurrencyPrice raw={product.price} fallback="-" /></p>
+        {productPriceState(product).onSale ? (
+          <p className="product-pdp-suggestion-price is-on-sale"><s><CurrencyPrice raw={productPriceState(product).regular} fallback="-" /></s><span><CurrencyPrice raw={productPriceState(product).active} fallback="-" /></span></p>
+        ) : <p className="product-pdp-suggestion-price"><CurrencyPrice raw={product.price} fallback="-" /></p>}
       </div>
     </Link>
   );
@@ -169,15 +175,19 @@ export default async function ProductPage({ params, searchParams }: Props) {
         data-review-files="app/product/[id]/page.tsx,app/components/ProductPdpBuyRow.tsx,app/components/ProductPdpGallery.tsx"
       >
         <h1 className="product-pdp-title">{displayName}</h1>
-        <ProductPdpGallery images={gallery} productName={displayName} ready3d={gift3dReady} />
+        <div className="product-pdp-left-column">
+          <ProductPdpGallery images={gallery} videos={product.videos} productId={product.id} productName={displayName} ready3d={isGiftingProduct(product) && gift3dReady} />
+          <ProductReviews productId={product.id} />
+        </div>
 
         <div className="product-pdp-info">
+          <div className="product-currency-control"><span>Currency</span><CurrencySelector compact /></div>
           {subtitleText ? <p className="product-pdp-subtitle">{subtitleText}</p> : null}
-          <p className="product-pdp-price"><CurrencyPrice raw={product.price} /></p>
+          {productPriceState(product).onSale ? (
+            <p className="product-pdp-price is-on-sale"><s><CurrencyPrice raw={productPriceState(product).regular} /></s><span><CurrencyPrice raw={productPriceState(product).active} /></span></p>
+          ) : <p className="product-pdp-price"><CurrencyPrice raw={product.price} /></p>}
 
           <ProductPdpBuyRow product={product} />
-
-          <ProductReviews productId={product.id} />
 
           {factRows.length > 0 ? (
             <section className="product-pdp-facts" aria-labelledby="pdp-facts-heading">
@@ -219,16 +229,10 @@ export default async function ProductPage({ params, searchParams }: Props) {
               <summary>Description</summary>
               <div className="product-pdp-accordion-body">{sections.description}</div>
             </details>
-            {keyIngredients.length > 0 ? (
-              <details className="product-pdp-accordion">
-                <summary>Key ingredients</summary>
-                <ul className="product-pdp-key-ingredients">
-                  {keyIngredients.map((item, index) => (
-                    <li key={`${item}-${index}`}>{decodeBasicHtmlEntities(item)}</li>
-                  ))}
-                </ul>
-              </details>
-            ) : null}
+            <details className="product-pdp-accordion">
+              <summary>Key ingredients</summary>
+              {keyIngredients.length ? <ul className="product-pdp-key-ingredients">{keyIngredients.map((item, index) => <li key={`${item}-${index}`}>{decodeBasicHtmlEntities(item)}</li>)}</ul> : <div className="product-pdp-accordion-body">Key ingredients are listed on the product label.</div>}
+            </details>
             <details className="product-pdp-accordion">
               <summary>Ingredients (full INCI)</summary>
               <div className="product-pdp-accordion-body">{sections.ingredients}</div>
@@ -244,8 +248,11 @@ export default async function ProductPage({ params, searchParams }: Props) {
               </details>
             ) : null}
           </div>
+
         </div>
       </div>
+
+      <ProductIngredientGallery productId={product.id} ingredients={keyIngredients} isAdmin={isAdmin} />
 
       <footer className="product-pdp-trust" aria-label="Certifications">
         <div className="product-pdp-trust-badge">Fair trade ethos</div>

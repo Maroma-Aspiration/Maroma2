@@ -48,17 +48,30 @@ function HeroNativeVideo({
     if (!video) return;
     video.muted = true;
     video.playsInline = true;
-    const tryPlay = () => {
+
+    const beginPlayback = () => {
+      try {
+        video.currentTime = 0;
+      } catch {
+        /* ignore seek before metadata */
+      }
       const play = video.play();
       if (play && typeof play.then === "function") {
         play.then(() => setNeedsTap(false)).catch(() => setNeedsTap(true));
       }
     };
-    tryPlay();
+
+    if (video.readyState >= 2) beginPlayback();
+    else video.addEventListener("canplay", beginPlayback, { once: true });
+
     const timer = window.setTimeout(() => {
       if (video.paused) setNeedsTap(true);
     }, 1200);
-    return () => window.clearTimeout(timer);
+
+    return () => {
+      window.clearTimeout(timer);
+      video.removeEventListener("canplay", beginPlayback);
+    };
   }, [src]);
 
   return (
@@ -73,8 +86,17 @@ function HeroNativeVideo({
         preload="auto"
         poster={poster}
         style={{ objectFit }}
-        onEnded={() => {
-          if (!loop) onEnded?.();
+        onEnded={(event) => {
+          if (loop) return;
+          const video = event.currentTarget;
+          if (
+            Number.isFinite(video.duration) &&
+            video.duration > 0 &&
+            video.currentTime < Math.max(0.35, video.duration * 0.08)
+          ) {
+            return;
+          }
+          onEnded?.();
         }}
         onPlaying={() => {
           setNeedsTap(false);

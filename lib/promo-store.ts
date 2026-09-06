@@ -3,6 +3,7 @@ import {
   buildDefaultPromoFrames,
   normalizePresentation,
   normalizePromoFrames,
+  normalizeSequenceFadeDurationMs,
   normalizeSequenceTransition,
 } from "./promo-sequence-utils";
 import { normalizePromoStripFields } from "./promo-strip-utils";
@@ -23,14 +24,19 @@ function parseBanner(raw: unknown): PromoBanner | null {
   const row = raw as Record<string, unknown>;
   const id = typeof row.id === "string" ? row.id.trim() : "";
   const title = typeof row.title === "string" ? row.title.trim() : "";
-  if (!id || !title) return null;
+  const adminName = typeof row.adminName === "string" ? row.adminName.trim() : "";
+  if (!id || (!title && !adminName)) return null;
   const animationRaw = row.animation;
   const animation: PromoAnimation =
     animationRaw === "fade" || animationRaw === "slide" || animationRaw === "pulse" || animationRaw === "marquee"
       ? animationRaw
       : "marquee";
   const mediaKind: PromoMediaKind =
-    row.mediaKind === "image" || row.mediaKind === "video" ? row.mediaKind : "none";
+    row.mediaKind === "image" ||
+    row.mediaKind === "video" ||
+    row.mediaKind === "title-media"
+      ? row.mediaKind
+      : "none";
   const mediaUrlRaw = typeof row.mediaUrl === "string" ? row.mediaUrl.trim() : "";
   const mediaUrl = mediaKind === "none" ? "" : mediaUrlRaw;
   const partial = {
@@ -44,17 +50,22 @@ function parseBanner(raw: unknown): PromoBanner | null {
   const strip = normalizePromoStripFields(row as Partial<PromoBanner>);
   return {
     id,
+    adminName,
     ...partial,
     animation,
     presentation: normalizePresentation(row.presentation),
     sequenceTransition: normalizeSequenceTransition(row.sequenceTransition),
+    sequenceFadeDurationMs: normalizeSequenceFadeDurationMs(row.sequenceFadeDurationMs),
     sequenceLoop: row.sequenceLoop !== false,
     frames: normalizePromoFrames(row.frames, partial),
     ctaBuyLinks: normalizeCtaBuyLinks(row.ctaBuyLinks),
     ...strip,
+    ctaOffsetX: Math.min(1200, Math.max(-1200, Number(row.ctaOffsetX) || 0)),
+    ctaOffsetY: Math.min(900, Math.max(-900, Number(row.ctaOffsetY) || 0)),
     startsAt: typeof row.startsAt === "string" ? row.startsAt : "",
     endsAt: typeof row.endsAt === "string" ? row.endsAt : "",
     active: row.active !== false,
+    promoModeEnabled: row.promoModeEnabled !== false,
     createdAt: typeof row.createdAt === "string" ? row.createdAt : new Date().toISOString(),
     updatedAt: typeof row.updatedAt === "string" ? row.updatedAt : new Date().toISOString(),
   };
@@ -87,14 +98,20 @@ export async function listLivePromoBanners(): Promise<PromoBanner[]> {
   return store.banners.filter((banner) => isPromoLive(banner));
 }
 
-export async function upsertPromoBanner(input: Partial<PromoBanner> & { title: string }): Promise<PromoBanner> {
+export async function upsertPromoBanner(
+  input: Partial<PromoBanner> & { title?: string; adminName?: string }
+): Promise<PromoBanner> {
   const store = await readPromoStore();
   const now = new Date().toISOString();
   const existing = input.id ? store.banners.find((b) => b.id === input.id) : null;
   const mergedMediaKind = input.mediaKind ?? existing?.mediaKind ?? "none";
   const mergedMediaUrlRaw = input.mediaUrl?.trim() ?? existing?.mediaUrl?.trim() ?? "";
   const mergedPartial = {
-    title: input.title.trim(),
+    adminName:
+      typeof input.adminName === "string"
+        ? input.adminName.trim()
+        : existing?.adminName?.trim() ?? "",
+    title: typeof input.title === "string" ? input.title.trim() : existing?.title?.trim() ?? "",
     body: input.body?.trim() ?? existing?.body ?? "",
     mediaUrl: mergedMediaKind === "none" ? "" : mergedMediaUrlRaw,
     mediaKind: mergedMediaKind,
@@ -108,13 +125,19 @@ export async function upsertPromoBanner(input: Partial<PromoBanner> & { title: s
     animation: input.animation ?? existing?.animation ?? "marquee",
     presentation: normalizePresentation(input.presentation ?? existing?.presentation),
     sequenceTransition: normalizeSequenceTransition(input.sequenceTransition ?? existing?.sequenceTransition),
+    sequenceFadeDurationMs: normalizeSequenceFadeDurationMs(
+      input.sequenceFadeDurationMs ?? existing?.sequenceFadeDurationMs
+    ),
     sequenceLoop: input.sequenceLoop ?? existing?.sequenceLoop ?? true,
     frames: normalizePromoFrames(input.frames ?? existing?.frames, mergedPartial),
     ctaBuyLinks: normalizeCtaBuyLinks(input.ctaBuyLinks ?? existing?.ctaBuyLinks),
     ...strip,
+    ctaOffsetX: Math.min(1200, Math.max(-1200, input.ctaOffsetX ?? existing?.ctaOffsetX ?? 0)),
+    ctaOffsetY: Math.min(900, Math.max(-900, input.ctaOffsetY ?? existing?.ctaOffsetY ?? 0)),
     startsAt: input.startsAt ?? existing?.startsAt ?? "",
     endsAt: input.endsAt ?? existing?.endsAt ?? "",
     active: input.active ?? existing?.active ?? true,
+    promoModeEnabled: input.promoModeEnabled ?? existing?.promoModeEnabled ?? true,
     createdAt: existing?.createdAt ?? now,
     updatedAt: now,
   };

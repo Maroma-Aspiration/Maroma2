@@ -15,32 +15,41 @@ export type HeroMarqueeStartInput = {
   productLeftInTrack?: number | null;
   startOffsetCm?: number;
   startOffsetPx?: number;
+  endOffsetCm?: number;
+  endOffsetPx?: number;
   cmToPx?: (cm: number) => number;
 };
 
-/** Hero marquee start X — cm/px offsets apply directly; text may start beyond the track (behind product). */
+/** Hero marquee start X — offsets are from the visible strip, not an off-screen product box. */
 export function computeHeroMarqueeStartX(input: HeroMarqueeStartInput): number {
   const toPx = input.cmToPx ?? ((cm: number) => (cm * 96) / 2.54);
   const startNudgePx = toPx(input.startOffsetCm ?? PROMO_HERO_MARQUEE_START_NUDGE_CM);
   const extraPx = input.startOffsetPx ?? 0;
   const trackWidth = input.trackWidth;
-  const textWidth = input.textWidth;
   const productRight = input.productRightInTrack;
   const productLeft = input.productLeftInTrack ?? 0;
 
-  const trackFallback = trackWidth - startNudgePx + extraPx;
-
-  if (productRight === null || !Number.isFinite(productRight)) {
-    return trackFallback;
+  let base = trackWidth;
+  const productOnTrack =
+    typeof productRight === "number" &&
+    Number.isFinite(productRight) &&
+    productRight > trackWidth * 0.2 &&
+    productRight <= trackWidth * 1.02 &&
+    productLeft < trackWidth;
+  if (productOnTrack) {
+    base = productRight;
   }
 
-  if (productRight <= 0 || productLeft >= trackWidth) {
-    return trackFallback;
-  }
+  // Higher cm moves start further left. Do not clamp to -textWidth; that pins many slider values.
+  return base - startNudgePx + extraPx;
+}
 
-  // Higher cm moves start further left (text emerges sooner from behind the product).
-  const startX = productRight - startNudgePx + extraPx;
-  return Math.max(-textWidth, startX);
+/** Extra shift for the rest/end position only (cm + px from strip center). */
+export function computeHeroMarqueeEndNudge(
+  input: Pick<HeroMarqueeStartInput, "endOffsetCm" | "endOffsetPx" | "cmToPx">
+): number {
+  const toPx = input.cmToPx ?? ((cm: number) => (cm * 96) / 2.54);
+  return toPx(input.endOffsetCm ?? 0) + (input.endOffsetPx ?? 0);
 }
 
 /** Shift applied to both marquee start and end so the whole message moves together. */

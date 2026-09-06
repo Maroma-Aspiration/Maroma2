@@ -14,6 +14,11 @@ export async function POST(request: Request) {
       phone: typeof body.phone === "string" ? body.phone : "",
       country: typeof body.country === "string" ? body.country : "",
       website: typeof body.website === "string" ? body.website : "",
+      gstNumber: typeof body.gstNumber === "string" ? body.gstNumber : "",
+      companyType: typeof body.companyType === "string" ? body.companyType : "",
+      companyAddress: typeof body.companyAddress === "string" ? body.companyAddress : "",
+      instagramUrl: typeof body.instagramUrl === "string" ? body.instagramUrl : "",
+      linkedinUrl: typeof body.linkedinUrl === "string" ? body.linkedinUrl : "",
       message: typeof body.message === "string" ? body.message : "",
     });
     return NextResponse.json({ ok: true, id: application.id });

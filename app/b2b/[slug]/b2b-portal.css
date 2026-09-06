@@ -242,3 +242,158 @@
     text-align: left;
   }
 }
+
+.b2b-catalog-toolbar {
+  margin-bottom: 16px;
+}
+
+.b2b-catalog-filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: center;
+}
+
+.b2b-catalog-filters select {
+  min-width: 148px;
+  padding: 8px 10px;
+  border: 1px solid rgba(19, 74, 87, 0.18);
+  border-radius: 8px;
+  background: #fff;
+  color: var(--ink);
+  font: inherit;
+  font-size: 0.88rem;
+}
+
+.b2b-catalog-quick-tabs {
+  flex-wrap: wrap;
+}
+
+.b2b-catalog-clear {
+  margin-left: 0;
+}
+
+.b2b-catalog-list {
+  display: grid;
+  gap: 0;
+}
+
+.b2b-catalog-row {
+  display: grid;
+  grid-template-columns: 72px minmax(0, 1fr) 120px;
+  gap: 14px;
+  align-items: center;
+  border-top: 1px solid rgba(0, 0, 0, 0.08);
+  padding-top: 12px;
+  padding-bottom: 12px;
+}
+
+.b2b-catalog-row:first-child {
+  border-top: 0;
+  padding-top: 0;
+}
+
+.b2b-catalog-thumb {
+  width: 72px;
+  height: 72px;
+  overflow: hidden;
+  background: #e8f0ec;
+  border-radius: 8px;
+}
+
+.b2b-catalog-thumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.b2b-catalog-copy strong {
+  display: block;
+  margin-bottom: 4px;
+}
+
+.b2b-catalog-meta {
+  display: grid;
+  gap: 2px;
+}
+
+.b2b-catalog-qty {
+  margin: 0;
+}
+
+.b2b-catalog-qty--compact input {
+  width: 100%;
+}
+
+.b2b-catalog-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 14px;
+}
+
+.b2b-catalog-card {
+  display: flex;
+  flex-direction: column;
+  min-height: 100%;
+  border: 1px solid rgba(19, 74, 87, 0.12);
+  border-radius: 12px;
+  background: #fff;
+  overflow: hidden;
+}
+
+.b2b-catalog-card-image {
+  aspect-ratio: 1;
+  display: grid;
+  place-items: center;
+  background: #e8f0ec;
+  overflow: hidden;
+}
+
+.b2b-catalog-card-image img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.b2b-catalog-card-image span {
+  color: rgba(19, 74, 87, 0.35);
+  font-size: 1.4rem;
+}
+
+.b2b-catalog-card-body {
+  display: grid;
+  gap: 10px;
+  padding: 12px;
+}
+
+.b2b-catalog-card-body strong {
+  font-size: 0.95rem;
+  line-height: 1.25;
+}
+
+@media (max-width: 720px) {
+  .b2b-catalog-row {
+    grid-template-columns: 64px minmax(0, 1fr);
+    grid-template-areas:
+      "thumb copy"
+      "qty qty";
+  }
+
+  .b2b-catalog-thumb {
+    grid-area: thumb;
+    width: 64px;
+    height: 64px;
+  }
+
+  .b2b-catalog-copy {
+    grid-area: copy;
+  }
+
+  .b2b-catalog-row .b2b-catalog-qty {
+    grid-area: qty;
+  }
+
+  .b2b-catalog-grid {
+    grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+  }
+}

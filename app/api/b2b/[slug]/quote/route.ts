@@ -59,7 +59,7 @@ export async function POST(request: Request, ctx: Ctx) {
   if (minSpend > 0 && subtotalInr < minSpend) {
     return NextResponse.json(
       {
-        error: `White-label quotes need a minimum of ₹${minSpend.toLocaleString("en-IN")}.`,
+        error: `Full catalogue orders need a minimum of ₹${minSpend.toLocaleString("en-IN")}.`,
         code: "min_spend",
         minSpendInr: minSpend,
         subtotalInr,

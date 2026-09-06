@@ -10,6 +10,7 @@ export type { ProductRecord } from "./product-types";
 export type ProductOverride = {
   imageUrl?: string;
   images?: string[];
+  videos?: string[];
   updatedAt: string;
 };
 
@@ -34,9 +35,13 @@ const readJson = async <T>(filePath: string, fallback: T): Promise<T> => {
 const cleanText = (text: string | null | undefined): string => {
   if (!text) return "";
   return text
+    // Legacy short descriptions append a heading followed by ingredient-only
+    // lines. Keep that information in the dedicated PDP ingredient sections.
+    .replace(/(?:^|\n)\s*KEY\s+INGREDIENTS\b[\s\S]*$/gi, "")
     .replace(/\\n\s*KEY INGREDIENTS\s*\\n/gi, "")
     .replace(/\n\s*KEY INGREDIENTS\s*\n/gi, "")
     .replace(/KEY INGREDIENTS/gi, "")
+    .replace(/\s*not\s+for\s+sale\s+in\s+the\s+uk\s+and\s+channel\s+islands\.?\s*/gi, " ")
     .trim();
 };
 
@@ -47,6 +52,7 @@ export const readProducts = async (): Promise<ProductRecord[]> => {
     const normalized = normalizeProductInciFields(product).product;
     return {
       ...normalized,
+      ukAndChannelIslandsRestricted: /not\s+for\s+sale\s+in\s+the\s+uk\s+and\s+channel\s+islands/i.test(`${normalized.shortDescription}\n${normalized.description}`),
       shortDescription: cleanText(normalized.shortDescription),
       description: cleanText(normalized.description),
     };
@@ -86,7 +92,8 @@ export const withOverrides = (
     return {
       ...product,
       imageUrl: override.imageUrl ?? product.imageUrl,
-      images: override.images && override.images.length > 0 ? override.images : product.images
+      images: override.images && override.images.length > 0 ? override.images : product.images,
+      videos: override.videos ?? product.videos
     };
   });
 };

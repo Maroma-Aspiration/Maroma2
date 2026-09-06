@@ -40,7 +40,7 @@ export function SiteFooter() {
         ? { href: "/newsletter?edit=1", label: "Newsletter" }
         : user
           ? { href: "/account", label: "Account" }
-          : { href: loginHref, label: "Login" };
+          : { href: loginHref, label: "Sign in" };
 
   return (
     <footer

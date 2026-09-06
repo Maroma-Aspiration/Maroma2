@@ -2,10 +2,11 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { defaultWideBannerLayout } from "../../lib/category-banner-defaults";
 import type { ResolvedCategoryBanner } from "../../lib/category-banner-types";
-import { ADMIN_DRAG_STORAGE_KEY, useAdminSession } from "../../lib/use-admin-session";
+import { prepareBannerImageFile } from "../../lib/prepare-banner-image-file";
+import { useAdminSession } from "../../lib/use-admin-session";
 
 function clamp(n: number, min: number, max: number): number {
   return Math.min(max, Math.max(min, n));
@@ -75,13 +76,24 @@ export function CategoryHeroWithAdmin({
   italicTagline = false
 }: CategoryHeroWithAdminProps) {
   const router = useRouter();
-  const { adminModeEnabled: admin } = useAdminSession();
+  const { isAdminUser } = useAdminSession();
   const isMobileCategoryHero = useMobileCategoryHero();
   const [drawerOpen, setDrawerOpen] = useState(false);
+  const [drawerOffsetX, setDrawerOffsetX] = useState(0);
+  const drawerDragStart = useRef<{ pointerX: number; offsetX: number } | null>(null);
+  const bannerMediaRef = useRef<HTMLDivElement>(null);
+  const copyDragStart = useRef<{ pointerX: number; pointerY: number; left: number; bottom: number } | null>(null);
+  const [copyLeftPct, setCopyLeftPct] = useState(resolved.copyLeftPct);
+  const [copyBottomPct, setCopyBottomPct] = useState(resolved.copyBottomPct);
+  const copyPositionRef = useRef({ left: resolved.copyLeftPct, bottom: resolved.copyBottomPct });
+  const [copyDragging, setCopyDragging] = useState(false);
   const [imageUrl, setImageUrl] = useState(resolved.imageUrl);
+  const [pendingImage, setPendingImage] = useState<File | null>(null);
+  const [pendingImagePreviewUrl, setPendingImagePreviewUrl] = useState<string | null>(null);
   const [heroTitle, setHeroTitle] = useState(resolved.heroTitle);
   const [heroTagline, setHeroTagline] = useState(resolved.heroTagline);
   const [objectPosition, setObjectPosition] = useState(resolved.objectPosition);
+  const [imageScale, setImageScale] = useState(resolved.imageScale);
   const [minHeight, setMinHeight] = useState(resolved.minHeight);
   const [maxHeight, setMaxHeight] = useState(resolved.maxHeight);
   const [thumbMaxWidth, setThumbMaxWidth] = useState(resolved.thumbMaxWidth);
@@ -89,19 +101,45 @@ export function CategoryHeroWithAdmin({
   const [posY, setPosY] = useState(() => parseObjectPosition(resolved.objectPosition).y);
   const [status, setStatus] = useState("");
   const [busy, setBusy] = useState(false);
+  const [saveSucceeded, setSaveSucceeded] = useState(false);
 
   useEffect(() => {
+    if (pendingImage) {
+      return;
+    }
     setImageUrl(resolved.imageUrl);
     setHeroTitle(resolved.heroTitle);
     setHeroTagline(resolved.heroTagline);
     setObjectPosition(resolved.objectPosition);
+    setImageScale(resolved.imageScale);
     setMinHeight(resolved.minHeight);
     setMaxHeight(resolved.maxHeight);
     setThumbMaxWidth(resolved.thumbMaxWidth);
+    setCopyLeftPct(resolved.copyLeftPct);
+    setCopyBottomPct(resolved.copyBottomPct);
+    copyPositionRef.current = { left: resolved.copyLeftPct, bottom: resolved.copyBottomPct };
     const p = parseObjectPosition(resolved.objectPosition);
     setPosX(p.x);
     setPosY(p.y);
-  }, [resolved]);
+  }, [
+    pendingImage,
+    resolved.heroTagline,
+    resolved.heroTitle,
+    resolved.imageScale,
+    resolved.imageUrl,
+    resolved.maxHeight,
+    resolved.minHeight,
+    resolved.objectPosition,
+    resolved.thumbMaxWidth,
+    resolved.copyLeftPct,
+    resolved.copyBottomPct,
+  ]);
+
+  useEffect(() => {
+    return () => {
+      if (pendingImagePreviewUrl) URL.revokeObjectURL(pendingImagePreviewUrl);
+    };
+  }, [pendingImagePreviewUrl]);
 
   useEffect(() => {
     setObjectPosition(`${Math.round(posX)}% ${Math.round(posY)}%`);
@@ -120,12 +158,15 @@ export function CategoryHeroWithAdmin({
     return () => window.removeEventListener("keydown", onKey);
   }, [drawerOpen]);
 
-  const showEditor = admin && Boolean(imageUrl);
+  const showEditor = isAdminUser && Boolean(imageUrl);
   const heroMods = `${wideCover ? "category-hero--wide" : ""} ${splitThumb ? "category-hero--split" : ""}`.trim();
   const bannerObjectPosition =
     wideCover && slug === "face-care" && isMobileCategoryHero
       ? faceCareMobileObjectPosition(objectPosition)
       : objectPosition;
+  // Mobile banners historically receive a small crop zoom; retain it while
+  // letting the admin slider control the underlying scale.
+  const renderedImageScale = (imageScale / 100) * (isMobileCategoryHero ? 1.1 : 1);
 
   const backLink = (
     <Link href="/?skipIntro=1" className="category-back">
@@ -133,24 +174,83 @@ export function CategoryHeroWithAdmin({
     </Link>
   );
 
+  const persistCopyPosition = async (left: number, bottom: number) => {
+    try {
+      const response = await fetch("/api/category-banners", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          slug,
+          patch: {
+            copyLeftPct: Math.round(left),
+            copyBottomPct: Math.round(bottom)
+          }
+        })
+      });
+      if (!response.ok) {
+        throw new Error(await readApiError(response, "Could not save headline position."));
+      }
+    } catch (error) {
+      setStatus((error as Error).message ?? "Could not save headline position.");
+      window.setTimeout(() => setStatus(""), 3200);
+    }
+  };
+
+  const onCopyDragStart = (event: React.PointerEvent<HTMLDivElement>) => {
+    if (!showEditor || !wideCover) {
+      return;
+    }
+    event.preventDefault();
+    copyDragStart.current = {
+      pointerX: event.clientX,
+      pointerY: event.clientY,
+      left: copyLeftPct,
+      bottom: copyBottomPct
+    };
+    setCopyDragging(true);
+    event.currentTarget.setPointerCapture(event.pointerId);
+  };
+
+  const onCopyDragMove = (event: React.PointerEvent<HTMLDivElement>) => {
+    if (!copyDragStart.current || !bannerMediaRef.current) {
+      return;
+    }
+    const rect = bannerMediaRef.current.getBoundingClientRect();
+    const deltaLeftPct = ((event.clientX - copyDragStart.current.pointerX) / rect.width) * 100;
+    const deltaBottomPct = (-(event.clientY - copyDragStart.current.pointerY) / rect.height) * 100;
+    const nextLeft = clamp(copyDragStart.current.left + deltaLeftPct, 0, 90);
+    const nextBottom = clamp(copyDragStart.current.bottom + deltaBottomPct, 0, 90);
+    copyPositionRef.current = { left: nextLeft, bottom: nextBottom };
+    setCopyLeftPct(nextLeft);
+    setCopyBottomPct(nextBottom);
+  };
+
+  const onCopyDragEnd = (event: React.PointerEvent<HTMLDivElement>) => {
+    if (!copyDragStart.current) {
+      return;
+    }
+    copyDragStart.current = null;
+    setCopyDragging(false);
+    event.currentTarget.releasePointerCapture(event.pointerId);
+    void persistCopyPosition(copyPositionRef.current.left, copyPositionRef.current.bottom);
+  };
+
+  const copyMaxWidth = `min(540px, calc(${Math.max(8, 98 - copyLeftPct)}% - 20px))`;
+
   const wideCoverTextPill = (
-    <div className="category-hero-text-pill">
-      <Link href="/?skipIntro=1" className="category-hero-pill-home" aria-label="Home">
-        <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
-          <path
-            d="M5.5 10.5 12 5l6.5 5.5V18a1.5 1.5 0 0 1-1.5 1.5H7A1.5 1.5 0 0 1 5.5 18v-7.5Z"
-            stroke="currentColor"
-            strokeWidth="1.5"
-            strokeLinejoin="round"
-          />
-          <path
-            d="M10 19.5V13a2 2 0 0 1 2-2h0a2 2 0 0 1 2 2v6.5"
-            stroke="currentColor"
-            strokeWidth="1.5"
-            strokeLinecap="round"
-          />
-        </svg>
-      </Link>
+    <div
+      className={`category-hero-text-pill${showEditor ? " category-hero-text-pill--draggable" : ""}${copyDragging ? " category-hero-text-pill--dragging" : ""}`}
+      style={{
+        left: `${copyLeftPct}%`,
+        bottom: `${copyBottomPct}%`,
+        maxWidth: copyMaxWidth
+      }}
+      onPointerDown={showEditor ? onCopyDragStart : undefined}
+      onPointerMove={showEditor ? onCopyDragMove : undefined}
+      onPointerUp={showEditor ? onCopyDragEnd : undefined}
+      onPointerCancel={showEditor ? onCopyDragEnd : undefined}
+      title={showEditor ? "Drag to reposition headline" : undefined}
+    >
       <span className="category-hero-pill-eyebrow eyebrow">Maroma Collection</span>
       <h1 className="category-hero-pill-title">{heroTitle}</h1>
       <p className={`category-hero-pill-tagline${italicTagline ? " category-hero-tagline" : ""}`}>{heroTagline}</p>
@@ -167,59 +267,71 @@ export function CategoryHeroWithAdmin({
 
   const heroCopy = wideCover ? wideCoverTextPill : defaultHeroCopy;
 
+  const readApiError = async (response: Response, fallback: string): Promise<string> => {
+    const data = (await response.json().catch(() => null)) as { error?: string } | null;
+    return data?.error || fallback;
+  };
+
+  const uploadImage = async (file: File, patch: Record<string, string | number>): Promise<string> => {
+    const prepared = await prepareBannerImageFile(file);
+    const formData = new FormData();
+    formData.set("slug", slug);
+    formData.set("image", prepared);
+    formData.set("patch", JSON.stringify(patch));
+    const response = await fetch("/api/category-banners/upload", {
+      method: "POST",
+      body: formData,
+    });
+    const data = (await response.json().catch(() => null)) as { imageUrl?: string; error?: string } | null;
+    if (!response.ok || !data?.imageUrl) {
+      throw new Error(data?.error ?? "Image upload failed");
+    }
+    return data.imageUrl;
+  };
+
   const savePatch = async (patch: Record<string, string | number>) => {
     setBusy(true);
     setStatus("");
+    setSaveSucceeded(false);
     try {
-      const response = await fetch("/api/category-banners", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ slug, patch })
-      });
-      const data = (await response.json()) as { error?: string };
-      if (!response.ok) {
-        throw new Error(data.error ?? "Save failed");
+      const nextImageUrl = pendingImage ? await uploadImage(pendingImage, patch) : imageUrl;
+      const response = pendingImage
+        ? null
+        : await fetch("/api/category-banners", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ slug, patch })
+          });
+      if (response && !response.ok) {
+        throw new Error(await readApiError(response, "Save failed"));
       }
-      setStatus("Saved.");
+      if (nextImageUrl) setImageUrl(nextImageUrl);
+      setPendingImage(null);
+      setPendingImagePreviewUrl(null);
+      setSaveSucceeded(true);
+      setStatus("Banner saved successfully.");
       router.refresh();
     } catch (error) {
       setStatus((error as Error).message ?? "Save failed.");
     } finally {
       setBusy(false);
-      window.setTimeout(() => setStatus(""), 3200);
+      window.setTimeout(() => {
+        setStatus("");
+        setSaveSucceeded(false);
+      }, 3200);
     }
   };
 
-  const onUpload = async (file: File | null) => {
+  const onSelectImage = (file: File | null) => {
     if (!file) {
       return;
     }
-    setBusy(true);
-    setStatus("");
-    try {
-      const formData = new FormData();
-      formData.set("slug", slug);
-      formData.set("image", file);
-      const response = await fetch("/api/category-banners/upload", {
-        method: "POST",
-        body: formData
-      });
-      const data = (await response.json()) as { imageUrl?: string; error?: string };
-      if (!response.ok) {
-        throw new Error(data.error ?? "Upload failed");
-      }
-      if (data.imageUrl) {
-        setImageUrl(data.imageUrl);
-      }
-      setStatus("Image uploaded.");
-      router.refresh();
-    } catch (error) {
-      setStatus((error as Error).message ?? "Upload failed.");
-    } finally {
-      setBusy(false);
-      window.setTimeout(() => setStatus(""), 3200);
-    }
+    setPendingImage(file);
+    setPendingImagePreviewUrl(URL.createObjectURL(file));
+    setStatus("New image ready. Save text & layout to apply it.");
   };
+
+  const displayImageUrl = pendingImagePreviewUrl ?? imageUrl;
 
   const resetOverrides = async () => {
     if (!window.confirm("Reset this category banner to catalog defaults?")) {
@@ -249,16 +361,38 @@ export function CategoryHeroWithAdmin({
   };
 
   const openDrawer = () => {
-    if (!admin || window.localStorage.getItem(ADMIN_DRAG_STORAGE_KEY) !== "true") {
-      window.alert(
-        'Turn on admin mode from the homepage using the floating "Admin" control, then return here.'
-      );
+    if (!isAdminUser) {
       return;
     }
     setDrawerOpen(true);
   };
 
-  if (!imageUrl) {
+  const onDrawerDragStart = (event: React.PointerEvent<HTMLDivElement>) => {
+    if ((event.target as HTMLElement).closest("button")) return;
+    drawerDragStart.current = { pointerX: event.clientX, offsetX: drawerOffsetX };
+    event.currentTarget.setPointerCapture(event.pointerId);
+  };
+
+  const onDrawerDragMove = (event: React.PointerEvent<HTMLDivElement>) => {
+    if (!drawerDragStart.current) return;
+    // Keep at least a practical editor width on screen, while allowing the
+    // drawer to move left and back to its normal right-hand position.
+    const minOffset = -(window.innerWidth - 320);
+    const next = clamp(
+      drawerDragStart.current.offsetX + event.clientX - drawerDragStart.current.pointerX,
+      minOffset,
+      0,
+    );
+    setDrawerOffsetX(next);
+  };
+
+  const onDrawerDragEnd = (event: React.PointerEvent<HTMLDivElement>) => {
+    if (!drawerDragStart.current) return;
+    drawerDragStart.current = null;
+    event.currentTarget.releasePointerCapture(event.pointerId);
+  };
+
+  if (!displayImageUrl) {
     return (
       <header
         className={`category-hero ${heroMods}`}
@@ -290,6 +424,7 @@ export function CategoryHeroWithAdmin({
       >
         {wideCover ? (
           <div
+            ref={bannerMediaRef}
             className="category-hero-wide-media category-banner-admin-target"
             style={{ minHeight, maxHeight }}
           >
@@ -305,9 +440,12 @@ export function CategoryHeroWithAdmin({
             ) : null}
             <img
               className="category-hero-wide-img"
-              src={imageUrl}
+              src={displayImageUrl}
               alt={`${categoryLabel} collection — Maroma`}
-              style={{ objectPosition: bannerObjectPosition }}
+              style={{
+                objectPosition: bannerObjectPosition,
+                transform: `scale(${renderedImageScale})`,
+              }}
             />
             <div className="category-hero-copy category-hero-copy--overlay">{heroCopy}</div>
           </div>
@@ -329,7 +467,7 @@ export function CategoryHeroWithAdmin({
                 </button>
               ) : null}
               <img
-                src={imageUrl}
+                src={displayImageUrl}
                 alt={`${categoryLabel} | Maroma Collection`}
                 style={splitThumb ? { maxWidth: thumbMaxWidth } : undefined}
               />
@@ -351,10 +489,23 @@ export function CategoryHeroWithAdmin({
             role="dialog"
             aria-label="Category banner editor"
             aria-modal="true"
+            style={{ transform: `translateX(${drawerOffsetX}px)` }}
           >
-            <div className="category-banner-drawer-head">
+            <div
+              className="category-banner-drawer-head category-banner-drawer-drag-handle"
+              onPointerDown={onDrawerDragStart}
+              onPointerMove={onDrawerDragMove}
+              onPointerUp={onDrawerDragEnd}
+              onPointerCancel={onDrawerDragEnd}
+              title="Drag left or right to move this editor"
+            >
               <h2 className="category-banner-drawer-title">Banner · {categoryLabel}</h2>
-              <button type="button" className="category-banner-drawer-close" onClick={() => setDrawerOpen(false)}>
+              <button
+                type="button"
+                className="category-banner-drawer-close"
+                onPointerDown={(event) => event.stopPropagation()}
+                onClick={() => setDrawerOpen(false)}
+              >
                 Close
               </button>
             </div>
@@ -366,7 +517,7 @@ export function CategoryHeroWithAdmin({
                   type="file"
                   accept="image/*"
                   disabled={busy}
-                  onChange={(event) => void onUpload(event.target.files?.[0] ?? null)}
+                  onChange={(event) => onSelectImage(event.target.files?.[0] ?? null)}
                 />
               </label>
 
@@ -381,17 +532,37 @@ export function CategoryHeroWithAdmin({
                   value={heroTagline}
                   onChange={(event) => setHeroTagline(event.target.value)}
                   disabled={busy}
-                  rows={3}
+                  rows={4}
                 />
+                <small className="category-banner-field-hint">Press Enter for a line break on the banner.</small>
               </label>
 
               {wideCover ? (
                 <>
                   <div className="category-banner-field">
-                    <span>Focal point (crop)</span>
+                    <span>Banner crop</span>
+                    <div className="category-banner-live-preview" aria-label="Live banner preview">
+                      <img
+                        src={displayImageUrl}
+                        alt="Live banner crop preview"
+                        style={{ objectPosition: bannerObjectPosition, transform: `scale(${renderedImageScale})` }}
+                      />
+                      <span>Live preview · {imageScale}% · X {Math.round(posX)}% · Y {Math.round(posY)}%</span>
+                    </div>
                     <div className="category-banner-slider-row">
                       <label>
-                        Horizontal
+                        Scale ({imageScale}%)
+                        <input
+                          type="range"
+                          min={50}
+                          max={300}
+                          value={imageScale}
+                          onChange={(event) => setImageScale(Number(event.target.value))}
+                          disabled={busy}
+                        />
+                      </label>
+                      <label>
+                        X ({Math.round(posX)}%)
                         <input
                           type="range"
                           min={0}
@@ -402,7 +573,7 @@ export function CategoryHeroWithAdmin({
                         />
                       </label>
                       <label>
-                        Vertical
+                        Y ({Math.round(posY)}%)
                         <input
                           type="range"
                           min={0}
@@ -413,7 +584,9 @@ export function CategoryHeroWithAdmin({
                         />
                       </label>
                     </div>
-                    <code className="category-banner-code">{objectPosition}</code>
+                    <code className="category-banner-code">
+                      Scale {imageScale}% · X {Math.round(posX)}% · Y {Math.round(posY)}%
+                    </code>
                   </div>
 
                   <label className="category-banner-field">
@@ -493,27 +666,34 @@ export function CategoryHeroWithAdmin({
               <div className="category-banner-actions">
                 <button
                   type="button"
-                  className="category-banner-btn primary"
+                  className={`category-banner-btn primary${saveSucceeded ? " is-success" : ""}`}
                   disabled={busy}
                   onClick={() =>
                     void savePatch({
                       heroTitle,
                       heroTagline,
                       ...(wideCover
-                        ? { objectPosition, minHeight, maxHeight }
+                        ? {
+                            objectPosition,
+                            imageScale,
+                            minHeight,
+                            maxHeight,
+                            copyLeftPct: Math.round(copyLeftPct),
+                            copyBottomPct: Math.round(copyBottomPct)
+                          }
                         : { thumbMaxWidth })
                     })
                   }
                 >
-                  {busy ? "Saving…" : "Save text & layout"}
+                  {busy ? "Saving…" : saveSucceeded ? "Saved ✓" : "Save banner changes"}
                 </button>
                 <button type="button" className="category-banner-btn" disabled={busy} onClick={() => void resetOverrides()}>
                   Reset all overrides
                 </button>
               </div>
               <p className="category-banner-hint">
-                Admin mode uses the same toggle as the homepage (`{ADMIN_DRAG_STORAGE_KEY}` in local storage). API routes
-                are open on this staging build. Do not expose publicly without authentication.
+                Drag the headline on the banner to reposition it. Banner controls are available to signed-in administrators.
+                API routes are open on this staging build. Do not expose publicly without authentication.
               </p>
             </div>
           </aside>

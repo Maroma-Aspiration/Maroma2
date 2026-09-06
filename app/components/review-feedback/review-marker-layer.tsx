@@ -15,7 +15,7 @@ const PAGE_TITLES: Record<string, string> = {
   stores: "Stores",
   rituals: "Rituals",
   gifting: "Gifting",
-  review: "Review export",
+  review: "Review report",
   special: "Special",
   search: "Search",
   b2b: "B2B",
@@ -144,7 +144,7 @@ export function ReviewFeedbackBar() {
         Add page note
       </button>
       <a href="/review" className="review-feedback-bar-outline">
-        Export ({review.items.length})
+        Report ({review.items.length})
       </a>
     </div>
   );

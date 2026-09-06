@@ -11,9 +11,15 @@ export type CategoryBannerOverride = {
   /** Homepage collection tile zoom (`background-size`, 100 = cover). */
   cardBackgroundScale?: number;
   objectPosition?: string;
+  /** Wide category-banner zoom, as a percentage (100 = natural cover size). */
+  imageScale?: number;
   minHeight?: string;
   maxHeight?: string;
   thumbMaxWidth?: number;
+  /** Wide-banner headline position (% from left edge). */
+  copyLeftPct?: number;
+  /** Wide-banner headline position (% from bottom edge). */
+  copyBottomPct?: number;
   updatedAt?: string;
 };
 
@@ -26,9 +32,12 @@ export type ResolvedCategoryBanner = {
   heroTitle: string;
   heroTagline: string;
   objectPosition: string;
+  imageScale: number;
   minHeight: string;
   maxHeight: string;
   thumbMaxWidth: number;
+  copyLeftPct: number;
+  copyBottomPct: number;
 };
 
 export type ResolvedCategoryCard = {

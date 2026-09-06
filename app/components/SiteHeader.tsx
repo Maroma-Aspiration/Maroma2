@@ -1,7 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { CompactShopNavigation } from "./CompactShopNavigation";
+import { usePathname, useRouter } from "next/navigation";
 import {
   forwardRef,
   useCallback,
@@ -14,8 +15,8 @@ import {
   type MouseEventHandler,
 } from "react";
 import { useCart } from "../../context/CartContext";
-import { CurrencySelector } from "./CurrencySelector";
 import { contentStorageKey, siteContent, type SiteContent } from "../content";
+import { mergeNavWithDefaults } from "../../lib/site-content-api";
 import { getNavHref } from "../../lib/catalog-categories";
 import {
   getMaromaMobileViewportMatches,
@@ -33,6 +34,50 @@ type NavScrollItem =
 
 const SPA_BOOKING_URL = "https://www.themaromaspa.com/register?next=/booking";
 const MAROMA_EXPERIENCES_URL = "https://www.maromaexperience.com";
+
+function NavSearchBar({
+  className = "",
+  compact = false,
+}: {
+  className?: string;
+  compact?: boolean;
+}) {
+  const router = useRouter();
+  const [query, setQuery] = useState("");
+
+  return (
+    <form
+      className={`nav-search-bar${compact ? " nav-search-bar--compact" : ""}${className ? ` ${className}` : ""}`.trim()}
+      action="/search"
+      method="get"
+      role="search"
+      onSubmit={(event) => {
+        event.preventDefault();
+        const nextQuery = query.trim();
+        router.push(nextQuery ? `/search?q=${encodeURIComponent(nextQuery)}` : "/search");
+      }}
+      onPointerDown={(event) => event.stopPropagation()}
+      onClick={(event) => event.stopPropagation()}
+    >
+      <svg className="nav-search-bar-icon" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+        <path
+          d="M10.5 3a7.5 7.5 0 015.92 12.08l4.35 4.35-1.42 1.42-4.35-4.35A7.5 7.5 0 1110.5 3zm0 2a5.5 5.5 0 100 11 5.5 5.5 0 000-11z"
+          fill="currentColor"
+        />
+      </svg>
+      <input
+        type="search"
+        name="q"
+        value={query}
+        onChange={(event) => setQuery(event.target.value)}
+        placeholder="Search"
+        aria-label="Search products"
+        autoComplete="off"
+        enterKeyHint="search"
+      />
+    </form>
+  );
+}
 
 const NAV_IMG_STYLE = {
   display: "block",
@@ -128,7 +173,8 @@ export function SiteHeader({ initialNav, initialViewportIsMobile = false }: Site
   const isMobileNav = navLayoutReady ? viewportIsMobile : initialViewportIsMobile;
   const [activeNavIndex, setActiveNavIndex] = useState(0);
   const { brand, nav } = navContent;
-  const navItems = useMemo(() => [...nav, "Newsletter", "Maroma Experiences"], [nav]);
+  const normalizedNav = useMemo(() => mergeNavWithDefaults(nav), [nav]);
+  const navItems = useMemo(() => [...normalizedNav, "Newsletter", "Maroma Experiences"], [normalizedNav]);
   const lastScrollY = useRef(0);
   const navLinksRef = useRef<HTMLDivElement>(null);
   const scrollItemRefs = useRef<(HTMLElement | null)[]>([]);
@@ -218,7 +264,7 @@ export function SiteHeader({ initialNav, initialViewportIsMobile = false }: Site
     }
     try {
       const parsed = JSON.parse(stored) as SiteContent;
-      setNavContent({ brand: parsed.brand, nav: parsed.nav });
+      setNavContent({ brand: parsed.brand, nav: mergeNavWithDefaults(parsed.nav) });
     } catch {
       setNavContent({ brand: siteContent.brand, nav: siteContent.nav });
     }
@@ -230,7 +276,7 @@ export function SiteHeader({ initialNav, initialViewportIsMobile = false }: Site
       if (response.ok) {
         const payload = (await response.json()) as { content?: SiteContent | null };
         if (payload.content) {
-          setNavContent({ brand: payload.content.brand, nav: payload.content.nav });
+          setNavContent({ brand: payload.content.brand, nav: mergeNavWithDefaults(payload.content.nav) });
           try {
             window.localStorage.setItem(contentStorageKey, JSON.stringify(payload.content));
           } catch {
@@ -640,7 +686,6 @@ export function SiteHeader({ initialNav, initialViewportIsMobile = false }: Site
             <Link href="/account" className="nav-b2b-account">
               Account
             </Link>
-            <CurrencySelector compact />
           </div>
         </nav>
       </header>
@@ -648,126 +693,15 @@ export function SiteHeader({ initialNav, initialViewportIsMobile = false }: Site
   }
 
   return (
-    <header
-      className={`site-header site-header-responsive${scrolled ? " site-header-solid" : ""}${navLiftUp ? " site-header-lift" : ""}`}
-      data-review="Site header"
-      data-review-id="site-header"
-      data-review-files="app/components/SiteHeader.tsx"
-    >
-      {isMobileNav ? (
-        <div className="maroma-nav-shell maroma-nav-shell--mobile">
-          <nav className={`nav nav-mobile ${navStateClass}`}>
-            <div className="nav-mobile-brand-row">
-              <Link href="/?skipIntro=1" className="brand" aria-label={`${brand} home`}>
-                <NavImg src="/nav-maroma-logo.png" alt={brand} className="brand-logo" width={160} height={22} />
-              </Link>
-              <div className="nav-basket-slot nav-basket-slot--inline" aria-label="Basket">
-                {basketLink}
-              </div>
-            </div>
-            <div
-              ref={navLinksRef}
-              className="nav-links nav-links-carousel"
-              role="navigation"
-              aria-label="Site sections"
-              onPointerDown={onCarouselPointerDown}
-              onPointerMove={onCarouselPointerMove}
-              onPointerUp={endCarouselDrag}
-              onPointerCancel={endCarouselDrag}
-            >
-              {carouselDomItems.map((item, domIndex) => {
-                const logicalIndex = scrollItems.length > 0 ? domIndex % scrollItems.length : domIndex;
-                const loopPass = scrollItems.length > 0 ? Math.floor(domIndex / scrollItems.length) : 0;
-                const centered = logicalIndex === activeNavIndex;
-                const itemKey = `${item.key}-loop-${loopPass}`;
-
-                if (item.kind === "link") {
-                  return (
-                    <Link
-                      key={itemKey}
-                      href={item.href}
-                      className={`nav-scroll-item${centered ? " is-centered" : ""}`}
-                      ref={(el) => {
-                        scrollItemRefs.current[domIndex] = el;
-                      }}
-                      onClick={onCarouselItemClick(logicalIndex)}
-                      aria-hidden={loopPass > 0 ? true : undefined}
-                      tabIndex={loopPass > 0 ? -1 : undefined}
-                    >
-                      {item.label === "Maroma Experiences" ? (
-                        <NavImg
-                          src="/nav-maroma-experiences.png"
-                          alt="Maroma Experiences"
-                          className="nav-experiences-logo"
-                          width={132}
-                          height={30}
-                        />
-                      ) : (
-                        item.label
-                      )}
-                    </Link>
-                  );
-                }
-
-                return (
-                  <SpaBookRollLink
-                    key={itemKey}
-                    carousel
-                    className={`nav-scroll-spa-logo nav-scroll-item${centered ? " is-centered" : ""}`}
-                    ref={(el) => {
-                      scrollItemRefs.current[domIndex] = el;
-                    }}
-                    aria-hidden={loopPass > 0 ? true : undefined}
-                    tabIndex={loopPass > 0 ? -1 : undefined}
-                    onClick={(event) => {
-                      if (dragState.current.moved) {
-                        event.preventDefault();
-                        dragState.current.moved = false;
-                      }
-                    }}
-                  />
-                );
-              })}
-            </div>
-          </nav>
-        </div>
-      ) : (
-        <div className="maroma-nav-shell maroma-nav-shell--desktop">
-          <nav className={`nav ${navStateClass}`}>
-            <Link href="/?skipIntro=1" className="brand" aria-label={`${brand} home`}>
-              <NavImg src="/nav-maroma-logo.png" alt={brand} className="brand-logo" width={160} height={22} />
-            </Link>
-            <div className="nav-links">{desktopNavLinks}</div>
-            <div className="nav-end">
-              <a
-                href={MAROMA_EXPERIENCES_URL}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="nav-experiences-link"
-                aria-label="Visit Maroma Experiences"
-              >
-                <NavImg src="/nav-maroma-experiences.png" alt="Maroma Experiences" width={132} height={25} />
-              </a>
-              <div className="spa-cta-wrap">
-                <NavImg src="/nav-spa-logo.png" alt="Maroma Spa" className="spa-book-logo" width={86} height={36} />
-                <a
-                  className="spa-book-btn"
-                  href={SPA_BOOKING_URL}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  aria-label="Book Maroma Spa"
-                >
-                  <span className="spa-book-text">BOOK NOW</span>
-                </a>
-              </div>
-              <div className="nav-basket-slot nav-basket-slot--inline-desktop" aria-label="Basket">
-                {basketLink}
-              </div>
-              <CurrencySelector compact />
-            </div>
-          </nav>
-        </div>
-      )}
+    <header className={`site-header site-header-responsive compact-store-header${scrolled ? " site-header-solid" : ""}`}>
+      <nav className={`compact-store-nav ${navStateClass}`} aria-label="Main navigation">
+        <Link href="/?skipIntro=1" className="brand" aria-label={`${brand} home`}>
+          <NavImg src="/nav-maroma-logo.png" alt={brand} className="brand-logo" width={160} height={22} />
+        </Link>
+        <CompactShopNavigation experiencesUrl={MAROMA_EXPERIENCES_URL} spaUrl={SPA_BOOKING_URL} />
+        <div className="compact-store-search"><NavSearchBar compact /></div>
+        <div className="compact-store-basket">{basketLink}</div>
+      </nav>
     </header>
   );
 }

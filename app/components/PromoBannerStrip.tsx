@@ -11,8 +11,14 @@ type PromoBannerStripProps = {
   /** When false, banners render as non-links (admin drag/preview). */
   linkable?: boolean;
   variant?: "default" | "hero";
-  /** Hold hero marquee at start position while editing offsets. */
+  /** Hold hero marquee at start or end position while editing offsets. */
+  /** Hold playback on frame 0 until Start (homepage preview iframe). */
+  startHeld?: boolean;
+  /** Hold marquee at start/end while editing offsets in admin. */
   marqueePreviewStart?: boolean;
+  marqueePreviewMode?: "start" | "end";
+  ctaDraggable?: boolean;
+  onCtaPositionChange?: (position: { x: number; y: number }) => void;
 };
 
 export function PromoBannerStrip({
@@ -20,7 +26,11 @@ export function PromoBannerStrip({
   className = "",
   linkable = true,
   variant = "default",
+  startHeld = false,
   marqueePreviewStart = false,
+  marqueePreviewMode = "start",
+  ctaDraggable = false,
+  onCtaPositionChange,
 }: PromoBannerStripProps) {
   const [banners, setBanners] = useState(initialBanners);
 
@@ -59,7 +69,12 @@ export function PromoBannerStrip({
           banner={banner}
           linkable={linkable}
           variant={variant}
+          startHeld={startHeld}
           marqueePreviewStart={marqueePreviewStart}
+          marqueePreviewMode={marqueePreviewMode}
+          rememberStripVideoSeen={linkable && variant === "hero"}
+          ctaDraggable={ctaDraggable}
+          onCtaPositionChange={onCtaPositionChange}
         />
       ))}
     </div>
@@ -73,6 +88,10 @@ type HeroPromoBannerProps = {
   onPointerDown?: PointerEventHandler<HTMLDivElement>;
   onPointerMove?: PointerEventHandler<HTMLDivElement>;
   onPointerUp?: PointerEventHandler<HTMLDivElement>;
+  marqueePreviewMode?: "start" | "end";
+  holdMarquee?: boolean;
+  ctaDraggable?: boolean;
+  onCtaPositionChange?: (position: { x: number; y: number }) => void;
 };
 
 export function HeroPromoBanner({
@@ -82,6 +101,10 @@ export function HeroPromoBanner({
   onPointerDown,
   onPointerMove,
   onPointerUp,
+  marqueePreviewMode = "start",
+  holdMarquee = false,
+  ctaDraggable = false,
+  onCtaPositionChange,
 }: HeroPromoBannerProps) {
   const stripStyle =
     initialBanners.length > 0 ? promoStripStyleVars(initialBanners[0]) : undefined;
@@ -101,7 +124,11 @@ export function HeroPromoBanner({
         initialBanners={initialBanners}
         linkable={!editable}
         variant="hero"
+        startHeld={holdMarquee}
         marqueePreviewStart={editable}
+        marqueePreviewMode={marqueePreviewMode}
+        ctaDraggable={ctaDraggable}
+        onCtaPositionChange={onCtaPositionChange}
       />
     </div>
   );

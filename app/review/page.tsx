@@ -1,8 +1,8 @@
 import { ReviewExportPanel } from "../components/review-feedback/review-export-panel";
 
 export const metadata = {
-  title: "Review export | Maroma",
-  description: "Export collected site review feedback as a Cursor-ready prompt.",
+  title: "Site review report | Maroma",
+  description: "Collected site review feedback from review mode.",
 };
 
 export default function ReviewPage() {

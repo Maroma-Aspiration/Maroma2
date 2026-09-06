@@ -4,6 +4,7 @@ import { useLayoutEffect, useRef } from "react";
 import type { PromoFrame } from "../../lib/promo-types";
 import {
   cmToPx,
+  computeHeroMarqueeEndNudge,
   computeHeroMarqueePathShift,
   computeHeroMarqueeStartX,
   computePromoMarqueeEndX,
@@ -17,8 +18,11 @@ type PromoSequenceMarqueeProps = {
   variant?: "default" | "hero";
   heroMarqueeStartOffsetCm?: number;
   heroMarqueeStartOffsetPx?: number;
-  /** Admin: hold text at start X while adjusting offsets (no scroll). */
+  heroMarqueeEndOffsetCm?: number;
+  heroMarqueeEndOffsetPx?: number;
+  /** Admin: hold text at start or end X while adjusting offsets (no scroll). */
   previewStartPosition?: boolean;
+  previewMode?: "start" | "end";
   onDurationReady: (durationMs: number) => void;
 };
 
@@ -105,7 +109,12 @@ function getHeroProductRect(track: HTMLElement): DOMRect | null {
 function resolveHeroMarqueeGeometry(
   track: HTMLElement,
   text: HTMLElement,
-  options?: { startOffsetCm?: number; startOffsetPx?: number }
+  options?: {
+    startOffsetCm?: number;
+    startOffsetPx?: number;
+    endOffsetCm?: number;
+    endOffsetPx?: number;
+  }
 ): HeroMarqueeGeometry {
   const trackWidth = track.clientWidth;
   const textWidth = measureMarqueeTextWidth(text);
@@ -132,9 +141,14 @@ function resolveHeroMarqueeGeometry(
     startOffsetPx: options?.startOffsetPx,
     cmToPx: cmToPxFn,
   });
+  const endNudge = computeHeroMarqueeEndNudge({
+    endOffsetCm: options?.endOffsetCm,
+    endOffsetPx: options?.endOffsetPx,
+    cmToPx: cmToPxFn,
+  });
 
   const baseEndX = computePromoMarqueeEndX(getStripCenterInTrack(track), textWidth);
-  const endX = baseEndX + pathShift;
+  const endX = baseEndX + pathShift + endNudge;
 
   return {
     trackWidth,
@@ -157,7 +171,10 @@ export function PromoSequenceMarquee({
   variant = "default",
   heroMarqueeStartOffsetCm,
   heroMarqueeStartOffsetPx,
+  heroMarqueeEndOffsetCm,
+  heroMarqueeEndOffsetPx,
   previewStartPosition = false,
+  previewMode = "start",
   onDurationReady,
 }: PromoSequenceMarqueeProps) {
   const trackRef = useRef<HTMLDivElement>(null);
@@ -180,13 +197,15 @@ export function PromoSequenceMarquee({
       const geometry = resolveHeroMarqueeGeometry(track, text, {
         startOffsetCm: heroMarqueeStartOffsetCm,
         startOffsetPx: heroMarqueeStartOffsetPx,
+        endOffsetCm: heroMarqueeEndOffsetCm,
+        endOffsetPx: heroMarqueeEndOffsetPx,
       });
       geometryRef.current = geometry;
       text.dataset.marqueeMode = "preview";
       text.style.whiteSpace = "nowrap";
       text.style.visibility = "visible";
       text.style.opacity = "1";
-      setTextTransform(text, geometry.startX);
+      setTextTransform(text, previewMode === "end" ? geometry.endX : geometry.startX);
     };
 
     applyPreview();
@@ -195,8 +214,11 @@ export function PromoSequenceMarquee({
   }, [
     frame.body,
     frame.bodySizeRem,
+    heroMarqueeEndOffsetCm,
+    heroMarqueeEndOffsetPx,
     heroMarqueeStartOffsetCm,
     heroMarqueeStartOffsetPx,
+    previewMode,
     previewStartPosition,
     runId,
     variant,
@@ -228,8 +250,8 @@ export function PromoSequenceMarquee({
       text.style.whiteSpace = "nowrap";
       text.style.paddingLeft = "0";
       text.style.margin = "0";
-      text.style.opacity = "0";
-      text.style.visibility = "hidden";
+      text.style.opacity = "1";
+      text.style.visibility = "visible";
 
       if (track.clientWidth <= 0) {
         if (attempt < 16) {
@@ -245,6 +267,8 @@ export function PromoSequenceMarquee({
           ? resolveHeroMarqueeGeometry(track, text, {
               startOffsetCm: heroMarqueeStartOffsetCm,
               startOffsetPx: heroMarqueeStartOffsetPx,
+              endOffsetCm: heroMarqueeEndOffsetCm,
+              endOffsetPx: heroMarqueeEndOffsetPx,
             })
           : null;
 
@@ -290,8 +314,8 @@ export function PromoSequenceMarquee({
 
       animationRef.current = text.animate(
         [
-          { transform: `translate3d(${resolvedStartX}px, -50%, 0)`, opacity: 0 },
-          { transform: `translate3d(${resolvedStartX}px, -50%, 0)`, opacity: 0, offset: holdOffset },
+          { transform: `translate3d(${resolvedStartX}px, -50%, 0)`, opacity: 1 },
+          { transform: `translate3d(${resolvedStartX}px, -50%, 0)`, opacity: 1, offset: holdOffset },
           { transform: `translate3d(${resolvedEndX}px, -50%, 0)`, opacity: 1 },
         ],
         {
@@ -318,6 +342,8 @@ export function PromoSequenceMarquee({
     frame.bodySizeRem,
     frame.durationMs,
     forceScroll,
+    heroMarqueeEndOffsetCm,
+    heroMarqueeEndOffsetPx,
     heroMarqueeStartOffsetCm,
     heroMarqueeStartOffsetPx,
     onDurationReady,

@@ -12,6 +12,7 @@ import type {
   B2bQuoteRequest,
 } from "../../../lib/b2b-types";
 import type { B2bApplication } from "../../../lib/b2b-applications-store";
+import { isFullCatalogProgram } from "../../../lib/b2b-pricing";
 import { decodeBasicHtmlEntities } from "../../../lib/decode-html-entities";
 import type { AdminProductSummary } from "../../../lib/product-catalog-admin";
 import "./b2b-admin.css";
@@ -362,6 +363,7 @@ export default function B2bAdminClient() {
                     <article key={application.id} style={{ marginTop: 12 }}>
                       <strong>{application.companyName}</strong> · {application.email}
                       <p>{application.message}</p>
+                      <p style={{ color: "#58797d", fontSize: 13 }}>GST: {application.gstNumber || "—"} · {application.companyType || "Company type not given"}<br />{application.website || "No website"}{application.instagramUrl ? ` · Instagram: ${application.instagramUrl}` : ""}{application.linkedinUrl ? ` · LinkedIn: ${application.linkedinUrl}` : ""}</p>
                       <button
                         type="button"
                         className="button primary button-sage"
@@ -576,19 +578,21 @@ export default function B2bAdminClient() {
                 <span>Programme</span>
                 <select
                   value={draft.program}
-                  onChange={(e) =>
+                  onChange={(e) => {
+                    const program = e.target.value as B2bProgram;
                     setDraft((d) => ({
                       ...d,
-                      program: e.target.value as B2bProgram,
-                      commerceMode: e.target.value === "white_label" ? "checkout" : d.commerceMode,
-                    }))
-                  }
+                      program,
+                      commerceMode: isFullCatalogProgram({ program }) ? "checkout" : d.commerceMode,
+                    }));
+                  }}
                 >
                   <option value="custom">Custom assortment</option>
                   <option value="white_label">White label (full catalogue, 35% off)</option>
+                  <option value="branded">Branded (full catalogue, 35% off)</option>
                 </select>
               </label>
-              {draft.program === "white_label" ? (
+              {isFullCatalogProgram({ program: draft.program }) ? (
                 <div className="catalog-admin-grid">
                   <label className="catalog-admin-field">
                     <span>Discount %</span>

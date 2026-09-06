@@ -11,6 +11,7 @@ const SALE_IN_INDIA_ONLY_RE =
   /\s*[\(\[]?\s*(?:only\s+)?for\s+sale\s+in\s+india\s+only\s*[\)\]]?\s*/gi;
 const SHORT_DESCRIPTION_TAIL_MARKERS = ["KEY INGREDIENTS", "KEY INGREDIENT"];
 const INTERNATIONAL_RESTRICTION_RE = /not\s+for\s+international/i;
+const UK_AND_CHANNEL_ISLANDS_RE = /\s*not\s+for\s+sale\s+in\s+the\s+uk\s+and\s+channel\s+islands\.?\s*/gi;
 
 function normalizeCatalogText(text: string): string {
   return decodeBasicHtmlEntities(text || "")
@@ -82,6 +83,7 @@ export function cleanProductSaleRegionCopy(
     result = result.replace(NOT_FOR_INTERNATIONAL_RE, "");
     result = result.replace(SALE_IN_INDIA_ONLY_RE, "");
   }
+  result = result.replace(UK_AND_CHANNEL_ISLANDS_RE, "");
 
   return finalizeCatalogText(result);
 }
@@ -91,8 +93,7 @@ export function deriveProductPdpCopy(name: string, shortDescription: string): {
   subtitleText: string;
 } {
   const { displayName, indiaOnlyNote } = stripIndiaOnlyFromProductName(name);
-  const hasInternationalRestriction = INTERNATIONAL_RESTRICTION_RE.test(shortDescription);
-  const showIndiaOnlyNote = Boolean(indiaOnlyNote || hasInternationalRestriction);
+  const showIndiaOnlyNote = Boolean(indiaOnlyNote);
 
   let body = cleanProductSaleRegionCopy(shortDescription, {
     suppressInternationalNote: showIndiaOnlyNote,

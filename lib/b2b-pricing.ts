@@ -5,21 +5,44 @@ import type { ProductRecord } from "./product-types";
 export const WHITE_LABEL_DISCOUNT_RATE = 0.35;
 export const WHITE_LABEL_MIN_SPEND_INR = 15000;
 
-export function isWhiteLabelCompany(company: Pick<B2bCompany, "program">): boolean {
-  return company.program === "white_label";
+export function isFullCatalogProgram(company: Pick<B2bCompany, "program">): boolean {
+  return company.program === "white_label" || company.program === "branded";
 }
 
-export function whiteLabelDiscountRate(company: Pick<B2bCompany, "program" | "whiteLabelDiscountPercent">): number {
-  if (!isWhiteLabelCompany(company)) return 0;
+/** @deprecated Use isFullCatalogProgram */
+export function isWhiteLabelCompany(company: Pick<B2bCompany, "program">): boolean {
+  return isFullCatalogProgram(company);
+}
+
+export function fullCatalogDiscountRate(
+  company: Pick<B2bCompany, "program" | "whiteLabelDiscountPercent">
+): number {
+  if (!isFullCatalogProgram(company)) return 0;
   const pct = company.whiteLabelDiscountPercent;
   const rate = typeof pct === "number" && Number.isFinite(pct) ? pct / 100 : WHITE_LABEL_DISCOUNT_RATE;
   return Math.min(0.9, Math.max(0, rate));
 }
 
-export function whiteLabelMinSpendInr(company: Pick<B2bCompany, "program" | "whiteLabelMinSpendInr">): number {
-  if (!isWhiteLabelCompany(company)) return 0;
+/** @deprecated Use fullCatalogDiscountRate */
+export function whiteLabelDiscountRate(
+  company: Pick<B2bCompany, "program" | "whiteLabelDiscountPercent">
+): number {
+  return fullCatalogDiscountRate(company);
+}
+
+export function fullCatalogMinSpendInr(
+  company: Pick<B2bCompany, "program" | "whiteLabelMinSpendInr">
+): number {
+  if (!isFullCatalogProgram(company)) return 0;
   const min = company.whiteLabelMinSpendInr;
   return typeof min === "number" && Number.isFinite(min) && min > 0 ? min : WHITE_LABEL_MIN_SPEND_INR;
+}
+
+/** @deprecated Use fullCatalogMinSpendInr */
+export function whiteLabelMinSpendInr(
+  company: Pick<B2bCompany, "program" | "whiteLabelMinSpendInr">
+): number {
+  return fullCatalogMinSpendInr(company);
 }
 
 export function whiteLabelUnitPrice(retailInr: number, discountRate: number): number {
@@ -30,8 +53,8 @@ export function resolveCompanyAssortment(
   company: B2bCompany,
   products: ProductRecord[]
 ): B2bAssortmentItem[] {
-  if (isWhiteLabelCompany(company)) {
-    const rate = whiteLabelDiscountRate(company);
+  if (isFullCatalogProgram(company)) {
+    const rate = fullCatalogDiscountRate(company);
     return products
       .map((product) => {
         const retail = parseInrPriceNumber(product.price);

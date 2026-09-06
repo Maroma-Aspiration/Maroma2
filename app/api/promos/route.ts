@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import { getSessionSecret, SESSION_COOKIE, verifySessionPayload } from "../../../lib/auth-session";
 import type { PromoFrame, PromoPresentation, PromoSequenceTransition } from "../../../lib/promo-types";
+import { asFiniteNumber, resolvePromoBannerTitle } from "../../../lib/promo-strip-utils";
 import {
   deletePromoBanner,
   listLivePromoBanners,
@@ -68,12 +69,14 @@ export async function POST(request: Request) {
     return NextResponse.json({ ok: true, banner });
   }
   const title = typeof body.title === "string" ? body.title.trim() : "";
-  if (!title) return NextResponse.json({ error: "Title is required." }, { status: 400 });
+  const adminNameRaw = typeof body.adminName === "string" ? body.adminName.trim() : "";
+  const adminName = adminNameRaw || (title ? "" : resolvePromoBannerTitle(body));
   const publishNow = body.publishNow === true;
   const active =
     publishNow ? true : typeof body.active === "boolean" ? body.active : body.active !== false;
   const banner = await upsertPromoBanner({
     id: typeof body.id === "string" ? body.id : undefined,
+    adminName,
     title,
     body: typeof body.body === "string" ? body.body : "",
     mediaUrl: typeof body.mediaUrl === "string" ? body.mediaUrl : "",
@@ -83,21 +86,45 @@ export async function POST(request: Request) {
     ctaHref: typeof body.ctaHref === "string" ? body.ctaHref : "",
     presentation: body.presentation as PromoPresentation,
     sequenceTransition: body.sequenceTransition as PromoSequenceTransition,
+    sequenceFadeDurationMs: asFiniteNumber(body.sequenceFadeDurationMs),
     sequenceLoop: typeof body.sequenceLoop === "boolean" ? body.sequenceLoop : undefined,
     frames: Array.isArray(body.frames) ? (body.frames as PromoFrame[]) : undefined,
     stripBackground: typeof body.stripBackground === "string" ? body.stripBackground : undefined,
-    stripHeightPx: typeof body.stripHeightPx === "number" ? body.stripHeightPx : undefined,
-    stripOpacity: typeof body.stripOpacity === "number" ? body.stripOpacity : undefined,
-    mediaOffsetXCm: typeof body.mediaOffsetXCm === "number" ? body.mediaOffsetXCm : undefined,
+    stripBackgroundImageUrl:
+      typeof body.stripBackgroundImageUrl === "string" ? body.stripBackgroundImageUrl : undefined,
+    stripBackgroundMediaKind:
+      body.stripBackgroundMediaKind === "video" || body.stripBackgroundMediaKind === "image"
+        ? body.stripBackgroundMediaKind
+        : body.stripBackgroundMediaKind === "none"
+          ? "none"
+          : undefined,
+    stripBackgroundVideoLoop:
+      typeof body.stripBackgroundVideoLoop === "boolean" ? body.stripBackgroundVideoLoop : undefined,
+    stripBackgroundImageScale: asFiniteNumber(body.stripBackgroundImageScale),
+    stripBackgroundImageOffsetX: asFiniteNumber(body.stripBackgroundImageOffsetX),
+    stripBackgroundImageOffsetY: asFiniteNumber(body.stripBackgroundImageOffsetY),
+    stripHeightPx: asFiniteNumber(body.stripHeightPx),
+    stripPositionOffsetCm: asFiniteNumber(body.stripPositionOffsetCm),
+    stripPositionOffsetPx: asFiniteNumber(body.stripPositionOffsetPx),
+    ctaOffsetX: asFiniteNumber(body.ctaOffsetX),
+    ctaOffsetY: asFiniteNumber(body.ctaOffsetY),
+    stripAspectRatio:
+      body.stripAspectRatio === "21:9" || body.stripAspectRatio === "fixed"
+        ? body.stripAspectRatio
+        : undefined,
+    stripOpacity: asFiniteNumber(body.stripOpacity),
+    mediaOffsetXCm: asFiniteNumber(body.mediaOffsetXCm),
     marqueeForceScroll: typeof body.marqueeForceScroll === "boolean" ? body.marqueeForceScroll : undefined,
-    heroMarqueeStartOffsetCm:
-      typeof body.heroMarqueeStartOffsetCm === "number" ? body.heroMarqueeStartOffsetCm : undefined,
-    heroMarqueeStartOffsetPx:
-      typeof body.heroMarqueeStartOffsetPx === "number" ? body.heroMarqueeStartOffsetPx : undefined,
+    heroMarqueeStartOffsetCm: asFiniteNumber(body.heroMarqueeStartOffsetCm),
+    heroMarqueeStartOffsetPx: asFiniteNumber(body.heroMarqueeStartOffsetPx),
+    heroMarqueeEndOffsetCm: asFiniteNumber(body.heroMarqueeEndOffsetCm),
+    heroMarqueeEndOffsetPx: asFiniteNumber(body.heroMarqueeEndOffsetPx),
     ctaBuyLinks: Array.isArray(body.ctaBuyLinks) ? body.ctaBuyLinks : undefined,
     startsAt: publishNow ? "" : normalizeScheduleValue(body.startsAt),
     endsAt: publishNow ? "" : normalizeScheduleValue(body.endsAt),
     active,
+    promoModeEnabled:
+      typeof body.promoModeEnabled === "boolean" ? body.promoModeEnabled : undefined,
   });
   return NextResponse.json({ ok: true, banner });
 }

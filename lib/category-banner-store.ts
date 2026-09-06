@@ -1,5 +1,5 @@
 import { readJsonKv, writeJsonKv } from "./json-kv-store";
-import { defaultWideBannerLayout } from "./category-banner-defaults";
+import { defaultWideBannerCopyPosition, defaultWideBannerLayout } from "./category-banner-defaults";
 import type {
   CategoryBannerOverride,
   CategoryBannerStore,
@@ -18,6 +18,8 @@ export { defaultWideBannerLayout } from "./category-banner-defaults";
 
 const KV_KEY = "maroma:category-banner-overrides";
 const FILE_NAME = "category-banner-overrides.json";
+const legacyDefaultMinHeight = "clamp(220px, 34vw, 400px)";
+const legacyDefaultMaxHeight = "min(48vh, 440px)";
 
 const emptyStore = (): CategoryBannerStore => ({ banners: {} });
 
@@ -47,9 +49,14 @@ export async function resolveCategoryBanner(
     heroTitle: o.heroTitle ?? category.heroTitle ?? category.label,
     heroTagline: o.heroTagline ?? category.heroTagline ?? category.description,
     objectPosition: o.objectPosition ?? defaultWideBannerLayout.objectPosition,
-    minHeight: o.minHeight ?? defaultWideBannerLayout.minHeight,
-    maxHeight: o.maxHeight ?? defaultWideBannerLayout.maxHeight,
-    thumbMaxWidth: o.thumbMaxWidth ?? 280
+    imageScale: o.imageScale ?? 100,
+    // Treat previously saved "Default" values as defaults, so the improved
+    // banner height also reaches existing categories without replacing custom sizes.
+    minHeight: o.minHeight === legacyDefaultMinHeight ? defaultWideBannerLayout.minHeight : (o.minHeight ?? defaultWideBannerLayout.minHeight),
+    maxHeight: o.maxHeight === legacyDefaultMaxHeight ? defaultWideBannerLayout.maxHeight : (o.maxHeight ?? defaultWideBannerLayout.maxHeight),
+    thumbMaxWidth: o.thumbMaxWidth ?? 280,
+    copyLeftPct: o.copyLeftPct ?? defaultWideBannerCopyPosition.copyLeftPct,
+    copyBottomPct: o.copyBottomPct ?? defaultWideBannerCopyPosition.copyBottomPct
   };
 }
 

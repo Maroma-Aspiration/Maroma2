@@ -28,6 +28,10 @@ function extForMime(mime: string): string {
   if (mime.includes("gif")) return "gif";
   if (mime.includes("svg")) return "svg";
   if (mime.includes("gltf-binary") || mime.includes("model/gltf")) return "glb";
+  if (mime.includes("webm")) return "webm";
+  if (mime.includes("quicktime")) return "mov";
+  if (mime.includes("mp4") || mime.includes("x-m4v")) return "mp4";
+  if (mime.startsWith("video/")) return "mp4";
   return "jpg";
 }
 

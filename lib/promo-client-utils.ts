@@ -64,10 +64,22 @@ export function promoVisibilityStatus(
   return "live";
 }
 
+/** Label for admin banner lists (prefers adminName over strip headline). */
+export function resolvePromoAdminName(
+  banner: Pick<PromoBanner, "adminName" | "title">
+): string {
+  const adminName = typeof banner.adminName === "string" ? banner.adminName.trim() : "";
+  if (adminName) return adminName.slice(0, 80);
+  const title = typeof banner.title === "string" ? banner.title.trim() : "";
+  if (title) return title.slice(0, 80);
+  return "Untitled banner";
+}
+
 export function buildPreviewBannerStack(
   savedBanners: PromoBanner[],
   draft: Pick<
     PromoBanner,
+    | "adminName"
     | "title"
     | "body"
     | "mediaUrl"
@@ -78,28 +90,45 @@ export function buildPreviewBannerStack(
     | "ctaBuyLinks"
     | "presentation"
     | "sequenceTransition"
+    | "sequenceFadeDurationMs"
     | "sequenceLoop"
     | "frames"
     | "startsAt"
     | "endsAt"
     | "active"
+    | "promoModeEnabled"
     | "stripBackground"
+    | "stripBackgroundImageUrl"
+    | "stripBackgroundMediaKind"
+    | "stripBackgroundVideoLoop"
+    | "stripBackgroundImageScale"
+    | "stripBackgroundImageOffsetX"
+    | "stripBackgroundImageOffsetY"
     | "stripHeightPx"
+    | "stripPositionOffsetCm"
+    | "stripPositionOffsetPx"
+    | "stripAspectRatio"
     | "stripOpacity"
     | "mediaOffsetXCm"
     | "marqueeForceScroll"
+    | "heroMarqueeStartOffsetCm"
+    | "heroMarqueeStartOffsetPx"
+    | "heroMarqueeEndOffsetCm"
+    | "heroMarqueeEndOffsetPx"
   >,
   editingId: string | null
 ): PromoBanner[] {
   const draftBanner: PromoBanner = {
     id: editingId ?? "__draft__",
-    title: draft.title.trim() || "Your banner headline",
+    adminName: draft.adminName?.trim() || resolvePromoAdminName(draft),
+    title: draft.title.trim(),
     body: draft.body.trim(),
     mediaUrl: draft.mediaUrl,
     mediaKind: draft.mediaKind,
     animation: draft.animation,
     presentation: draft.presentation,
     sequenceTransition: draft.sequenceTransition,
+    sequenceFadeDurationMs: draft.sequenceFadeDurationMs,
     sequenceLoop: draft.sequenceLoop,
     frames: draft.frames,
     ctaLabel: draft.ctaLabel.trim(),
@@ -109,11 +138,12 @@ export function buildPreviewBannerStack(
     startsAt: draft.startsAt,
     endsAt: draft.endsAt,
     active: draft.active,
+    promoModeEnabled: draft.promoModeEnabled,
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
   };
 
-  const others = savedBanners.filter((banner) => banner.id !== editingId);
-  const merged = [draftBanner, ...others];
-  return merged.filter((banner) => isPromoLiveClient(banner));
+  // Admin editor always previews the in-progress banner alone, including when inactive,
+  // so strip background and layout edits are visible before publish.
+  return [draftBanner];
 }

@@ -20,7 +20,46 @@
 /* Desktop: keep link row visible; clip only on mobile carousel shell */
 html:not(.maroma-viewport-mobile):not([data-maroma-viewport-mobile]) .maroma-nav-shell--desktop .nav-links {
   overflow: visible;
+  flex-wrap: wrap;
+  row-gap: 6px;
+  flex: 1 1 auto;
+  justify-content: flex-start;
+  min-width: 0;
+}
+
+html:not(.maroma-viewport-mobile):not([data-maroma-viewport-mobile]) .maroma-nav-shell--desktop .nav-search-mid {
+  display: flex;
+  align-items: center;
   justify-content: center;
+  flex: 0 0 auto;
+  min-width: 0;
+  margin: 0 4px;
+}
+
+.site-header .nav-search-bar {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  width: min(100%, 108px);
+  height: 24px;
+  padding: 0 8px 0 6px;
+  box-sizing: border-box;
+  border: 1px solid rgba(19, 74, 87, 0.26);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.58);
+  color: var(--ink, #145366);
+}
+
+.site-header .nav-search-bar input {
+  flex: 1 1 auto;
+  min-width: 0;
+  width: 100%;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: 500 10px/1 var(--font-sans), sans-serif;
+  letter-spacing: 0.03em;
+  outline: none;
 }
 
 html.maroma-viewport-mobile .maroma-nav-shell--mobile .nav-links,

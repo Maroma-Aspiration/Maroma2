@@ -33,6 +33,7 @@ export const parseSiteContent = (value: unknown): SiteContent | null => {
 export const mergeWithDefaults = (value: unknown): SiteContent => {
   const parsed = parseSiteContent(value);
   const base = parsed ? structuredClone(parsed) : structuredClone(siteContent);
+  base.nav = mergeNavWithDefaults(base.nav);
   const storedSrc = base.hero.video.src?.trim() ?? "";
   const legacyDesktopSrc = "https://youtu.be/S_uYmuKyMRg";
   if (!storedSrc || storedSrc === legacyDesktopSrc) {
@@ -46,3 +47,17 @@ export const mergeWithDefaults = (value: unknown): SiteContent => {
   }
   return base;
 };
+
+/** Keep the full default category nav on every page, even when stored content is stale. */
+export function mergeNavWithDefaults(storedNav: string[]): string[] {
+  const canonical = siteContent.nav;
+  if (!Array.isArray(storedNav) || storedNav.length === 0) {
+    return [...canonical];
+  }
+  const storedSet = new Set(storedNav);
+  if (!canonical.every((item) => storedSet.has(item))) {
+    return [...canonical];
+  }
+  const extras = storedNav.filter((item) => !canonical.includes(item));
+  return [...canonical, ...extras];
+}

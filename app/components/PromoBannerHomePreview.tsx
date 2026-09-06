@@ -7,7 +7,9 @@ import {
   type PromoVisibilityStatus,
 } from "../../lib/promo-client-utils";
 import {
+  notifyPromoPreviewPlayback,
   notifyPromoPreviewUpdate,
+  PROMO_PREVIEW_STATUS,
   writePromoPreviewPayload,
 } from "../../lib/promo-preview-storage";
 
@@ -41,6 +43,7 @@ export function PromoBannerHomePreview({
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const [scale, setScale] = useState(0.4);
   const [iframeReady, setIframeReady] = useState(false);
+  const [animPlaying, setAnimPlaying] = useState(false);
 
   const previewSrc = useMemo(
     () => `/?skipIntro=1&promoPreview=1&_=${PREVIEW_VIEWPORT_WIDTH}`,
@@ -50,7 +53,7 @@ export function PromoBannerHomePreview({
   useEffect(() => {
     writePromoPreviewPayload(stack);
     if (iframeReady) {
-      notifyPromoPreviewUpdate(iframeRef.current?.contentWindow);
+      notifyPromoPreviewUpdate(iframeRef.current?.contentWindow, stack);
     }
   }, [stack, iframeReady]);
 
@@ -73,10 +76,15 @@ export function PromoBannerHomePreview({
   useEffect(() => {
     const onMessage = (event: MessageEvent) => {
       if (event.origin !== window.location.origin) return;
-      if (event.data?.type !== "maroma:promo-preview-ready") return;
-      setIframeReady(true);
-      writePromoPreviewPayload(stack);
-      notifyPromoPreviewUpdate(iframeRef.current?.contentWindow);
+      if (event.data?.type === "maroma:promo-preview-ready") {
+        setIframeReady(true);
+        writePromoPreviewPayload(stack);
+        notifyPromoPreviewUpdate(iframeRef.current?.contentWindow, stack);
+        return;
+      }
+      if (event.data?.type === PROMO_PREVIEW_STATUS) {
+        setAnimPlaying(event.data.playback === "playing");
+      }
     };
     window.addEventListener("message", onMessage);
     return () => window.removeEventListener("message", onMessage);
@@ -88,14 +96,38 @@ export function PromoBannerHomePreview({
     <aside className="promo-admin-preview-wrap" aria-label="Homepage preview">
       <div className="promo-admin-preview-toolbar">
         <div className="promo-admin-preview-label">Homepage preview</div>
-        <a
-          className="promo-admin-preview-open"
-          href={previewSrc}
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          Open full size
-        </a>
+        <div className="promo-admin-preview-toolbar-actions">
+          <button
+            type="button"
+            className={`promo-admin-preview-anim-btn${animPlaying ? " is-active" : ""}`}
+            disabled={!iframeReady}
+            onClick={() => {
+              setAnimPlaying(true);
+              notifyPromoPreviewPlayback(iframeRef.current?.contentWindow, "play");
+            }}
+          >
+            Start anim
+          </button>
+          <button
+            type="button"
+            className={`promo-admin-preview-anim-btn${animPlaying ? "" : " is-active"}`}
+            disabled={!iframeReady}
+            onClick={() => {
+              setAnimPlaying(false);
+              notifyPromoPreviewPlayback(iframeRef.current?.contentWindow, "stop");
+            }}
+          >
+            Stop
+          </button>
+          <a
+            className="promo-admin-preview-open"
+            href={previewSrc}
+            target="_blank"
+            rel="noopener noreferrer"
+          >
+            Open full size
+          </a>
+        </div>
       </div>
       <div
         ref={shellRef}
@@ -114,13 +146,13 @@ export function PromoBannerHomePreview({
           }}
           onLoad={() => {
             writePromoPreviewPayload(stack);
-            notifyPromoPreviewUpdate(iframeRef.current?.contentWindow);
+            notifyPromoPreviewUpdate(iframeRef.current?.contentWindow, stack);
           }}
         />
       </div>
       <p className="promo-admin-preview-note">
-        Real homepage hero at {PREVIEW_VIEWPORT_WIDTH}px width. Nav, hero product layer, and promo
-        placement match production.
+        Real homepage hero at {PREVIEW_VIEWPORT_WIDTH}px width. Use Start anim to play the promo
+        sequence. Stop freezes the current frame.
       </p>
       <div className="promo-admin-preview-meta">
         <span className={`promo-admin-preview-status promo-admin-preview-status--${draftStatus}`}>

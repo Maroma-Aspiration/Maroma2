@@ -82,9 +82,25 @@ html[data-maroma-viewport-mobile] .maroma-nav-shell--mobile {
   }
 
   html:not(.maroma-viewport-mobile) .maroma-nav-shell--desktop .nav-links {
-    overflow: visible;
+    overflow: hidden;
     gap: clamp(6px, 0.85vw, 18px);
     font-size: clamp(0.58rem, 0.55rem + 0.12vw, 0.7rem);
+    min-width: 0;
+  }
+
+  html:not(.maroma-viewport-mobile) .maroma-nav-shell--desktop .nav-search-mid {
+    margin: 0 4px;
+  }
+
+  html:not(.maroma-viewport-mobile) .maroma-nav-shell--desktop .nav-search-bar {
+    width: clamp(88px, 8vw, 108px);
+    height: 22px;
+  }
+
+  html:not(.maroma-viewport-mobile) .maroma-nav-shell--desktop .nav-links {
+    gap: clamp(5px, 0.72vw, 16px);
+    font-size: clamp(0.56rem, 0.52rem + 0.1vw, 0.68rem);
+    padding-right: 2px;
   }
 
   html:not(.maroma-viewport-mobile) .maroma-nav-shell--desktop .nav-experiences-link {

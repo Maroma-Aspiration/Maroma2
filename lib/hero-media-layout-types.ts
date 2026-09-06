@@ -68,6 +68,14 @@ export type HeroVisualState = {
   heroPromoBannerPos: XY;
   /** Promo strip width as % of artboard. */
   heroPromoBannerWidthPct: number;
+  /** Homepage hero marquee start, cm from product right. Persisted with Save All. */
+  heroMarqueeStartOffsetCm?: number;
+  /** Homepage hero marquee start fine-tune (px). */
+  heroMarqueeStartOffsetPx?: number;
+  /** Homepage hero marquee rest/end, cm from strip center. */
+  heroMarqueeEndOffsetCm?: number;
+  /** Homepage hero marquee rest/end fine-tune (px). */
+  heroMarqueeEndOffsetPx?: number;
   heroCopyWidthVw: number;
   primarySettings: HeroLayerSettings;
   overlayLayer: HeroOverlayLayer;

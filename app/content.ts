@@ -51,9 +51,10 @@ export const siteContent: SiteContent = {
     "Baby",
     "Man",
     "Perfumes",
-    "Home Essentials",
+    "Home Care",
     "Colibri",
-    "Gifting"
+    "Gifting",
+    "Offers"
   ],
   hero: {
     eyebrow: "Conscious luxury",

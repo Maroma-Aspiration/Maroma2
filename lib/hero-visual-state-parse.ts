@@ -553,6 +553,22 @@ export const parseHeroVisualState = (value: unknown, base?: HeroVisualState): He
     heroPromoBannerTopCm,
     heroPromoBannerPos,
     heroPromoBannerWidthPct,
+    heroMarqueeStartOffsetCm:
+      typeof raw.heroMarqueeStartOffsetCm === "number" && Number.isFinite(raw.heroMarqueeStartOffsetCm)
+        ? Math.min(25, Math.max(-5, raw.heroMarqueeStartOffsetCm))
+        : b.heroMarqueeStartOffsetCm,
+    heroMarqueeStartOffsetPx:
+      typeof raw.heroMarqueeStartOffsetPx === "number" && Number.isFinite(raw.heroMarqueeStartOffsetPx)
+        ? Math.min(600, Math.max(-600, Math.round(raw.heroMarqueeStartOffsetPx)))
+        : b.heroMarqueeStartOffsetPx,
+    heroMarqueeEndOffsetCm:
+      typeof raw.heroMarqueeEndOffsetCm === "number" && Number.isFinite(raw.heroMarqueeEndOffsetCm)
+        ? Math.min(15, Math.max(-15, raw.heroMarqueeEndOffsetCm))
+        : b.heroMarqueeEndOffsetCm,
+    heroMarqueeEndOffsetPx:
+      typeof raw.heroMarqueeEndOffsetPx === "number" && Number.isFinite(raw.heroMarqueeEndOffsetPx)
+        ? Math.min(600, Math.max(-600, Math.round(raw.heroMarqueeEndOffsetPx)))
+        : b.heroMarqueeEndOffsetPx,
     heroCopyWidthVw,
     primarySettings,
     overlayLayer,

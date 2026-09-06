@@ -1,3 +1,12 @@
+.login-page:has(.admin-site-card) {
+  place-items: start center;
+  align-content: start;
+}
+
+.admin-site-card {
+  overflow: visible;
+}
+
 .promo-admin {
   display: grid;
   gap: 28px;
@@ -27,18 +36,53 @@
 
 .promo-admin-layout {
   display: grid;
-  grid-template-columns: minmax(0, 1.05fr) minmax(280px, 0.95fr);
+  grid-template-columns: minmax(0, 1.05fr) minmax(300px, 0.95fr);
   gap: 24px;
   align-items: start;
 }
 
 .promo-admin-form {
+  position: sticky;
+  top: 16px;
+  z-index: 1;
   display: grid;
   gap: 20px;
   padding: 20px;
   border-radius: 16px;
   border: 1px solid rgba(255, 255, 255, 0.08);
   background: rgba(255, 255, 255, 0.03);
+  scroll-margin-top: 24px;
+  max-height: calc(100vh - 32px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+.admin-site-card .button.secondary,
+.promo-admin .button.secondary {
+  background: #eef6f2;
+  border-color: #d7e6df;
+  color: #134a57;
+}
+
+.admin-site-card .button.secondary:hover,
+.promo-admin .button.secondary:hover {
+  background: #ffffff;
+  border-color: #ffffff;
+  color: #0c333c;
+}
+
+.promo-admin-editing-note {
+  margin: 0;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: rgba(122, 196, 168, 0.16);
+  border: 1px solid rgba(122, 196, 168, 0.35);
+  color: #eafff4;
+  font-size: 0.86rem;
+}
+
+.promo-admin-editing-note strong {
+  color: #fff;
 }
 
 .promo-admin-section h3 {
@@ -78,10 +122,102 @@
   min-height: 84px;
 }
 
-.promo-admin-row {
+.promo-admin-timing-list {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 12px;
+  gap: 10px;
+}
+
+.promo-admin-collapse {
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.promo-admin-collapse > summary {
+  list-style: none;
+  cursor: pointer;
+}
+
+.promo-admin-collapse > summary::-webkit-details-marker {
+  display: none;
+}
+
+.promo-admin-collapse-summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 12px;
+  font-size: 0.82rem;
+  color: rgba(244, 247, 244, 0.92);
+}
+
+.promo-admin-collapse-summary::before {
+  content: "▸";
+  flex-shrink: 0;
+  margin-right: 8px;
+  color: rgba(255, 255, 255, 0.5);
+  font-size: 0.72rem;
+}
+
+.promo-admin-collapse[open] > .promo-admin-collapse-summary::before {
+  content: "▾";
+}
+
+.promo-admin-collapse-title {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  flex: 1;
+  min-width: 0;
+}
+
+.promo-admin-collapse-body {
+  display: grid;
+  gap: 10px;
+  padding: 0 12px 12px;
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.promo-admin-collapse-section {
+  margin-top: 10px;
+}
+
+.promo-admin-timing-card {
+  display: grid;
+  gap: 8px;
+  padding: 0;
+  border: none;
+  background: transparent;
+}
+
+.promo-admin-timing-card strong {
+  font-size: 0.82rem;
+  color: #f4f7f4;
+}
+
+.promo-admin-timing-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: end;
+  justify-content: space-between;
+  gap: 10px 16px;
+}
+
+.promo-admin-timing-type {
+  min-width: min(100%, 220px);
+  margin: 0;
+}
+
+.promo-admin-timing-kind {
+  font-size: 0.78rem;
+  color: rgba(244, 247, 244, 0.72);
+}
+
+.promo-admin-timing-row {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
 }
 
 .promo-admin-chip-row {
@@ -144,6 +280,60 @@
   font-size: 0.78rem;
 }
 
+.promo-admin-hint {
+  margin: 4px 0 8px;
+  font-size: 0.76rem;
+  color: rgba(255, 255, 255, 0.48);
+  line-height: 1.35;
+}
+
+.promo-admin-upload-inline {
+  display: inline-flex;
+  align-items: center;
+  min-height: 36px;
+  padding: 0 12px;
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: rgba(255, 255, 255, 0.04);
+  font-size: 0.82rem;
+  color: rgba(255, 255, 255, 0.82);
+  cursor: pointer;
+}
+
+.promo-admin-upload-inline input[type="file"] {
+  display: none;
+}
+
+.promo-admin-upload-inline.process-success {
+  background: #22c55e !important;
+  border-color: #16a34a !important;
+  color: #fff !important;
+  box-shadow: 0 0 0 2px rgba(34, 197, 94, 0.45);
+}
+
+.promo-admin-strip-bg-preview {
+  position: relative;
+  width: min(100%, 220px);
+  height: var(--promo-strip-height, 106px);
+  overflow: hidden;
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.06);
+  flex-shrink: 0;
+}
+
+.promo-admin-strip-bg-thumb {
+  width: 72px;
+  height: 44px;
+}
+
+.promo-admin-strip-bg-thumb-video {
+  object-fit: cover;
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.06);
+}
+
 .promo-admin-media-url {
   font-size: 0.72rem;
   color: rgba(255, 255, 255, 0.45);
@@ -160,22 +350,41 @@
 }
 
 .promo-admin-actions {
+  position: relative;
+  z-index: 3;
   display: flex;
   flex-wrap: wrap;
   gap: 10px;
   padding-top: 4px;
 }
 
-.promo-admin-actions .button.process-success {
-  transform: scale(1.01);
-  transition: background 0.2s ease, box-shadow 0.2s ease, transform 0.2s ease;
+.promo-admin-actions .button.process-success,
+.promo-admin-actions .button.promo-publish-success,
+.promo-admin-actions .button[data-published="true"] {
+  background: #22c55e !important;
+  border-color: #16a34a !important;
+  color: #fff !important;
+  opacity: 1 !important;
+  transform: none;
+  box-shadow: 0 0 0 2px rgba(34, 197, 94, 0.45) !important;
+  transition: background 0.2s ease, box-shadow 0.2s ease, color 0.2s ease;
 }
 
 .promo-admin-preview-wrap {
   position: sticky;
-  top: 52px;
+  top: 16px;
+  z-index: 8;
+  align-self: start;
   display: grid;
   gap: 10px;
+  max-height: calc(100vh - 32px);
+  overflow: auto;
+  padding: 12px;
+  border-radius: 16px;
+  background: #14181d;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  box-shadow: 0 16px 36px rgba(0, 0, 0, 0.28);
+  pointer-events: auto;
 }
 
 .promo-admin-preview-toolbar {
@@ -183,6 +392,45 @@
   align-items: center;
   justify-content: space-between;
   gap: 12px;
+  flex-wrap: wrap;
+}
+
+.promo-admin-preview-toolbar-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.promo-admin-preview-anim-btn {
+  min-height: 34px;
+  padding: 6px 12px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 248, 230, 0.55);
+  background: #f4efe4;
+  color: #134a57;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+
+.promo-admin-preview-anim-btn:hover,
+.promo-admin-preview-anim-btn:focus-visible {
+  background: #fffdf8;
+  outline: none;
+}
+
+.promo-admin-preview-anim-btn.is-active {
+  background: #22c55e;
+  border-color: #16a34a;
+  color: #052e16;
+}
+
+.promo-admin-preview-anim-btn:disabled {
+  opacity: 0.45;
+  cursor: wait;
 }
 
 .promo-admin-preview-open {
@@ -204,6 +452,7 @@
   border: 1px solid rgba(255, 255, 255, 0.1);
   background: #eef3ee;
   box-shadow: 0 18px 40px rgba(0, 0, 0, 0.28);
+  max-height: min(52vh, 460px);
 }
 
 .promo-admin-preview-iframe {
@@ -212,7 +461,7 @@
   left: 0;
   transform-origin: top left;
   border: 0;
-  pointer-events: auto;
+  pointer-events: none;
   background: #eef3ee;
 }
 
@@ -596,9 +845,38 @@
 }
 
 .promo-admin-list-actions {
+  position: relative;
+  z-index: 4;
   display: flex;
   gap: 8px;
   flex-shrink: 0;
+}
+
+.promo-admin-list-actions .button,
+.promo-admin-live-card .button,
+.promo-admin-list-item .button {
+  min-height: 40px;
+  padding: 10px 16px;
+  opacity: 1;
+}
+
+.promo-admin-list-actions .promo-admin-edit-btn {
+  background: #7ac4a8 !important;
+  border-color: #7ac4a8 !important;
+  color: #0f2a24 !important;
+  font-weight: 700;
+}
+
+.promo-admin-list-actions .promo-admin-unpublish-btn {
+  background: #f4f7f4 !important;
+  border-color: #f4f7f4 !important;
+  color: #134a57 !important;
+}
+
+.promo-admin-list-actions .promo-admin-delete-btn {
+  background: #3a1d1b !important;
+  border-color: #ffb4a8 !important;
+  color: #ffd4cc !important;
 }
 
 .promo-admin-frame-toolbar {
@@ -625,11 +903,10 @@
 
 .promo-admin-frame-card {
   display: grid;
-  gap: 10px;
-  padding: 12px;
-  border-radius: 12px;
-  background: rgba(255, 255, 255, 0.04);
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  gap: 0;
+  padding: 0;
+  border: none;
+  background: transparent;
 }
 
 .promo-admin-buy-link-groups {
@@ -711,7 +988,7 @@
   width: min(920px, calc(100vw - 32px));
   max-height: min(82vh, 760px);
   display: grid;
-  grid-template-rows: auto auto 1fr;
+  grid-template-rows: auto auto minmax(0, 1fr);
   gap: 14px;
   padding: 18px 20px 20px;
   border-radius: 18px;
@@ -776,6 +1053,14 @@
   align-content: start;
 }
 
+.maroma-catalog-picker-body {
+  display: grid;
+  grid-template-rows: minmax(0, 1fr) auto;
+  gap: 12px;
+  min-height: 0;
+  overflow: hidden;
+}
+
 .maroma-catalog-picker-item {
   display: grid;
   grid-template-columns: 48px minmax(0, 1fr);
@@ -788,6 +1073,58 @@
   color: inherit;
   text-align: left;
   cursor: pointer;
+}
+
+.maroma-catalog-picker-item:has(.maroma-catalog-picker-check) {
+  grid-template-columns: 22px 48px minmax(0, 1fr);
+}
+
+.maroma-catalog-picker-check {
+  display: grid;
+  place-items: center;
+  width: 18px;
+  height: 18px;
+  border-radius: 4px;
+  border: 1px solid rgba(255, 255, 255, 0.28);
+  font-size: 0.72rem;
+  line-height: 1;
+  color: #0f1f1c;
+}
+
+.maroma-catalog-picker-item.is-selected {
+  border-color: rgba(122, 196, 168, 0.72);
+  background: rgba(122, 196, 168, 0.14);
+}
+
+.maroma-catalog-picker-item.is-selected .maroma-catalog-picker-check {
+  border-color: rgba(122, 196, 168, 0.95);
+  background: #7ac4a8;
+}
+
+.maroma-catalog-picker-item.is-disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.maroma-catalog-picker-selection-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding-top: 4px;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.maroma-catalog-picker-selection-count {
+  margin: 0;
+  font-size: 0.82rem;
+  color: rgba(255, 255, 255, 0.68);
+}
+
+.maroma-catalog-picker-selection-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
 }
 
 .maroma-catalog-picker-item:hover,
@@ -873,10 +1210,20 @@
   }
 
   .promo-admin-preview-wrap {
-    position: static;
+    order: -1;
+    top: 8px;
+    max-height: 42vh;
+  }
+
+  .promo-admin-form {
+    position: relative;
+    top: auto;
+    max-height: none;
+    overflow: visible;
   }
 
   .promo-admin-row,
+  .promo-admin-timing-row,
   .promo-admin-animation-grid {
     grid-template-columns: 1fr;
   }

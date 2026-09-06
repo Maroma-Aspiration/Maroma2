@@ -119,6 +119,13 @@ export default async function RootLayout({
             __html: `(function(){try{var q=window.matchMedia("(max-width:900px)");var t=window.matchMedia("(hover:none) and (pointer:coarse)");function s(){var m=q.matches||t.matches;document.documentElement.classList.toggle("maroma-viewport-mobile",m);document.documentElement.toggleAttribute("data-maroma-viewport-mobile",m);}s();q.addEventListener("change",s);t.addEventListener("change",s);}catch(e){}})();`,
           }}
         />
+        <Script
+          id="maroma-homepage-intro-boot"
+          strategy="beforeInteractive"
+          dangerouslySetInnerHTML={{
+            __html: `(function(){try{var p=location.pathname;if(p!=="/"&&p!=="")return;if(location.hash==="#shop")return;var q=location.search;if(q.indexOf("skipIntro=1")>=0||q.indexOf("promoPreview=1")>=0||/[?&]q=/.test(q))return;document.documentElement.classList.add("homepage-intro-experience","homepage-intro-active");}catch(e){}})();`,
+          }}
+        />
         <ViewportRootSync />
         <ShopHashScroll />
         <Script src="https://elfsightcdn.com/platform.js" strategy="afterInteractive" />

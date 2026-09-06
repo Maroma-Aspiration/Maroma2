@@ -20,7 +20,10 @@ import {
   type PerfumeNavSelection,
 } from "../../lib/perfume-shop-nav";
 import { getDisplayImageUrl } from "../../lib/product-image";
+import { productImageTransform } from "../../lib/product-image-focus";
 import { isGift3dPreviewProduct } from "../../lib/gift-builder-catalog";
+import { isGiftingProduct } from "../../lib/product-gifting";
+import { productPriceState } from "../../lib/product-pricing";
 import type { ProductRecord } from "../../lib/product-types";
 import { useAdminSession } from "../../lib/use-admin-session";
 
@@ -43,6 +46,7 @@ const SHOP_TYPES: Record<string, ShopType[]> = {
     { id: "lip-eye", label: "Lip & Eye Care", tokens: ["lip", "under eye", "eye cream"] },
   ],
   "body-care": [
+    { id: "colibri", label: "Colibri", tokens: ["colibri"] },
     { id: "lotion", label: "Lotions", tokens: ["lotion", "body milk"] },
     { id: "gel", label: "Shower Gels", tokens: ["shower gel", "body wash"] },
     { id: "soap", label: "Soaps", tokens: ["soap"] },
@@ -79,6 +83,7 @@ const SHOP_TYPES: Record<string, ShopType[]> = {
     { id: "perfume-sets", label: "Perfume Sets", tokens: ["set", "collection"] },
   ],
   "home-essentials": [
+    { id: "colibri", label: "Colibri", tokens: ["colibri"] },
     { id: "incense", label: "Incense", tokens: ["incense", "smudge"] },
     { id: "candles", label: "Candles", tokens: ["candle", "votive"] },
     { id: "diffusers", label: "Diffusers", tokens: ["diffuser", "perfume mat"] },
@@ -518,7 +523,8 @@ export function ProductListingWithFilters({ products, categorySlug, searchQuery 
       <div className="collection-recommended-grid">
         {recommendedProducts.map((product) => {
           const imageSrc = getDisplayImageUrl(product);
-          const convertedPrice = formatCatalogPrice(product.price);
+          const priceState = productPriceState(product);
+          const convertedPrice = formatCatalogPrice(priceState.active);
           const priceLabel = convertedPrice ? `${isEstimated ? "≈ " : ""}${convertedPrice}` : "Price on request";
           return (
             <Link key={product.id} href={`/product/${product.id}`} className="collection-recommended-card">
@@ -527,7 +533,10 @@ export function ProductListingWithFilters({ products, categorySlug, searchQuery 
               </div>
               <div className="collection-recommended-copy">
                 <h3>{decodeBasicHtmlEntities(product.name)}</h3>
-                <p>{priceLabel}</p>
+                <p className={priceState.onSale ? "collection-recommended-price is-on-sale" : "collection-recommended-price"}>
+                  {priceState.onSale ? <s>{formatCatalogPrice(priceState.regular)}</s> : null}
+                  <span>{priceLabel}</span>
+                </p>
                 <span>View product <span aria-hidden="true">→</span></span>
               </div>
             </Link>
@@ -946,7 +955,8 @@ export function ProductListingWithFilters({ products, categorySlug, searchQuery 
             </div>
           )) : sortedProducts.map((product) => {
             const imageSrc = getDisplayImageUrl(product);
-            const convertedPrice = formatCatalogPrice(product.price);
+            const priceState = productPriceState(product);
+            const convertedPrice = formatCatalogPrice(priceState.active);
             const priceLabel = convertedPrice ? `${isEstimated ? "≈ " : ""}${convertedPrice}` : "Price on request";
             return (
               <div key={product.id} className="product-card-wrap">
@@ -960,20 +970,23 @@ export function ProductListingWithFilters({ products, categorySlug, searchQuery 
                     <div className="product-card-media">
                       <div className="product-image">
                         {imageSrc ? (
-                          <img src={imageSrc} alt={`${decodeBasicHtmlEntities(product.name)} — Maroma`} />
+                          <img src={imageSrc} alt={`${decodeBasicHtmlEntities(product.name)} — Maroma`} style={{ transform: productImageTransform(product.id) }} />
                         ) : (
                           <span>No image</span>
                         )}
                       </div>
-                      {ready3dIds.has(product.id) || isGift3dPreviewProduct(product.id) ? (
+                      {isGiftingProduct(product) && isGift3dPreviewProduct(product.id) ? (
                         <span className="product-card-3d-badge">
-                          {ready3dIds.has(product.id) ? "3D ready" : "3D"}
+                          3D
                         </span>
                       ) : null}
                     </div>
                     <div className="product-copy">
                       <h3 className="product-card-title">{decodeBasicHtmlEntities(product.name)}</h3>
-                      <p className="product-card-price">{priceLabel}</p>
+                      <p className={priceState.onSale ? "product-card-price is-on-sale" : "product-card-price"}>
+                        {priceState.onSale ? <s>{formatCatalogPrice(priceState.regular)}</s> : null}
+                        <span>{priceLabel}</span>
+                      </p>
                       <span className="product-card-cta">Add to Basket</span>
                     </div>
                   </article>

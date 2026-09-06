@@ -54,6 +54,7 @@ export async function PATCH(request: Request, context: RouteContext) {
   if (body.name !== undefined) editPatch.name = body.name.trim();
   if (body.sku !== undefined) editPatch.sku = body.sku.trim();
   if (body.price !== undefined) editPatch.price = body.price.trim();
+  if (body.salePrice !== undefined) editPatch.salePrice = body.salePrice.trim();
   if (body.shortDescription !== undefined) editPatch.shortDescription = body.shortDescription;
   if (body.description !== undefined) editPatch.description = body.description;
   if (body.categories !== undefined) editPatch.categories = body.categories;

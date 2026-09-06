@@ -7,6 +7,13 @@
   isolation: isolate;
 }
 
+/* The hero deliberately overlaps this section. During admin editing, lift the
+   tiles above that transparent overlap so the visible Edit tile controls are
+   also the browser's click targets. */
+.scroller-section.home-collections-section.is-admin-collections-editable {
+  z-index: 1000 !important;
+}
+
 .home-collections-grid {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -110,6 +117,21 @@
 
 .home-collection-edit-trigger:hover {
   background: rgba(18, 42, 36, 0.82);
+}
+
+.home-collection-edit-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 12000;
+  pointer-events: none;
+}
+
+.home-collection-edit-trigger--overlay {
+  position: fixed;
+  right: auto;
+  z-index: 1;
+  transform: translateX(-100%);
+  pointer-events: auto;
 }
 
 .home-collection-editor-preview {

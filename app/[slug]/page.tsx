@@ -18,6 +18,9 @@ import type { ProductRecord } from "../../lib/product-types";
 
 /** Category pages read JSON from disk via `product-db`; keep on Node (not Edge). */
 export const runtime = "nodejs";
+// Banner overrides are managed live by admins. Do not serve a build-time copy
+// after an editor refresh, or the client will reset to the old banner image.
+export const dynamic = "force-dynamic";
 
 type CategoryPageProps = {
   params: {
@@ -133,21 +136,23 @@ export default async function CategoryPage({ params }: CategoryPageProps) {
         italicTagline={Boolean(category.heroTagline)}
       />
 
-      <section className="category-seo-intro" aria-label={`${category.label} overview`}>
-        <p>{intro}</p>
-        {related.length > 0 ? (
-          <nav className="category-related-nav" aria-label="Related collections">
-            <span className="category-related-label">Explore also</span>
-            <ul>
-              {related.map((item) => (
-                <li key={item.href}>
-                  <Link href={item.href}>{item.label}</Link>
-                </li>
-              ))}
-            </ul>
-          </nav>
-        ) : null}
-      </section>
+      {category.showSeoIntro !== false ? (
+        <section className="category-seo-intro" aria-label={`${category.label} overview`}>
+          <p>{intro}</p>
+          {related.length > 0 ? (
+            <nav className="category-related-nav" aria-label="Related collections">
+              <span className="category-related-label">Explore also</span>
+              <ul>
+                {related.map((item) => (
+                  <li key={item.href}>
+                    <Link href={item.href}>{item.label}</Link>
+                  </li>
+                ))}
+              </ul>
+            </nav>
+          ) : null}
+        </section>
+      ) : null}
 
       <section
         className="product-listing-section"

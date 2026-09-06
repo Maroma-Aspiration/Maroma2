@@ -7,6 +7,8 @@ export type CatalogCategory = {
    * Prefer this over stuffing keywords into the visual hero tagline.
    */
   seoIntro?: string;
+  /** Set false where the banner is intended to lead directly into the collection. */
+  showSeoIntro?: boolean;
   keywords: string[];
   /** Optional hero image (local `/staging-media/...` path), e.g. from maroma.com category asset. */
   bannerImage?: string;
@@ -25,7 +27,8 @@ export const catalogCategories: CatalogCategory[] = [
     description: "Botanical face care from Maroma — cleansers, serums, and daily skincare rituals handmade in Auroville, India.",
     seoIntro:
       "Maroma face care focuses on botanical cleansers, serums, and simple daily rituals. Formulations are made in Auroville, India, for people looking for natural skincare that supports balanced, glowing skin.",
-    keywords: ["face", "facial", "skin care", "serum", "cleanser", "face care"],
+    showSeoIntro: false,
+    keywords: ["face", "facial", "skin care", "serum", "cleanser", "face care", "day cream", "night cream"],
     bannerImage: "/staging-media/admin-category-banners/face-care-1776928521609.png",
     bannerLayout: "wide-cover",
     heroTitle: "Love Your Skin",
@@ -38,7 +41,7 @@ export const catalogCategories: CatalogCategory[] = [
     description: "Natural body care from Maroma — soaps, washes, oils, and nourishing essentials handmade in Auroville.",
     seoIntro:
       "Explore Maroma body care: aromatic soaps, washes, oils, and everyday essentials made with botanical ingredients in Auroville, India.",
-    keywords: ["body care", "bath", "soap", "body", "lotion"],
+    keywords: ["body care", "bath", "soap", "body", "lotion", "colibri"],
     bannerImage: "/staging-media/admin-category-banners/body-care-1776932025032.png",
     bannerLayout: "wide-cover"
   },
@@ -92,7 +95,7 @@ export const catalogCategories: CatalogCategory[] = [
     description: "Natural incense, handmade candles, and home fragrance from Maroma in Auroville, India.",
     seoIntro:
       "Maroma Home Essentials brings natural incense, candles, and ambient fragrance for living spaces. Many pieces continue Auroville’s tradition of handmade home fragrance.",
-    keywords: ["home", "incense", "candle", "ambient", "room", "diffuser"],
+    keywords: ["home", "incense", "candle", "ambient", "room", "diffuser", "colibri"],
     bannerImage: "/staging-media/admin-category-banners/home-essentials-1776932101259.png",
     bannerLayout: "wide-cover"
   },
@@ -143,7 +146,9 @@ const slugify = (value: string): string =>
 
 const navHrefByNormalizedLabel: Record<string, string> = (() => {
   const map: Record<string, string> = {
-    home: "/?skipIntro=1"
+    home: "/?skipIntro=1",
+    "home-care": "/home-essentials",
+    offers: "/special"
   };
   for (const category of catalogCategories) {
     map[normalize(category.label)] = `/${category.slug}`;

@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
+import { createPortal } from "react-dom";
 import type { ResolvedCategoryCard } from "../../lib/category-banner-types";
 import {
   formatBackgroundPosition,
@@ -10,6 +11,7 @@ import {
   parseBackgroundPosition,
 } from "../../lib/category-banner-position";
 import type { SiteMediaItem } from "../../lib/site-media-gallery-types";
+import { prepareBannerImageFile } from "../../lib/prepare-banner-image-file";
 
 type CollectionCardEditorProps = {
   card: ResolvedCategoryCard;
@@ -118,23 +120,25 @@ export function CollectionCardEditor({ card, open, onClose }: CollectionCardEdit
     setBusy(true);
     setStatus("");
     try {
+      const prepared = await prepareBannerImageFile(file);
       const formData = new FormData();
       formData.set("slug", card.slug);
       formData.set("target", "card");
-      formData.set("image", file);
+      formData.set("image", prepared);
       const response = await fetch("/api/category-banners/upload", {
         method: "POST",
         body: formData,
       });
-      const data = (await response.json()) as { cardImageUrl?: string; imageUrl?: string; error?: string };
+      const data = (await response.json().catch(() => null)) as { cardImageUrl?: string; imageUrl?: string; error?: string } | null;
       if (!response.ok) {
-        throw new Error(data.error ?? "Upload failed");
+        throw new Error(data?.error ?? "Upload failed");
       }
-      const nextUrl = data.cardImageUrl ?? data.imageUrl ?? "";
+      const nextUrl = data?.cardImageUrl ?? data?.imageUrl ?? "";
       if (nextUrl) {
         setImageUrl(nextUrl);
       }
       setStatus("Image uploaded.");
+      router.refresh();
     } catch (error) {
       setStatus((error as Error).message ?? "Upload failed.");
     } finally {
@@ -174,7 +178,10 @@ export function CollectionCardEditor({ card, open, onClose }: CollectionCardEdit
     return null;
   }
 
-  return (
+  // The collection section is deliberately isolated so it can layer below the
+  // hero. Render this fixed drawer at the document root so that isolation does
+  // not trap it underneath the hero when a tile is edited.
+  return createPortal(
     <div className="category-banner-drawer-root" role="presentation">
       <button
         type="button"
@@ -321,6 +328,7 @@ export function CollectionCardEditor({ card, open, onClose }: CollectionCardEdit
           </div>
         </div>
       </aside>
-    </div>
+    </div>,
+    document.body,
   );
 }

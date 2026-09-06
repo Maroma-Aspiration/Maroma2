@@ -59,6 +59,9 @@ export async function GET(_request: Request, ctx: Ctx) {
         priceInr: item.priceInr,
         moq: item.moq,
         retailPriceInr: retail,
+        primaryCategory: product.categories[0] ?? "",
+        categories: product.categories ?? [],
+        brand: product.brand?.trim() ?? "",
       };
     })
     .filter((row): row is NonNullable<typeof row> => Boolean(row));

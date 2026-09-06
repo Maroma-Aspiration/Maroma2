@@ -6,6 +6,7 @@ export type ProductCatalogEdit = {
   name?: string;
   sku?: string;
   price?: string;
+  salePrice?: string;
   shortDescription?: string;
   description?: string;
   categories?: string[];
@@ -50,6 +51,7 @@ function parseStore(value: unknown): ProductCatalogEditStore {
     if (typeof row.name === "string") patch.name = row.name.trim().slice(0, 200);
     if (typeof row.sku === "string") patch.sku = row.sku.trim().slice(0, 80);
     if (typeof row.price === "string") patch.price = row.price.trim().slice(0, 24);
+    if (typeof row.salePrice === "string") patch.salePrice = row.salePrice.trim().slice(0, 24);
     if (typeof row.shortDescription === "string") {
       patch.shortDescription = row.shortDescription.trim().slice(0, 600);
     }

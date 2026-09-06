@@ -5,6 +5,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { SignOutButton } from "../../components/SignOutButton";
 import { formatInrPrice } from "../../../lib/format-price";
+import { productImageTransform } from "../../../lib/product-image-focus";
 import type { AdminProductDetail, AdminProductFilter, AdminProductSummary } from "../../../lib/product-catalog-admin";
 
 const LIVE_STATUS_LABELS = { live: "Live", not_live: "Not live", draft: "Draft" } as const;
@@ -365,7 +366,7 @@ export default function AdminProductsClient() {
                     <Link href={`/admin/products/${product.id}`} className="catalog-admin-product-cell">
                       <span className="catalog-admin-thumb">
                         {product.imageUrl ? (
-                          <img src={product.imageUrl} alt="" />
+                          <img src={product.imageUrl} alt="" style={{ transform: productImageTransform(product.id) }} />
                         ) : (
                           <span aria-hidden>◇</span>
                         )}
@@ -411,7 +412,7 @@ export default function AdminProductsClient() {
             {products.map((product) => (
               <article className="catalog-admin-product-card" key={product.id}>
                 <Link href={`/admin/products/${product.id}`} className="catalog-admin-product-card-image">
-                  {product.imageUrl ? <img src={product.imageUrl} alt="" /> : <span aria-hidden>◇</span>}
+                  {product.imageUrl ? <img src={product.imageUrl} alt="" style={{ transform: productImageTransform(product.id) }} /> : <span aria-hidden>◇</span>}
                   <span className="catalog-admin-product-card-badges">
                     <span className={`catalog-admin-badge catalog-admin-badge--${product.liveStatus}`}>
                       {LIVE_STATUS_LABELS[product.liveStatus]}

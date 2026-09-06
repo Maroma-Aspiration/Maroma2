@@ -1,12 +1,14 @@
 import type { PromoBanner } from "../../lib/promo-types";
 import { usesPromoSequence } from "../../lib/promo-sequence-utils";
-import { promoStripStyleVars } from "../../lib/promo-strip-utils";
+import { promoStripStyleVars, promoStripBannerClass } from "../../lib/promo-strip-utils";
 import { PromoBannerSequence } from "./PromoBannerSequence";
 import { PromoCtaCluster } from "./PromoCtaCluster";
 import { PromoSequenceMarquee } from "./PromoSequenceMarquee";
+import { PromoStripBackgroundMedia } from "./PromoStripBackgroundMedia";
 
 export type PromoBannerLike = Pick<
   PromoBanner,
+  | "id"
   | "title"
   | "body"
   | "mediaUrl"
@@ -17,13 +19,21 @@ export type PromoBannerLike = Pick<
   | "ctaBuyLinks"
   | "presentation"
   | "sequenceTransition"
+  | "sequenceFadeDurationMs"
   | "sequenceLoop"
   | "frames"
   | "stripBackground"
+  | "stripBackgroundFallbackImageUrl"
   | "stripHeightPx"
   | "stripOpacity"
   | "mediaOffsetXCm"
   | "marqueeForceScroll"
+  | "heroMarqueeStartOffsetCm"
+  | "heroMarqueeStartOffsetPx"
+  | "heroMarqueeEndOffsetCm"
+  | "heroMarqueeEndOffsetPx"
+  | "ctaOffsetX"
+  | "ctaOffsetY"
 >;
 
 type PromoBannerCardProps = {
@@ -32,7 +42,15 @@ type PromoBannerCardProps = {
   linkable?: boolean;
   className?: string;
   variant?: "default" | "hero";
+  /** Hold playback on frame 0 until Start (homepage preview iframe). */
+  startHeld?: boolean;
+  /** Hold marquee at start/end while editing offsets in admin. */
   marqueePreviewStart?: boolean;
+  marqueePreviewMode?: "start" | "end";
+  /** Remember strip video playback for the browser session (live homepage). */
+  rememberStripVideoSeen?: boolean;
+  ctaDraggable?: boolean;
+  onCtaPositionChange?: (position: { x: number; y: number }) => void;
 };
 
 function PromoBannerStatic({
@@ -61,13 +79,16 @@ function PromoBannerStatic({
 
   return (
     <div
-      className={`promo-banner promo-banner--${banner.animation} promo-banner--${variant} ${className}`.trim()}
+      className={`promo-banner promo-banner--${banner.animation} promo-banner--${variant}${promoStripBannerClass(banner)} ${className}`.trim()}
       style={promoStripStyleVars(banner)}
     >
-      {banner.mediaKind === "image" && banner.mediaUrl ? (
+      <PromoStripBackgroundMedia banner={banner} />
+      {banner.mediaKind === "image" || banner.mediaKind === "title-media" ? (
+        banner.mediaUrl ? (
         <div className="promo-banner-media-wrap">
           <img src={banner.mediaUrl} alt="" className="promo-banner-media" />
         </div>
+        ) : null
       ) : null}
       {banner.mediaKind === "video" && banner.mediaUrl ? (
         <div className="promo-banner-media-wrap">
@@ -75,7 +96,9 @@ function PromoBannerStatic({
         </div>
       ) : null}
       <div className="promo-banner-content">
-        {banner.title && !isHero ? <strong className="promo-banner-title">{banner.title}</strong> : null}
+        {banner.title && (!isHero || banner.mediaKind === "title-media") ? (
+          <strong className="promo-banner-title">{banner.title}</strong>
+        ) : null}
         {banner.body ? (
           isHero ? (
             <PromoSequenceMarquee
@@ -88,6 +111,10 @@ function PromoBannerStatic({
               }}
               variant="hero"
               forceScroll={banner.marqueeForceScroll !== false}
+              heroMarqueeStartOffsetCm={banner.heroMarqueeStartOffsetCm}
+              heroMarqueeStartOffsetPx={banner.heroMarqueeStartOffsetPx}
+              heroMarqueeEndOffsetCm={banner.heroMarqueeEndOffsetCm}
+              heroMarqueeEndOffsetPx={banner.heroMarqueeEndOffsetPx}
               onDurationReady={() => {}}
             />
           ) : useMarquee ? (
@@ -113,7 +140,12 @@ export function PromoBannerCard({
   linkable = true,
   className = "",
   variant = "default",
+  startHeld = false,
   marqueePreviewStart = false,
+  marqueePreviewMode = "start",
+  rememberStripVideoSeen = false,
+  ctaDraggable = false,
+  onCtaPositionChange,
 }: PromoBannerCardProps) {
   if (usesPromoSequence(banner, variant)) {
     return (
@@ -122,7 +154,12 @@ export function PromoBannerCard({
         linkable={linkable}
         variant={variant}
         className={className}
+        startHeld={startHeld}
         marqueePreviewStart={marqueePreviewStart}
+        marqueePreviewMode={marqueePreviewMode}
+        rememberStripVideoSeen={rememberStripVideoSeen}
+        ctaDraggable={ctaDraggable}
+        onCtaPositionChange={onCtaPositionChange}
       />
     );
   }

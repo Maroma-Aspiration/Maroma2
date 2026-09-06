@@ -1,0 +1,24 @@
+.compact-store-header { overflow:visible; }
+.compact-store-nav { display:flex; align-items:center; gap:clamp(16px,2.5vw,40px); padding:20px clamp(16px,3vw,48px); min-height:80px; box-sizing:border-box; width:100%; }
+.compact-store-nav .brand { flex:0 0 auto; }
+.compact-shop-links { display:flex; align-items:center; justify-content:center; gap:clamp(18px,2.5vw,36px); flex:1; min-width:0; }
+.compact-shop-links > a,.compact-shop-links button { color:#174d57; font:600 12px/1.4 var(--font-sans),sans-serif; letter-spacing:.06em; text-transform:uppercase; white-space:nowrap; text-decoration:none; }
+.compact-shop-links button { border:0; background:transparent; padding:10px 0; cursor:pointer; }
+.compact-shop-links :is(a,button):focus-visible { outline:2px solid #174d57; outline-offset:4px; }
+.compact-shop-dropdown { position:relative; }
+.compact-shop-menu { position:absolute; top:100%; left:0; min-width:210px; display:flex; flex-direction:column; gap:0; padding:10px; border:1px solid #d7e3df; border-radius:12px; background:#fffdf8; box-shadow:0 12px 30px #174d5726; z-index:100; }
+.compact-shop-dropdown:last-child .compact-shop-menu { left:auto; right:0; }
+.compact-shop-menu a { display:block; padding:10px 12px; color:#174d57; text-decoration:none; font:500 14px/1.4 var(--font-sans),sans-serif; border-radius:6px; white-space:nowrap; }
+.compact-shop-menu a:hover { background:#edf4ef; }
+.compact-store-search { flex:0 0 150px; }
+.compact-store-search .nav-search-bar { width:100%; }
+.compact-store-basket { flex:0 0 auto; }
+@media(max-width:800px) {
+  .compact-store-nav { display:grid; grid-template-columns:1fr minmax(90px,140px) auto; gap:8px 14px; padding:12px 16px; }
+  .compact-store-nav .brand { grid-column:1; grid-row:1; }
+  .compact-store-nav .brand-logo { width:125px!important; max-width:125px!important; height:auto!important; }
+  .compact-store-search { grid-column:2; grid-row:1; }
+  .compact-store-basket { grid-column:3; grid-row:1; }
+  .compact-shop-links { grid-column:1/-1; grid-row:2; justify-content:space-between; gap:12px; }
+  .compact-shop-links > a,.compact-shop-links button { font-size:10px; letter-spacing:.03em; }
+}

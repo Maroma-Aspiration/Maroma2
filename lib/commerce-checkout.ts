@@ -9,6 +9,7 @@ import { sendOrderConfirmationEmail } from "./commerce-order-email";
 import { decrementStockForOrder } from "./commerce-stock";
 import { normalizeIndianPincode, pincodeValidationMessage } from "./indian-pincode";
 import type { OrderRecord, ShippingAddress } from "./commerce-types";
+import { matchingRestrictions, readShippingRestrictions } from "./shipping-restrictions";
 
 export type CheckoutInput = {
   cartId: string;
@@ -55,6 +56,9 @@ export async function createOrderFromCart(
   if (view.items.length === 0) {
     throw new CartError("Your basket is empty.", 400);
   }
+  const restrictions = await readShippingRestrictions();
+  const matched = matchingRestrictions(restrictions, [input.shipping.country, input.shipping.state, input.shipping.city], view.items.map((item) => item.productId), view.items.filter((item) => item.ukAndChannelIslandsRestricted).map((item) => item.productId));
+  if (matched.length) throw new CartError("One or more items in your basket cannot be delivered to this destination. Please remove them or use another delivery address.", 400);
 
   for (const item of view.items) {
     if (item.quantity > item.maxQuantity) {

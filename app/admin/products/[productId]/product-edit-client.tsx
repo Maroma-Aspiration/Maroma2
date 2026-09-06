@@ -31,6 +31,7 @@ export default function ProductEditClient({ productId }: ProductEditClientProps)
   const [name, setName] = useState("");
   const [sku, setSku] = useState("");
   const [price, setPrice] = useState("");
+  const [salePrice, setSalePrice] = useState("");
   const [stock, setStock] = useState(0);
   const [published, setPublished] = useState(true);
   const [shortDescription, setShortDescription] = useState("");
@@ -44,6 +45,7 @@ export default function ProductEditClient({ productId }: ProductEditClientProps)
     setName(detail.name);
     setSku(detail.sku);
     setPrice(detail.price);
+    setSalePrice(detail.salePrice ?? "");
     setStock(detail.stock);
     setPublished(detail.published);
     setShortDescription(detail.shortDescription);
@@ -99,6 +101,7 @@ export default function ProductEditClient({ productId }: ProductEditClientProps)
           name,
           sku,
           price,
+          salePrice,
           stock,
           published,
           shortDescription,
@@ -322,6 +325,19 @@ export default function ProductEditClient({ productId }: ProductEditClientProps)
                 <span>Price (INR)</span>
                 <input type="text" inputMode="decimal" value={price} onChange={(e) => setPrice(e.target.value)} />
               </label>
+              <label className="catalog-admin-field">
+                <span>Sale price (INR, optional)</span>
+                <input
+                  type="text"
+                  inputMode="decimal"
+                  value={salePrice}
+                  onChange={(e) => setSalePrice(e.target.value)}
+                  placeholder="Leave blank for no sale"
+                />
+              </label>
+              <p className="catalog-admin-card-copy">
+                When lower than the regular price, the storefront shows the regular price crossed out and uses this sale price in the bag and checkout.
+              </p>
             </section>
 
             <section className="catalog-admin-card">

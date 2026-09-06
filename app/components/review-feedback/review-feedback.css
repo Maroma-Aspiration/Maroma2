@@ -357,6 +357,86 @@ html.review-mode-active {
   color: #f4f7f5;
 }
 
+.review-export-summary-list {
+  margin: 0 0 16px;
+  padding-left: 1.1rem;
+  color: #2f6771;
+  font-size: 0.95rem;
+}
+
+.review-export-summary-list li + li {
+  margin-top: 6px;
+}
+
+.review-export-summary-list strong {
+  color: #134a57;
+}
+
+.review-export-page-group + .review-export-page-group {
+  margin-top: 18px;
+  padding-top: 18px;
+  border-top: 1px solid rgba(19, 74, 87, 0.1);
+}
+
+.review-export-page-group-title {
+  margin: 0 0 10px;
+  font-size: 1rem;
+  font-weight: 600;
+}
+
+.review-export-page-group-path {
+  display: block;
+  margin-top: 4px;
+  font-size: 12px;
+  font-weight: 500;
+  color: #2f6771;
+}
+
+.review-export-item h4 {
+  font-size: 0.95rem;
+  font-weight: 600;
+}
+
+.review-export-item-meta {
+  margin-top: 4px;
+  font-size: 12px;
+  color: #2f6771;
+}
+
+.review-export-admin-tools {
+  margin-top: 8px;
+  padding: 12px 14px;
+  border: 1px dashed rgba(19, 74, 87, 0.18);
+  border-radius: 12px;
+  background: rgba(248, 246, 239, 0.55);
+  color: #2f6771;
+  font-size: 0.82rem;
+}
+
+.review-export-admin-tools summary {
+  cursor: pointer;
+  color: #2f6771;
+  font-size: 0.78rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  user-select: none;
+}
+
+.review-export-admin-tools[open] {
+  padding-bottom: 16px;
+}
+
+.review-export-admin-lede {
+  margin: 10px 0 12px;
+  color: #2f6771;
+  font-size: 0.82rem;
+}
+
+.review-export-admin-tools .review-export-prompt {
+  margin-bottom: 10px;
+}
+
 .review-export-prompt {
   width: 100%;
   min-height: 360px;

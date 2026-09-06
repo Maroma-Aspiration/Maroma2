@@ -15,7 +15,19 @@ import { SignOutButton } from "./components/SignOutButton";
 import type { CategoryBannerStore } from "../lib/category-banner-types";
 import type { ProductRecord } from "../lib/product-types";
 import type { PromoBanner } from "../lib/promo-types";
-import { normalizePromoStripFields, PROMO_STRIP_DEFAULTS } from "../lib/promo-strip-utils";
+import {
+  normalizePromoStripFields,
+  PROMO_STRIP_DEFAULTS,
+  PROMO_STRIP_ASPECT_21_9,
+  PROMO_STRIP_HEIGHT_MAX,
+  PROMO_STRIP_HEIGHT_MIN,
+  PROMO_STRIP_POSITION_CM_MIN,
+  PROMO_STRIP_POSITION_CM_MAX,
+  PROMO_STRIP_POSITION_PX_MIN,
+  PROMO_STRIP_POSITION_PX_MAX,
+  promoStripHidesHeroPrimary,
+  isPromoModeEnabled,
+} from "../lib/promo-strip-utils";
 import {
   PROMO_PREVIEW_MESSAGE,
   readPromoPreviewPayload,
@@ -125,6 +137,10 @@ type HeroVisualApiState = {
   heroPromoBannerTopCm?: number;
   heroPromoBannerPos?: { x: number; y: number };
   heroPromoBannerWidthPct?: number;
+  heroMarqueeStartOffsetCm?: number;
+  heroMarqueeStartOffsetPx?: number;
+  heroMarqueeEndOffsetCm?: number;
+  heroMarqueeEndOffsetPx?: number;
   heroCopyWidthVw?: number;
   primarySettings?: HeroLayerSettings;
   overlayLayer?: HeroOverlayLayer;
@@ -254,10 +270,49 @@ export default function HomePageClient({
     }
     return initialPromoBanners;
   });
+  const livePromoBannersRef = useRef(livePromoBanners);
+  livePromoBannersRef.current = livePromoBanners;
+  const promoPatchTimerRef = useRef<number | null>(null);
+  const [marqueePreviewMode, setMarqueePreviewMode] = useState<"start" | "end">("start");
+  const [heroMarqueeStartOffsetCm, setHeroMarqueeStartOffsetCm] = useState(
+    initialHeroVisual.heroMarqueeStartOffsetCm ??
+      initialPromoBanners[0]?.heroMarqueeStartOffsetCm ??
+      PROMO_STRIP_DEFAULTS.heroMarqueeStartOffsetCm
+  );
+  const [heroMarqueeStartOffsetPx, setHeroMarqueeStartOffsetPx] = useState(
+    initialHeroVisual.heroMarqueeStartOffsetPx ??
+      initialPromoBanners[0]?.heroMarqueeStartOffsetPx ??
+      PROMO_STRIP_DEFAULTS.heroMarqueeStartOffsetPx
+  );
+  const [heroMarqueeEndOffsetCm, setHeroMarqueeEndOffsetCm] = useState(
+    initialHeroVisual.heroMarqueeEndOffsetCm ??
+      initialPromoBanners[0]?.heroMarqueeEndOffsetCm ??
+      PROMO_STRIP_DEFAULTS.heroMarqueeEndOffsetCm
+  );
+  const [heroMarqueeEndOffsetPx, setHeroMarqueeEndOffsetPx] = useState(
+    initialHeroVisual.heroMarqueeEndOffsetPx ??
+      initialPromoBanners[0]?.heroMarqueeEndOffsetPx ??
+      PROMO_STRIP_DEFAULTS.heroMarqueeEndOffsetPx
+  );
 
   useEffect(() => {
-    setLivePromoBanners(initialPromoBanners);
-  }, [initialPromoBanners]);
+    if (initialPromoPreview) return;
+    setLivePromoBanners((current) => {
+      const local = current[0];
+      const incoming = initialPromoBanners[0];
+      if (
+        local &&
+        incoming &&
+        local.id === incoming.id &&
+        local.updatedAt &&
+        incoming.updatedAt &&
+        Date.parse(local.updatedAt) > Date.parse(incoming.updatedAt)
+      ) {
+        return current;
+      }
+      return initialPromoBanners;
+    });
+  }, [initialPromoBanners, initialPromoPreview]);
 
   useEffect(() => {
     if (!initialPromoPreview) return undefined;
@@ -276,6 +331,10 @@ export default function HomePageClient({
     const onMessage = (event: MessageEvent) => {
       if (event.origin !== window.location.origin) return;
       if (event.data?.type !== PROMO_PREVIEW_MESSAGE) return;
+      if (Array.isArray(event.data.banners) && event.data.banners.length > 0) {
+        setLivePromoBanners(event.data.banners);
+        return;
+      }
       applyPreviewBanners();
     };
 
@@ -534,6 +593,7 @@ export default function HomePageClient({
     | "eyebrow"
     | "actions"
     | "promo-banner"
+    | "promo-cta"
     | "ritual-band"
     | "rituals"
     | "loved-florals"
@@ -661,6 +721,18 @@ export default function HomePageClient({
     if (data.heroPromoBannerPos) setHeroPromoBannerPos(data.heroPromoBannerPos);
     if (typeof data.heroPromoBannerWidthPct === "number") {
       setHeroPromoBannerWidthPct(data.heroPromoBannerWidthPct);
+    }
+    if (typeof data.heroMarqueeStartOffsetCm === "number") {
+      setHeroMarqueeStartOffsetCm(data.heroMarqueeStartOffsetCm);
+    }
+    if (typeof data.heroMarqueeStartOffsetPx === "number") {
+      setHeroMarqueeStartOffsetPx(data.heroMarqueeStartOffsetPx);
+    }
+    if (typeof data.heroMarqueeEndOffsetCm === "number") {
+      setHeroMarqueeEndOffsetCm(data.heroMarqueeEndOffsetCm);
+    }
+    if (typeof data.heroMarqueeEndOffsetPx === "number") {
+      setHeroMarqueeEndOffsetPx(data.heroMarqueeEndOffsetPx);
     }
     if (data.eyebrowPos) setEyebrowPos(data.eyebrowPos);
     if (data.ritualCarouselPos) setRitualCarouselPos(data.ritualCarouselPos);
@@ -1500,7 +1572,7 @@ export default function HomePageClient({
     if (!canEditLayout && !canEditMobilePreview) {
       return;
     }
-    if (persistLayoutToMobile && adminEditLayer !== "actions") {
+    if (adminEditLayer !== "actions") {
       return;
     }
     heroActionsDragStart.current = { x: event.clientX, y: event.clientY };
@@ -1514,7 +1586,7 @@ export default function HomePageClient({
     if (!heroActionsDragStart.current || (!canEditLayout && !canEditMobilePreview)) {
       return;
     }
-    if (persistLayoutToMobile && adminEditLayer !== "actions") {
+    if (adminEditLayer !== "actions") {
       return;
     }
     const dx = event.clientX - heroActionsDragStart.current.x;
@@ -1668,6 +1740,14 @@ export default function HomePageClient({
       heroPromoBannerTopCm: heroPromoBannerTopCmRef.current,
       heroPromoBannerPos: heroPromoBannerPosRef.current,
       heroPromoBannerWidthPct,
+      heroMarqueeStartOffsetCm:
+        heroMarqueeStartOffsetCm ?? livePromoBanners[0]?.heroMarqueeStartOffsetCm,
+      heroMarqueeStartOffsetPx:
+        heroMarqueeStartOffsetPx ?? livePromoBanners[0]?.heroMarqueeStartOffsetPx,
+      heroMarqueeEndOffsetCm:
+        heroMarqueeEndOffsetCm ?? livePromoBanners[0]?.heroMarqueeEndOffsetCm,
+      heroMarqueeEndOffsetPx:
+        heroMarqueeEndOffsetPx ?? livePromoBanners[0]?.heroMarqueeEndOffsetPx,
       ritualCarouselPos,
       ritualCarouselPosPct,
       eyebrowPos,
@@ -1733,6 +1813,31 @@ export default function HomePageClient({
 
       if (!contentResponse.ok) {
         throw new Error("Unable to save site content.");
+      }
+
+      const liveBanner = livePromoBannersRef.current[0];
+      if (liveBanner) {
+        const strip = normalizePromoStripFields({
+          ...liveBanner,
+          heroMarqueeStartOffsetCm:
+            heroMarqueeStartOffsetCm ?? liveBanner.heroMarqueeStartOffsetCm,
+          heroMarqueeStartOffsetPx:
+            heroMarqueeStartOffsetPx ?? liveBanner.heroMarqueeStartOffsetPx,
+          heroMarqueeEndOffsetCm: heroMarqueeEndOffsetCm ?? liveBanner.heroMarqueeEndOffsetCm,
+          heroMarqueeEndOffsetPx: heroMarqueeEndOffsetPx ?? liveBanner.heroMarqueeEndOffsetPx,
+        });
+        const promoRes = await fetch("/api/promos", {
+          method: "POST",
+          credentials: "same-origin",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            ...liveBanner,
+            ...strip,
+          }),
+        });
+        if (!promoRes.ok) {
+          throw new Error("Unable to save marquee start and end.");
+        }
       }
 
       writeHeroVisualLocalBackup(parseHeroVisualState(visualResponse));
@@ -2634,6 +2739,11 @@ export default function HomePageClient({
     adminDragEnabled && adminEditLayer === "eyebrow" ? "is-editing-eyebrow" : "",
     adminDragEnabled && adminEditLayer === "actions" ? "is-editing-actions" : "",
     adminDragEnabled && adminEditLayer === "promo-banner" ? "is-editing-promo-banner" : "",
+    livePromoBanners[0] &&
+      isPromoModeEnabled(livePromoBanners[0]) &&
+      promoStripHidesHeroPrimary(livePromoBanners[0])
+      ? "is-promo-21-9-video"
+      : "",
     layoutDragging ? "is-layout-dragging" : "",
   ]
     .filter(Boolean)
@@ -2677,17 +2787,27 @@ export default function HomePageClient({
           ["--hero-actions-nudge-y" as string]: `${heroActionsRenderPos.y}px`,
         }
       : {};
+  const heroPrimaryPaintZ = heroPromoStackZ + 1;
+  const livePromoStripLayout =
+    livePromoBanners[0] && isPromoModeEnabled(livePromoBanners[0])
+      ? normalizePromoStripFields(livePromoBanners[0])
+      : PROMO_STRIP_DEFAULTS;
   const artboardStackStyle = {
     ["--hero-copy-offset-y" as string]: showMobileLayout ? mobileEffective.heroCopyOffsetY : heroCopyOffsetY,
-    ["--hero-promo-top-offset" as string]: `${heroPromoTopCmForRender}cm`,
+    ["--hero-promo-top-offset" as string]: `${
+      heroPromoTopCmForRender + livePromoStripLayout.stripPositionOffsetCm
+    }cm`,
     ["--hero-promo-nudge-x" as string]: `${heroPromoRenderPos.x}px`,
-    ["--hero-promo-nudge-y" as string]: `${heroPromoRenderPos.y}px`,
+    ["--hero-promo-nudge-y" as string]: `${
+      heroPromoRenderPos.y + livePromoStripLayout.stripPositionOffsetPx
+    }px`,
     ["--hero-promo-width-pct" as string]: `${heroPromoWidthPctForRender}%`,
-    ["--hero-z-background" as string]: heroBackgroundStackZ,
-    ["--hero-z-promo" as string]: heroPromoStackZ,
-    ["--hero-z-media" as string]: heroMediaStackZ,
-    ["--hero-z-copy" as string]: heroCopyStackZ,
-    ["--hero-z-rituals" as string]: heroRitualStackZ,
+    ["--hero-z-background" as string]: String(heroBackgroundStackZ),
+    ["--hero-z-promo" as string]: String(heroPromoStackZ),
+    ["--hero-z-media" as string]: String(heroMediaStackZ),
+    ["--hero-z-primary-product" as string]: String(heroPrimaryPaintZ),
+    ["--hero-z-copy" as string]: String(heroCopyStackZ),
+    ["--hero-z-rituals" as string]: String(heroRitualStackZ),
     ["--hero-ritual-x-pct" as string]: String(ritualPositionPctForRender.x),
     ["--hero-ritual-y-pct" as string]: String(ritualPositionPctForRender.y),
     ["--hero-headline-size" as string]: `${headlineSizeForRender}rem`,
@@ -2792,26 +2912,80 @@ export default function HomePageClient({
     void persistHeroVisualPatch({ heroPromoBannerWidthPct: clamped });
   };
 
-  const editPromoStrip = livePromoBanners[0]
-    ? normalizePromoStripFields(livePromoBanners[0])
+  const displayPromoBanners = useMemo(() => {
+    if (livePromoBanners.length === 0) return livePromoBanners;
+    if (initialPromoPreview) return livePromoBanners;
+    const first = {
+      ...livePromoBanners[0],
+      heroMarqueeStartOffsetCm,
+      heroMarqueeStartOffsetPx,
+      heroMarqueeEndOffsetCm,
+      heroMarqueeEndOffsetPx,
+    };
+    return [first, ...livePromoBanners.slice(1)];
+  }, [
+    heroMarqueeEndOffsetCm,
+    heroMarqueeEndOffsetPx,
+    heroMarqueeStartOffsetCm,
+    heroMarqueeStartOffsetPx,
+    initialPromoPreview,
+    livePromoBanners,
+  ]);
+
+  const editPromoStrip = displayPromoBanners[0]
+    ? normalizePromoStripFields(displayPromoBanners[0])
     : PROMO_STRIP_DEFAULTS;
+
+  const heroPromoBanners = useMemo(
+    () => displayPromoBanners.filter((banner) => isPromoModeEnabled(banner)),
+    [displayPromoBanners]
+  );
+
+  const persistLivePromoStrip = useCallback(async (banner: PromoBanner) => {
+    const strip = normalizePromoStripFields(banner);
+    const res = await fetch("/api/promos", {
+      method: "POST",
+      credentials: "same-origin",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        ...banner,
+        ...strip,
+      }),
+    });
+    if (!res.ok) {
+      setSaveStatus("error");
+      return;
+    }
+    const data = (await res.json().catch(() => null)) as { banner?: PromoBanner } | null;
+    if (data?.banner) {
+      livePromoBannersRef.current = [
+        data.banner,
+        ...livePromoBannersRef.current.filter((item) => item.id !== data.banner?.id),
+      ];
+      setLivePromoBanners(livePromoBannersRef.current);
+    }
+  }, []);
 
   const patchLivePromoStrip = useCallback(
     (patch: Partial<PromoBanner>) => {
-      const banner = livePromoBanners[0];
+      const banner = livePromoBannersRef.current[0];
       if (!banner) return;
-      const nextBanner: PromoBanner = { ...banner, ...patch };
-      setLivePromoBanners([nextBanner, ...livePromoBanners.slice(1)]);
-      void fetch("/api/promos", {
-        method: "POST",
-        credentials: "same-origin",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(nextBanner),
-      }).catch(() => {
-        /* keep optimistic UI */
-      });
+      const nextBanner: PromoBanner = {
+        ...banner,
+        ...patch,
+        updatedAt: new Date().toISOString(),
+      };
+      livePromoBannersRef.current = [nextBanner, ...livePromoBannersRef.current.slice(1)];
+      setLivePromoBanners(livePromoBannersRef.current);
+      if (promoPatchTimerRef.current !== null) {
+        window.clearTimeout(promoPatchTimerRef.current);
+      }
+      promoPatchTimerRef.current = window.setTimeout(() => {
+        const latest = livePromoBannersRef.current[0];
+        if (latest) void persistLivePromoStrip(latest);
+      }, 250);
     },
-    [livePromoBanners]
+    [persistLivePromoStrip]
   );
 
   const snapPromoBetweenHeadlineAndActions = useCallback(() => {
@@ -3717,8 +3891,8 @@ export default function HomePageClient({
       </div>
       {kind === "primary" ? (
         <span className="floating-admin-hint" style={{ fontSize: "0.72rem" }}>
-          Stack depth {heroMediaStackZ} · promo {heroPromoStackZ}. Higher than promo moves product above the
-          strip. Match or exceed florals depth ({lovedFloralsStackZ}) to tuck florals behind the hero.
+          Stack depth {heroMediaStackZ} · promo {heroPromoStackZ}. Overlay/florals use stack depth.
+          The product graphic always sits one layer above the promo strip.
         </span>
       ) : null}
     </div>
@@ -3976,6 +4150,66 @@ export default function HomePageClient({
       </div>
     ) : null;
 
+  const renderHeroPrimaryFrame = () => (
+    <div
+      className={`hero-media-frame hero-primary-product-frame${
+        adminDragEnabled && adminEditLayer === "primary" ? " hero-media-editable" : ""
+      }`}
+      style={{
+        ...heroMediaFrameLayoutStyle(
+          mobilePrimaryLayout,
+          mobilePrimaryScale,
+          heroPrimarySettings.rotateDeg
+        ),
+        opacity: heroPrimarySettings.opacity,
+        zIndex: heroPrimarySettings.zIndex,
+        display: !heroPrimarySettings.visible ? "none" : "block",
+        pointerEvents: primaryMediaPointerEvents,
+      }}
+      onPointerDown={(e) => handleMediaDragDown(e, "primary")}
+      onPointerMove={handleMediaDragMove}
+      onPointerUp={handleMediaDragUp}
+    >
+      {heroVideoIsBackground ? (
+        <img
+          className="hero-media-image"
+          src="/hero-products-primary.png"
+          alt=""
+          aria-hidden="true"
+          style={{ objectFit: heroPrimarySettings.fit }}
+        />
+      ) : introPhase === "playing" && !adminDragEnabled && hero.video.poster ? (
+        <img
+          className="hero-media-image"
+          src={hero.video.poster}
+          alt=""
+          aria-hidden="true"
+          style={{ objectFit: heroPrimarySettings.fit }}
+        />
+      ) : (
+        <HeroVideoMedia
+          src={heroVideoSrcForRender}
+          poster={hero.video.poster}
+          objectFit={heroPrimarySettings.fit}
+          portrait={Boolean(showMobileLayout && hero.video.mobileSrc?.trim())}
+        />
+      )}
+    </div>
+  );
+
+  const hidePrimaryForPromoView =
+    (initialPromoPreview &&
+      displayPromoBanners[0] &&
+      promoStripHidesHeroPrimary(displayPromoBanners[0])) ||
+    (adminDragEnabled && adminEditLayer === "promo-banner") ||
+    (heroPromoBanners[0] &&
+      promoStripHidesHeroPrimary(heroPromoBanners[0]) &&
+      !(adminDragEnabled && adminEditLayer === "primary"));
+  const showHeroPrimaryProductLayer =
+    (hasHeroMedia || adminDragEnabled) && !hidePrimaryForPromoView;
+  const showHeroMediaOverlayHost =
+    (hasOverlayMedia && overlayInHeroMedia) || (adminDragEnabled && hasOverlayMedia);
+
   const pageHeroStack = (
     <>
       <section
@@ -4020,7 +4254,7 @@ export default function HomePageClient({
                   }
             }
           >
-            {heroVideoIsBackground ? (
+            {heroVideoIsBackground && adminDragEnabled ? (
               <HeroVideoMedia
                 src={heroVideoSrcForRender}
                 poster={hero.video.poster}
@@ -4039,8 +4273,14 @@ export default function HomePageClient({
         ) : null}
         {useMobileDocumentFlow && !mobileNudgeActive ? renderHeroOverlayFrame() : null}
         <HeroPromoBanner
-          initialBanners={livePromoBanners}
+          initialBanners={heroPromoBanners}
           editable={adminDragEnabled && adminEditLayer === "promo-banner"}
+          marqueePreviewMode={marqueePreviewMode}
+          holdMarquee={initialPromoPreview || introPhase === "playing"}
+          ctaDraggable={adminDragEnabled && adminEditLayer === "promo-cta"}
+          onCtaPositionChange={(position) =>
+            patchLivePromoStrip({ ctaOffsetX: Math.round(position.x), ctaOffsetY: Math.round(position.y) })
+          }
           bannerRef={heroPromoElRef}
           onPointerDown={
             adminDragEnabled && (canEditLayout || canEditMobilePreview)
@@ -4058,6 +4298,14 @@ export default function HomePageClient({
               : undefined
           }
         />
+        {showHeroPrimaryProductLayer ? (
+          <div className="hero-primary-product-layer" aria-hidden={!heroPrimarySettings.visible}>
+            {renderHeroPrimaryFrame()}
+          </div>
+        ) : null}
+        {showHeroMediaOverlayHost ? (
+          <div className="hero-media">{overlayInHeroMedia ? renderHeroOverlayFrame() : null}</div>
+        ) : null}
         <div className="hero-copy">
           <div style={showMobileLayout ? { width: "100%", maxWidth: "100%" } : { width: `${copyWidth}vw`, maxWidth: "100%" }}>
           {eyebrowVisible ? (
@@ -4097,7 +4345,7 @@ export default function HomePageClient({
           {actionsVisible ? (
             <div
               ref={heroActionsElRef}
-              className={`hero-actions${adminDragEnabled ? " hero-cta-drag" : ""}`}
+              className={`hero-actions${adminDragEnabled && adminEditLayer === "actions" ? " hero-cta-drag" : ""}`}
               style={{
                 ...(mobileNudgeActive
                   ? mobileNudgeTransformStyle(heroActionsRenderPos.x, heroActionsRenderPos.y, "actions")
@@ -4106,9 +4354,21 @@ export default function HomePageClient({
                   ? undefined
                   : heroCopyOffsetStyle(heroActionsRenderPos.x, heroActionsRenderPos.y)),
               }}
-              onPointerDown={canEditLayout || canEditMobilePreview ? handleHeroActionsPointerDown : undefined}
-              onPointerMove={canEditLayout || canEditMobilePreview ? handleHeroActionsPointerMove : undefined}
-              onPointerUp={canEditLayout || canEditMobilePreview ? handleHeroActionsPointerUp : undefined}
+              onPointerDown={
+                (canEditLayout || canEditMobilePreview) && adminEditLayer === "actions"
+                  ? handleHeroActionsPointerDown
+                  : undefined
+              }
+              onPointerMove={
+                (canEditLayout || canEditMobilePreview) && adminEditLayer === "actions"
+                  ? handleHeroActionsPointerMove
+                  : undefined
+              }
+              onPointerUp={
+                (canEditLayout || canEditMobilePreview) && adminEditLayer === "actions"
+                  ? handleHeroActionsPointerUp
+                  : undefined
+              }
             >
               <Link href="/special" className="button primary button-gold">
                 {hero.ctaPrimary}
@@ -4143,48 +4403,6 @@ export default function HomePageClient({
           ) : null}
           </div>
         </div>
-
-        {/* Primary Media Layer (Video, Poster, or Fallback Graphic) */}
-        {hasHeroMedia || adminDragEnabled || hasOverlayMedia ? (
-          <div className="hero-media">
-            {overlayInHeroMedia ? renderHeroOverlayFrame() : null}
-
-            <div
-              className={`hero-media-frame ${adminDragEnabled && adminEditLayer === "primary" ? "hero-media-editable" : ""}`}
-              style={{
-                ...heroMediaFrameLayoutStyle(
-                  mobilePrimaryLayout,
-                  mobilePrimaryScale,
-                  heroPrimarySettings.rotateDeg
-                ),
-                opacity: heroPrimarySettings.opacity,
-                zIndex: heroPrimarySettings.zIndex,
-                display: !heroPrimarySettings.visible ? "none" : "block",
-                pointerEvents: primaryMediaPointerEvents
-              }}
-              onPointerDown={(e) => handleMediaDragDown(e, "primary")}
-              onPointerMove={handleMediaDragMove}
-              onPointerUp={handleMediaDragUp}
-            >
-              {heroVideoIsBackground ? (
-                <img
-                  className="hero-media-image"
-                  src="/Products%20on%20boxes.png"
-                  alt=""
-                  aria-hidden="true"
-                  style={{ objectFit: heroPrimarySettings.fit }}
-                />
-              ) : (
-                <HeroVideoMedia
-                  src={heroVideoSrcForRender}
-                  poster={hero.video.poster}
-                  objectFit={heroPrimarySettings.fit}
-                  portrait={Boolean(showMobileLayout && hero.video.mobileSrc?.trim())}
-                />
-              )}
-            </div>
-          </div>
-        ) : null}
         </div>
       </section>
 
@@ -4270,7 +4488,7 @@ export default function HomePageClient({
 
   const pageContent = (
     <div
-      className={`page maroma${showMobileLayout ? " is-mobile-layout" : ""}${useMobileDocumentFlow ? " is-mobile-document-flow" : ""}${persistLayoutToMobile && useMobileDocumentFlow ? " is-mobile-edit-active" : ""}${adminMobilePreviewActive ? " is-admin-mobile-preview" : ""}${initialPromoPreview ? " is-promo-preview-page" : ""}`}
+      className={`page maroma${showMobileLayout ? " is-mobile-layout" : ""}${useMobileDocumentFlow ? " is-mobile-document-flow" : ""}${persistLayoutToMobile && useMobileDocumentFlow ? " is-mobile-edit-active" : ""}${adminMobilePreviewActive ? " is-admin-mobile-preview" : ""}${initialPromoPreview ? " is-promo-preview-page" : ""}${introPhase === "playing" ? " is-intro-pending" : ""}`}
       style={{
         ...pageStackStyle,
         ...(introPhase !== "done"
@@ -4463,6 +4681,7 @@ export default function HomePageClient({
                   <option value="eyebrow">Eyebrow</option>
                   <option value="actions">Hero actions row</option>
                   <option value="promo-banner">Promo banner strip</option>
+                  <option value="promo-cta">Promo CTA cluster</option>
                   <option value="ritual-band">Carousel band (behind tiles)</option>
                   <option value="rituals">Ritual carousel</option>
                   <option value="loved-section">Loved section (position)</option>
@@ -4479,6 +4698,11 @@ export default function HomePageClient({
             >
               {adminEditLayer === "ritual-band" ? renderRitualBandControls() : null}
               {adminEditLayer === "rituals" ? renderRitualCarouselControls() : null}
+              {adminEditLayer === "promo-cta" ? (
+                <p className="floating-admin-hint">
+                  Drag the product tiles and CTA directly on the homepage. The new position saves automatically.
+                </p>
+              ) : null}
               {adminEditLayer === "background" && (
                 <>
                   <label>
@@ -4793,7 +5017,7 @@ export default function HomePageClient({
                 <>
                   <p className="floating-admin-hint">
                     Drag the promo strip up/down on the page (CTAs are locked while editing this layer), or use the
-                    Y / Top offset sliders. Width still uses the width slider. Click Save All Changes when done.
+                    Y / Top offset / Height sliders. Width uses the width slider. Click Save All Changes when done.
                   </p>
                   <label>
                     Top offset (cm){" "}
@@ -4847,6 +5071,76 @@ export default function HomePageClient({
                     />{" "}
                     <span>{Math.round(editHeroPromoWidthPct)}%</span>
                   </label>
+                  {livePromoBanners[0] ? (
+                    <>
+                      <label className="floating-admin-toggle-row">
+                        <input
+                          type="checkbox"
+                          checked={displayPromoBanners[0]?.promoModeEnabled !== false}
+                          onChange={(e) =>
+                            patchLivePromoStrip({ promoModeEnabled: e.target.checked })
+                          }
+                        />{" "}
+                        Promo mode (off hides strip, shows primary media)
+                      </label>
+                      <label>
+                        Height (px){" "}
+                        <input
+                          type="range"
+                          min={PROMO_STRIP_HEIGHT_MIN}
+                          max={PROMO_STRIP_HEIGHT_MAX}
+                          step={1}
+                          value={editPromoStrip.stripHeightPx}
+                          onChange={(e) =>
+                            patchLivePromoStrip({ stripHeightPx: Number(e.target.value) })
+                          }
+                        />{" "}
+                        <span>{editPromoStrip.stripHeightPx}px</span>
+                      </label>
+                      <label>
+                        Strip position (cm){" "}
+                        <input
+                          type="range"
+                          min={PROMO_STRIP_POSITION_CM_MIN}
+                          max={PROMO_STRIP_POSITION_CM_MAX}
+                          step={0.5}
+                          value={editPromoStrip.stripPositionOffsetCm}
+                          onChange={(e) =>
+                            patchLivePromoStrip({ stripPositionOffsetCm: Number(e.target.value) })
+                          }
+                        />{" "}
+                        <span>{editPromoStrip.stripPositionOffsetCm.toFixed(1)}cm</span>
+                      </label>
+                      <label>
+                        Fine position (px){" "}
+                        <input
+                          type="range"
+                          min={PROMO_STRIP_POSITION_PX_MIN}
+                          max={PROMO_STRIP_POSITION_PX_MAX}
+                          step={1}
+                          value={editPromoStrip.stripPositionOffsetPx}
+                          onChange={(e) =>
+                            patchLivePromoStrip({ stripPositionOffsetPx: Number(e.target.value) })
+                          }
+                        />{" "}
+                        <span>{editPromoStrip.stripPositionOffsetPx}px</span>
+                      </label>
+                      {editPromoStrip.stripBackgroundMediaKind === "video" ? (
+                      <label className="floating-admin-toggle-row">
+                        <input
+                          type="checkbox"
+                          checked={editPromoStrip.stripAspectRatio === PROMO_STRIP_ASPECT_21_9}
+                          onChange={(e) =>
+                            patchLivePromoStrip({
+                              stripAspectRatio: e.target.checked ? PROMO_STRIP_ASPECT_21_9 : "fixed",
+                            })
+                          }
+                        />{" "}
+                        21:9 video strip (taller layout for widescreen video)
+                      </label>
+                      ) : null}
+                    </>
+                  ) : null}
                   <button type="button" className="button secondary" onClick={snapPromoBetweenHeadlineAndActions}>
                     Snap between headline and CTAs
                   </button>
@@ -4883,9 +5177,13 @@ export default function HomePageClient({
                           max={25}
                           step={0.1}
                           value={editPromoStrip.heroMarqueeStartOffsetCm}
-                          onChange={(e) =>
-                            patchLivePromoStrip({ heroMarqueeStartOffsetCm: Number(e.target.value) })
-                          }
+                          onChange={(e) => {
+                            const next = Number(e.target.value);
+                            setMarqueePreviewMode("start");
+                            setHeroMarqueeStartOffsetCm(next);
+                            patchLivePromoStrip({ heroMarqueeStartOffsetCm: next });
+                            void persistHeroVisualPatch({ heroMarqueeStartOffsetCm: next });
+                          }}
                         />{" "}
                         <span>{editPromoStrip.heroMarqueeStartOffsetCm.toFixed(1)}cm</span>
                       </label>
@@ -4897,31 +5195,58 @@ export default function HomePageClient({
                           max={600}
                           step={1}
                           value={editPromoStrip.heroMarqueeStartOffsetPx}
-                          onChange={(e) =>
-                            patchLivePromoStrip({ heroMarqueeStartOffsetPx: Number(e.target.value) })
-                          }
+                          onChange={(e) => {
+                            const next = Number(e.target.value);
+                            setMarqueePreviewMode("start");
+                            setHeroMarqueeStartOffsetPx(next);
+                            patchLivePromoStrip({ heroMarqueeStartOffsetPx: next });
+                            void persistHeroVisualPatch({ heroMarqueeStartOffsetPx: next });
+                          }}
                         />{" "}
                         <span>{editPromoStrip.heroMarqueeStartOffsetPx}px</span>
                       </label>
-                      <p className="floating-admin-hint" style={{ fontSize: "0.72rem" }}>
-                        Text holds still while you adjust start position. Higher cm moves the whole
-                        message left; lower cm moves it right (emerges later from behind the product).
-                        Use ↻ on the strip to preview the scroll.
-                      </p>
                       <label>
-                        Strip height{" "}
+                        Marquee end (cm from strip center){" "}
                         <input
                           type="range"
-                          min={48}
-                          max={160}
-                          step={1}
-                          value={editPromoStrip.stripHeightPx}
-                          onChange={(e) =>
-                            patchLivePromoStrip({ stripHeightPx: Number(e.target.value) })
-                          }
+                          min={-15}
+                          max={15}
+                          step={0.1}
+                          value={editPromoStrip.heroMarqueeEndOffsetCm}
+                          onChange={(e) => {
+                            const next = Number(e.target.value);
+                            setMarqueePreviewMode("end");
+                            setHeroMarqueeEndOffsetCm(next);
+                            patchLivePromoStrip({ heroMarqueeEndOffsetCm: next });
+                            void persistHeroVisualPatch({ heroMarqueeEndOffsetCm: next });
+                          }}
                         />{" "}
-                        <span>{editPromoStrip.stripHeightPx}px</span>
+                        <span>{editPromoStrip.heroMarqueeEndOffsetCm.toFixed(1)}cm</span>
                       </label>
+                      <label>
+                        Marquee end fine-tune (px){" "}
+                        <input
+                          type="range"
+                          min={-600}
+                          max={600}
+                          step={1}
+                          value={editPromoStrip.heroMarqueeEndOffsetPx}
+                          onChange={(e) => {
+                            const next = Number(e.target.value);
+                            setMarqueePreviewMode("end");
+                            setHeroMarqueeEndOffsetPx(next);
+                            patchLivePromoStrip({ heroMarqueeEndOffsetPx: next });
+                            void persistHeroVisualPatch({ heroMarqueeEndOffsetPx: next });
+                          }}
+                        />{" "}
+                        <span>{editPromoStrip.heroMarqueeEndOffsetPx}px</span>
+                      </label>
+                      <p className="floating-admin-hint" style={{ fontSize: "0.72rem" }}>
+                        Text holds still while you adjust. Start sliders move the whole message
+                        (higher cm emerges sooner from behind the product). End sliders move only
+                        the rest position (positive cm/px is right). Click SAVE ALL CHANGES, then
+                        use ↻ on the strip to preview the scroll.
+                      </p>
                       <label>
                         Gift offset (cm){" "}
                         <input
@@ -4946,6 +5271,19 @@ export default function HomePageClient({
                         />{" "}
                         Always scroll message
                       </label>
+                      {displayPromoBanners[0]?.stripBackgroundMediaKind === "video" &&
+                      displayPromoBanners[0]?.stripBackgroundImageUrl ? (
+                        <label className="floating-admin-toggle-row">
+                          <input
+                            type="checkbox"
+                            checked={editPromoStrip.stripBackgroundVideoLoop}
+                            onChange={(e) =>
+                              patchLivePromoStrip({ stripBackgroundVideoLoop: e.target.checked })
+                            }
+                          />{" "}
+                          Loop strip video
+                        </label>
+                      ) : null}
                       <p className="floating-admin-hint" style={{ gridColumn: "1 / -1" }}>
                         <Link href="/admin/site">Edit banner content, frames, and schedule</Link>
                       </p>

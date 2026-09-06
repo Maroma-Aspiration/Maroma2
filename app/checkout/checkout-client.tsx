@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import { useCart } from "../../context/CartContext";
 import { useCurrency } from "../../context/CurrencyContext";
+import { CurrencySelector } from "../components/CurrencySelector";
 import { decodeBasicHtmlEntities } from "../../lib/decode-html-entities";
 import {
   loadCheckoutShippingDraft,
@@ -496,6 +497,7 @@ export default function CheckoutClient() {
           {step !== 3 && (
             <aside className="maroma-order-summary" aria-label="Order summary">
               <h2 className="maroma-order-summary-title">Order summary</h2>
+              <div className="product-currency-control"><span>Currency</span><CurrencySelector compact /></div>
               <div className="maroma-checkout-summary-items">
                 {cart.map((item) => (
                   <div key={item.id} className="maroma-checkout-summary-item">

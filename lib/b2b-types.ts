@@ -1,6 +1,6 @@
 export type B2bCommerceMode = "quote" | "checkout";
 export type B2bCompanyStatus = "pending" | "active" | "paused";
-export type B2bProgram = "custom" | "white_label";
+export type B2bProgram = "custom" | "white_label" | "branded";
 
 export type B2bAssortmentItem = {
   productId: string;
@@ -32,7 +32,7 @@ export type B2bCompany = {
   userEmail: string;
   commerceMode: B2bCommerceMode;
   status: B2bCompanyStatus;
-  /** White-label buyers get the full catalogue at a scheduled discount. */
+  /** Full-catalog programmes (white label or branded) use a scheduled discount on the live catalogue. */
   program: B2bProgram;
   whiteLabelDiscountPercent?: number;
   whiteLabelMinSpendInr?: number;

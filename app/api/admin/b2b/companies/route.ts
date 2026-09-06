@@ -58,7 +58,12 @@ export async function POST(request: Request) {
   const isUpdate = typeof body.id === "string" && Boolean(body.id.trim());
   const sendWelcome =
     body.sendWelcomeEmail === true || (!isUpdate && body.sendWelcomeEmail !== false);
-  const program: B2bProgram = body.program === "white_label" ? "white_label" : "custom";
+  const program: B2bProgram =
+    body.program === "white_label"
+      ? "white_label"
+      : body.program === "branded"
+        ? "branded"
+        : "custom";
   const discountPct = Number(body.whiteLabelDiscountPercent);
   const minSpend = Number(body.whiteLabelMinSpendInr);
 
@@ -68,17 +73,17 @@ export async function POST(request: Request) {
       name,
       slug: slugRaw,
       userEmail,
-      commerceMode: program === "white_label" ? "checkout" : commerceMode,
+      commerceMode: program === "white_label" || program === "branded" ? "checkout" : commerceMode,
       status,
       program,
       whiteLabelDiscountPercent:
-        program === "white_label"
+        program === "white_label" || program === "branded"
           ? Number.isFinite(discountPct) && discountPct > 0
             ? discountPct
             : 35
           : undefined,
       whiteLabelMinSpendInr:
-        program === "white_label"
+        program === "white_label" || program === "branded"
           ? Number.isFinite(minSpend) && minSpend > 0
             ? minSpend
             : 15000

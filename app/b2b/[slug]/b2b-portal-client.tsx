@@ -5,17 +5,17 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { formatInrPrice } from "../../../lib/format-price";
 import { decodeBasicHtmlEntities } from "../../../lib/decode-html-entities";
 import type { B2bDeliveryAddress } from "../../../lib/b2b-types";
+import {
+  filterB2bCatalog,
+  listB2bCatalogBrands,
+  listB2bCatalogCategories,
+  type B2bCatalogQuickFilter,
+  type B2bCatalogRow,
+  type B2bCatalogSort,
+} from "../../../lib/b2b-catalog-filter";
 import "./b2b-portal.css";
 
-type AssortmentRow = {
-  productId: string;
-  sku: string;
-  name: string;
-  imageUrl: string;
-  priceInr: number;
-  moq: number;
-  retailPriceInr: number | null;
-};
+type AssortmentRow = B2bCatalogRow;
 
 type PortalPayload = {
   company: {
@@ -24,7 +24,7 @@ type PortalPayload = {
     name: string;
     commerceMode: "quote" | "checkout";
     status: string;
-    program?: "custom" | "white_label";
+    program?: "custom" | "white_label" | "branded";
     whiteLabelDiscountPercent?: number;
     whiteLabelMinSpendInr?: number;
     userEmail: string;
@@ -106,6 +106,35 @@ const emptyAddress = (): AddressDraft => ({
   isDefault: false,
 });
 
+type CatalogViewMode = "list" | "grid";
+
+function B2bCatalogQtyField({
+  productId,
+  value,
+  onChange,
+  compact = false,
+}: {
+  productId: string;
+  value: number;
+  onChange: (productId: string, next: number) => void;
+  compact?: boolean;
+}) {
+  return (
+    <label className={`catalog-admin-field b2b-catalog-qty${compact ? " b2b-catalog-qty--compact" : ""}`}>
+      <span>Qty</span>
+      <input
+        type="number"
+        min={0}
+        step={1}
+        value={value}
+        onChange={(e) =>
+          onChange(productId, Math.max(0, Math.floor(Number(e.target.value) || 0)))
+        }
+      />
+    </label>
+  );
+}
+
 export default function B2bPortalClient({ slug }: { slug: string }) {
   const [data, setData] = useState<PortalPayload | null>(null);
   const [error, setError] = useState("");
@@ -122,7 +151,28 @@ export default function B2bPortalClient({ slug }: { slug: string }) {
   const [editingAddressId, setEditingAddressId] = useState<string | null>(null);
   const [showAddressForm, setShowAddressForm] = useState(false);
   const [catalogQuery, setCatalogQuery] = useState("");
+  const [catalogCategory, setCatalogCategory] = useState("");
+  const [catalogBrand, setCatalogBrand] = useState("");
+  const [catalogSort, setCatalogSort] = useState<B2bCatalogSort>("name_asc");
+  const [catalogQuickFilter, setCatalogQuickFilter] = useState<B2bCatalogQuickFilter>("all");
+  const [catalogViewMode, setCatalogViewMode] = useState<CatalogViewMode>("list");
   const [savingAddress, setSavingAddress] = useState(false);
+
+  useEffect(() => {
+    const savedView = window.localStorage.getItem("maroma-b2b-catalog-view");
+    if (savedView === "grid" || savedView === "list") {
+      setCatalogViewMode(savedView);
+    }
+  }, []);
+
+  const changeCatalogView = (nextView: CatalogViewMode) => {
+    setCatalogViewMode(nextView);
+    window.localStorage.setItem("maroma-b2b-catalog-view", nextView);
+  };
+
+  const setProductQty = useCallback((productId: string, next: number) => {
+    setQty((current) => ({ ...current, [productId]: next }));
+  }, []);
 
   const load = useCallback(async () => {
     setError("");
@@ -170,6 +220,32 @@ export default function B2bPortalClient({ slug }: { slug: string }) {
   const subtotal = useMemo(
     () => Math.round(lines.reduce((sum, l) => sum + l.lineTotal, 0) * 100) / 100,
     [lines]
+  );
+
+  const catalogCategories = useMemo(
+    () => (data ? listB2bCatalogCategories(data.assortment) : []),
+    [data]
+  );
+  const catalogBrands = useMemo(
+    () => (data ? listB2bCatalogBrands(data.assortment) : []),
+    [data]
+  );
+  const visibleAssortment = useMemo(
+    () =>
+      data
+        ? filterB2bCatalog(
+            data.assortment,
+            {
+              query: catalogQuery,
+              category: catalogCategory,
+              brand: catalogBrand,
+              sort: catalogSort,
+              quick: catalogQuickFilter,
+            },
+            qty
+          )
+        : [],
+    [data, catalogQuery, catalogCategory, catalogBrand, catalogSort, catalogQuickFilter, qty]
   );
 
   const persistAddresses = async (next: B2bDeliveryAddress[]) => {
@@ -464,16 +540,47 @@ export default function B2bPortalClient({ slug }: { slug: string }) {
 
   const isQuote = data.company.commerceMode === "quote";
   const selectedAddress = addresses.find((a) => a.id === selectedAddressId) ?? null;
-  const isWhiteLabel = data.company.program === "white_label";
+  const isFullCatalog =
+    data.company.program === "white_label" || data.company.program === "branded";
   const minSpend = data.company.whiteLabelMinSpendInr ?? 0;
   const discountPct = data.company.whiteLabelDiscountPercent ?? 35;
+  const programHeadline =
+    data.company.program === "branded"
+      ? `Branded programme: full catalogue at ${discountPct}% off. Minimum order ₹${minSpend.toLocaleString("en-IN")}.`
+      : data.company.program === "white_label"
+        ? `White-label programme: full catalogue at ${discountPct}% off. Minimum order ₹${minSpend.toLocaleString("en-IN")}.`
+        : "Restricted assortment with your negotiated rates.";
   const remainingMin = Math.max(0, minSpend - subtotal);
-  const catalogQueryNorm = catalogQuery.trim().toLowerCase();
-  const visibleAssortment = catalogQueryNorm
-    ? data.assortment.filter((row) =>
-        `${row.name} ${row.sku}`.toLowerCase().includes(catalogQueryNorm)
-      )
-    : data.assortment;
+
+  const clearCatalogFilters = () => {
+    setCatalogQuery("");
+    setCatalogCategory("");
+    setCatalogBrand("");
+    setCatalogSort("name_asc");
+    setCatalogQuickFilter("all");
+  };
+
+  const renderCatalogProductMeta = (row: AssortmentRow) => (
+    <>
+      <strong>{decodeBasicHtmlEntities(row.name)}</strong>
+      <div className="catalog-admin-card-copy b2b-catalog-meta">
+        <span>
+          {row.sku} · MOQ {row.moq}
+        </span>
+        {row.primaryCategory ? <span>{row.primaryCategory}</span> : null}
+        {row.brand ? <span>{row.brand}</span> : null}
+        <span>
+          Your price: {formatInrPrice(String(row.priceInr)) ?? `₹${row.priceInr}`}
+          {row.retailPriceInr != null && row.retailPriceInr > row.priceInr ? (
+            <>
+              {" "}
+              · Retail {formatInrPrice(String(row.retailPriceInr)) ?? `₹${row.retailPriceInr}`}
+            </>
+          ) : null}
+        </span>
+      </div>
+    </>
+  );
 
   return (
     <main className="catalog-admin-page b2b-portal-page">
@@ -485,9 +592,7 @@ export default function B2bPortalClient({ slug }: { slug: string }) {
             </p>
             <h1>{data.company.name}</h1>
             <p className="catalog-admin-lede">
-              {isWhiteLabel
-                ? `White-label programme: full catalogue at ${discountPct}% off. Minimum order ₹${minSpend.toLocaleString("en-IN")}.`
-                : "Restricted assortment with your negotiated rates."}
+              {isFullCatalog ? programHeadline : "Restricted assortment with your negotiated rates."}
               {isQuote
                 ? " Submit a quote request — Maroma will confirm availability and invoicing."
                 : " Checkout with negotiated rates — pay now or request an invoice."}
@@ -509,77 +614,160 @@ export default function B2bPortalClient({ slug }: { slug: string }) {
           </section>
         ) : (
           <section className="catalog-admin-card">
-            {isWhiteLabel ? (
+            {isFullCatalog ? (
               <p className="catalog-admin-card-copy">
                 {remainingMin > 0
                   ? `Add ₹${remainingMin.toLocaleString("en-IN")} more to reach the ₹${minSpend.toLocaleString("en-IN")} minimum.`
                   : `Minimum spend of ₹${minSpend.toLocaleString("en-IN")} met.`}
               </p>
             ) : null}
-            <label className="catalog-admin-field" style={{ marginBottom: 12 }}>
-              <span>Search catalogue</span>
-              <input
-                type="search"
-                value={catalogQuery}
-                onChange={(e) => setCatalogQuery(e.target.value)}
-                placeholder="Name or SKU"
-              />
-            </label>
-            <div style={{ display: "grid", gap: 14 }}>
-              {visibleAssortment.map((row) => (
-                <article
-                  key={row.productId}
-                  style={{
-                    display: "grid",
-                    gridTemplateColumns: "72px 1fr 120px",
-                    gap: 14,
-                    alignItems: "center",
-                    borderTop: "1px solid rgba(0,0,0,0.08)",
-                    paddingTop: 12,
-                  }}
+
+            <div className="b2b-catalog-toolbar catalog-admin-toolbar">
+              <div className="catalog-admin-search">
+                <input
+                  type="search"
+                  value={catalogQuery}
+                  onChange={(e) => setCatalogQuery(e.target.value)}
+                  placeholder="Search by name, SKU, category, or brand"
+                  aria-label="Search catalogue"
+                />
+              </div>
+
+              <div className="catalog-admin-filters b2b-catalog-filters">
+                <select
+                  value={catalogCategory}
+                  onChange={(e) => setCatalogCategory(e.target.value)}
+                  aria-label="Filter by category"
                 >
-                  <div
-                    style={{
-                      width: 72,
-                      height: 72,
-                      overflow: "hidden",
-                      background: "#e8f0ec",
-                    }}
+                  <option value="">All categories</option>
+                  {catalogCategories.map((entry) => (
+                    <option key={entry} value={entry}>
+                      {entry}
+                    </option>
+                  ))}
+                </select>
+
+                {catalogBrands.length > 0 ? (
+                  <select
+                    value={catalogBrand}
+                    onChange={(e) => setCatalogBrand(e.target.value)}
+                    aria-label="Filter by brand"
                   >
-                    {row.imageUrl ? (
-                      <img
-                        src={row.imageUrl}
-                        alt=""
-                        style={{ width: "100%", height: "100%", objectFit: "cover" }}
-                      />
-                    ) : null}
+                    <option value="">All brands</option>
+                    {catalogBrands.map((entry) => (
+                      <option key={entry} value={entry}>
+                        {entry}
+                      </option>
+                    ))}
+                  </select>
+                ) : null}
+
+                <select
+                  value={catalogSort}
+                  onChange={(e) => setCatalogSort(e.target.value as B2bCatalogSort)}
+                  aria-label="Sort products"
+                >
+                  <option value="name_asc">Name A–Z</option>
+                  <option value="name_desc">Name Z–A</option>
+                  <option value="price_asc">Price low to high</option>
+                  <option value="price_desc">Price high to low</option>
+                  <option value="sku_asc">SKU</option>
+                </select>
+
+                <div className="catalog-admin-status-tabs b2b-catalog-quick-tabs" role="group" aria-label="Catalogue filters">
+                  <button
+                    type="button"
+                    aria-pressed={catalogQuickFilter === "all"}
+                    className={`catalog-admin-status-tab catalog-admin-status-tab--all${catalogQuickFilter === "all" ? " is-active" : ""}`}
+                    onClick={() => setCatalogQuickFilter("all")}
+                  >
+                    All
+                  </button>
+                  <button
+                    type="button"
+                    aria-pressed={catalogQuickFilter === "in_order"}
+                    className={`catalog-admin-status-tab${catalogQuickFilter === "in_order" ? " is-active" : ""}`}
+                    onClick={() => setCatalogQuickFilter("in_order")}
+                  >
+                    In order
+                  </button>
+                  <button
+                    type="button"
+                    aria-pressed={catalogQuickFilter === "moq"}
+                    className={`catalog-admin-status-tab${catalogQuickFilter === "moq" ? " is-active" : ""}`}
+                    onClick={() => setCatalogQuickFilter("moq")}
+                  >
+                    MOQ &gt; 1
+                  </button>
+                  <span className="catalog-admin-filter-results" aria-live="polite">
+                    {visibleAssortment.length.toLocaleString()} of {data.assortment.length.toLocaleString()}
+                  </span>
+                  <div className="catalog-admin-view-toggle" role="group" aria-label="Catalogue view">
+                    <button
+                      type="button"
+                      className={catalogViewMode === "list" ? "is-active" : ""}
+                      aria-pressed={catalogViewMode === "list"}
+                      onClick={() => changeCatalogView("list")}
+                    >
+                      <span aria-hidden>☰</span> List
+                    </button>
+                    <button
+                      type="button"
+                      className={catalogViewMode === "grid" ? "is-active" : ""}
+                      aria-pressed={catalogViewMode === "grid"}
+                      onClick={() => changeCatalogView("grid")}
+                    >
+                      <span aria-hidden>▦</span> Grid
+                    </button>
                   </div>
-                  <div>
-                    <strong>{decodeBasicHtmlEntities(row.name)}</strong>
-                    <div className="catalog-admin-card-copy">
-                      {row.sku} · MOQ {row.moq}
-                      <br />
-                      Your price: {formatInrPrice(String(row.priceInr)) ?? `₹${row.priceInr}`}
-                    </div>
-                  </div>
-                  <label className="catalog-admin-field">
-                    <span>Qty</span>
-                    <input
-                      type="number"
-                      min={0}
-                      step={1}
-                      value={qty[row.productId] ?? 0}
-                      onChange={(e) =>
-                        setQty((current) => ({
-                          ...current,
-                          [row.productId]: Math.max(0, Math.floor(Number(e.target.value) || 0)),
-                        }))
-                      }
-                    />
-                  </label>
-                </article>
-              ))}
+                </div>
+
+                {catalogQuery || catalogCategory || catalogBrand || catalogQuickFilter !== "all" ? (
+                  <button type="button" className="button secondary b2b-catalog-clear" onClick={clearCatalogFilters}>
+                    Clear filters
+                  </button>
+                ) : null}
+              </div>
             </div>
+
+            {visibleAssortment.length === 0 ? (
+              <p className="catalog-admin-empty">No products match your filters.</p>
+            ) : catalogViewMode === "list" ? (
+              <div className="b2b-catalog-list">
+                {visibleAssortment.map((row) => (
+                  <article key={row.productId} className="b2b-catalog-row">
+                    <div className="b2b-catalog-thumb">
+                      {row.imageUrl ? <img src={row.imageUrl} alt="" /> : null}
+                    </div>
+                    <div className="b2b-catalog-copy">{renderCatalogProductMeta(row)}</div>
+                    <B2bCatalogQtyField
+                      productId={row.productId}
+                      value={qty[row.productId] ?? 0}
+                      onChange={setProductQty}
+                    />
+                  </article>
+                ))}
+              </div>
+            ) : (
+              <div className="b2b-catalog-grid">
+                {visibleAssortment.map((row) => (
+                  <article key={row.productId} className="b2b-catalog-card">
+                    <div className="b2b-catalog-card-image">
+                      {row.imageUrl ? <img src={row.imageUrl} alt="" /> : <span aria-hidden>◇</span>}
+                    </div>
+                    <div className="b2b-catalog-card-body">
+                      {renderCatalogProductMeta(row)}
+                      <B2bCatalogQtyField
+                        productId={row.productId}
+                        value={qty[row.productId] ?? 0}
+                        onChange={setProductQty}
+                        compact
+                      />
+                    </div>
+                  </article>
+                ))}
+              </div>
+            )}
           </section>
         )}
 

@@ -28,6 +28,28 @@ const sliceUntil = (text: string, markers: string[]): string => {
   return text.slice(0, shortest).trim();
 };
 
+/** Key ingredients already have their own PDP section. Remove only standalone
+ * ingredient lines from descriptive copy; never remove prose sentences. */
+const removeStandaloneKeyIngredientLines = (text: string, items: string[]): string => {
+  const names = new Set(items.map((item) => item.replace(/\s+/g, " ").trim().toLowerCase()).filter(Boolean));
+  if (!names.size) return text;
+  return text
+    .split("\n")
+    .filter((line) => !names.has(line.replace(/[•·,;]+$/g, "").replace(/\s+/g, " ").trim().toLowerCase()))
+    .join("\n")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
+};
+
+/** Legacy catalogue copy often appends a complete ingredient list after this
+ * heading. The list belongs in the dedicated ingredient section, never in the
+ * shopper-facing summary. */
+const removeLegacyIngredientBlock = (text: string): string =>
+  text
+    .replace(/(?:\n\s*)?KEY\s+INGREDIENTS\b[\s\S]*$/i, "")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
+
 export type PdpAccordionSections = {
   description: string;
   ingredients: string;
@@ -95,6 +117,8 @@ export function derivePdpSections(product: ProductRecord): PdpAccordionSections 
   if (!benefits) {
     benefits = "See the description for how this product supports your routine.";
   }
+
+  description = removeLegacyIngredientBlock(removeStandaloneKeyIngredientLines(description, product.attributes["Key Ingredients"] ?? []));
 
   if (!ingredients) {
     ingredients = "Full INCI ingredient list is not yet available online. Please refer to the product label or contact Maroma before purchase.";
