@@ -640,21 +640,39 @@ export function SiteHeader({ initialNav, initialViewportIsMobile = false }: Site
     return null;
   }
 
+  const basketFillState = totalItems > 0 ? Math.min(totalItems, 4) : 0;
+
+  const basketImageByCount = [
+    "/icons/basket-1-item.png",
+    "/icons/basket-2-items.png",
+    "/icons/basket-3-items.png",
+    "/icons/basket-4-items.png",
+  ];
+
   const basketLink = (
     <Link
       href="/cart"
       className="nav-basket-btn"
       aria-label={`Basket${totalItems ? `, ${totalItems} items` : ""}`}
     >
-      <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
-        <path
-          d="M7 7h14l-1.5 9H8.5L7 7Zm2-3h8a1 1 0 0 1 1 1v1H8V5a1 1 0 0 1 1-1Z"
-          stroke="currentColor"
-          strokeWidth="1.1"
-          strokeLinejoin="round"
+      {basketFillState === 0 ? (
+        <img
+          src="/icons/Shopping%20basket.png"
+          alt="Basket"
+          className="nav-basket-icon nav-basket-icon-default"
+          width={36}
+          height={36}
         />
-        <path d="M9 11h8" stroke="currentColor" strokeWidth="1.1" strokeLinecap="round" />
-      </svg>
+      ) : (
+        <img
+          src={basketImageByCount[basketFillState - 1]}
+          alt={`${basketFillState} items basket`}
+          className="nav-basket-icon nav-basket-icon-default"
+          width={36}
+          height={36}
+          aria-hidden="true"
+        />
+      )}
       {totalItems > 0 ? <span className="nav-basket-count">{totalItems}</span> : null}
     </Link>
   );

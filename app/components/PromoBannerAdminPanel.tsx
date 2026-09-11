@@ -51,7 +51,7 @@ const emptyDraft = () => ({
   presentation: "sequence" as PromoPresentation,
   sequenceTransition: "crossfade" as PromoSequenceTransition,
   sequenceFadeDurationMs: PROMO_SEQUENCE_FADE_MS_DEFAULT,
-  sequenceLoop: true,
+  sequenceLoop: false,
   frames: buildDefaultPromoFrames(),
   ctaLabel: "",
   ctaHref: "",
@@ -995,15 +995,7 @@ export function PromoBannerAdminPanel({
             </div>
             {draft.presentation === "sequence" ? (
               <>
-                <label className="promo-admin-toggle">
-                  <input
-                    type="checkbox"
-                    checked={draft.sequenceLoop}
-                    onChange={(event) => updateDraft({ sequenceLoop: event.target.checked })}
-                    disabled={busy}
-                  />
-                  <span>Loop sequence</span>
-                </label>
+                <p>Sequence plays once and holds the last frame.</p>
                 <div className="promo-admin-timing-list">
                   {draft.frames.map((frame, index) => (
                     <details key={frame.id} className="promo-admin-collapse promo-admin-timing-card">

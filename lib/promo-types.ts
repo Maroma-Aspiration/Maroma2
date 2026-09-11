@@ -3,10 +3,31 @@ export type PromoMediaKind = "none" | "image" | "title-media" | "video";
 export type PromoPresentation = "static" | "sequence";
 export type PromoFrameKind = "empty" | "title-media" | "text" | "image" | "marquee" | "cta";
 export type PromoSequenceTransition = "fade" | "slide-up" | "slide-down" | "crossfade";
+export type PromoCtaStyle = "magical" | "promo" | "outline";
+export type PromoTextBannerStyle = "glass" | "ivory" | "teal";
+export type PromoOverlayAnimation = "none" | "fade" | "slide" | "pulse" | "zoom";
+export type PromoOverlayCrop = "none" | "square" | "portrait" | "landscape";
+
+export type PromoOverlayImage = {
+  id: string;
+  imageUrl: string;
+  x: number;
+  y: number;
+  scale: number;
+  radius: number;
+  shadow: boolean;
+  animation: PromoOverlayAnimation;
+  animationDurationMs: number;
+  crop: PromoOverlayCrop;
+  cropX: number;
+  cropY: number;
+};
 
 export type PromoCtaBuyLink = {
   id: string;
   side: "left" | "right";
+  /** Admin-controlled visibility without deleting the configured product. */
+  visible?: boolean;
   /** First line: scent or product name (e.g. "Aloe Vera Hibiscus"). */
   label?: string;
   /** Second line: product type (e.g. "Conditioner"). */
@@ -49,6 +70,26 @@ export type PromoBanner = {
   animation: PromoAnimation;
   ctaLabel: string;
   ctaHref: string;
+  ctaStyle?: PromoCtaStyle;
+  animateEnabled?: boolean;
+  /** Optional translucent strip behind the promo headline and tagline. */
+  textBannerEnabled?: boolean;
+  textBannerOffsetX?: number;
+  textBannerOffsetY?: number;
+  textBannerScale?: number;
+
+  textBannerStyle?: PromoTextBannerStyle;
+  /** Independent headline and tagline layout controls. */
+  headlineOffsetX?: number;
+  headlineOffsetY?: number;
+  headlineScale?: number;
+  headlineAnimation?: PromoOverlayAnimation;
+  headlineAnimationDurationMs?: number;
+  taglineOffsetX?: number;
+  taglineOffsetY?: number;
+  taglineScale?: number;
+  taglineAnimation?: PromoOverlayAnimation;
+  taglineAnimationDurationMs?: number;
   /** Up to 3 buy links per side of the CTA button (6 total). */
   ctaBuyLinks?: PromoCtaBuyLink[];
   presentation: PromoPresentation;
@@ -59,6 +100,8 @@ export type PromoBanner = {
   frames: PromoFrame[];
   /** Solid strip background (hex or css color). */
   stripBackground?: string;
+  /** Optional curated CSS gradient used when no background image is selected. */
+  stripBackgroundGradient?: string;
   /** Optional image painted behind strip content; clipped by strip overflow. */
   stripBackgroundImageUrl?: string;
   /** Strip background media type when stripBackgroundImageUrl is set. */
@@ -75,19 +118,36 @@ export type PromoBanner = {
   stripBackgroundImageOffsetY?: number;
   /** Strip height in px (when stripAspectRatio is fixed). */
   stripHeightPx?: number;
+  /** Banner frame width as a percentage of available space. */
+  stripWidthPct?: number;
+  stripFrameScale?: number;
+  stripPositionOffsetX?: number;
   /** Vertical nudge for the whole strip on the homepage (cm). Positive moves down. */
   stripPositionOffsetCm?: number;
   /** Fine vertical nudge for the strip (px). Positive moves down. */
   stripPositionOffsetPx?: number;
-  /** Direct-drag offset for the CTA product cluster (px). */
+  /** Direct-drag offset for the CTA button (px). */
   ctaOffsetX?: number;
   ctaOffsetY?: number;
+  /** Direct-drag offset for the product thumbnail group (px). */
+  thumbnailOffsetX?: number;
+  thumbnailOffsetY?: number;
   /** fixed = use stripHeightPx; 21:9 = match widescreen video aspect to strip width. */
   stripAspectRatio?: "fixed" | "21:9";
   /** Backdrop opacity (1 = fully opaque). */
   stripOpacity?: number;
   /** Horizontal nudge for promo gift/media in hero (cm). */
   mediaOffsetXCm?: number;
+  overlayImageX?: number;
+  overlayImageY?: number;
+  overlayImageScale?: number;
+  overlayImageRadius?: number;
+  overlayImageShadow?: boolean;
+  overlayImageAnimation?: PromoOverlayAnimation;
+  /** Duration of one second-layer animation cycle, in milliseconds. */
+  overlayImageAnimationDurationMs?: number;
+  /** Multiple independently positioned foreground image layers. */
+  overlayImages?: PromoOverlayImage[];
   /** Scroll marquee even when the message fits in the strip. */
   marqueeForceScroll?: boolean;
   /** Hero marquee: cm left of product right edge where text begins (default 3). */

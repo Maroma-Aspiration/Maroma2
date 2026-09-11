@@ -1,0 +1,434 @@
+{
+  "overrides": {
+    "2260": {
+      "videos": [
+        "/staging-media/product-videos/How To USE videos__Coconut Body Butter__Coconut body butter.MOV"
+      ],
+      "updatedAt": "2026-09-11T03:59:03.455Z"
+    },
+    "2402": {
+      "videos": [
+        "/staging-media/product-videos/How To USE videos__Mango Body Butter__Mango body butter.MOV"
+      ],
+      "updatedAt": "2026-09-11T03:59:03.455Z"
+    },
+    "2412": {
+      "videos": [
+        "/staging-media/product-videos/How To USE videos__Hand Cream__Hand cream.MOV"
+      ],
+      "updatedAt": "2026-09-11T03:59:03.455Z"
+    },
+    "2420": {
+      "videos": [
+        "/staging-media/product-videos/How To USE videos__Foot Cream__Foot cream.MOV"
+      ],
+      "updatedAt": "2026-09-11T03:59:03.455Z"
+    },
+    "2427": {
+      "videos": [
+        "/staging-media/product-videos/How To USE videos__Deo Rollon__Citrus - Mint deo.mp4"
+      ],
+      "updatedAt": "2026-09-11T03:59:03.455Z"
+    },
+    "2449": {
+      "videos": [
+        "/staging-media/product-videos/How To USE videos__Foaming Face Wash__Foaming face wash.MOV"
+      ],
+      "updatedAt": "2026-09-11T03:59:03.455Z"
+    },
+    "2456": {
+      "videos": [
+        "/staging-media/product-videos/How To USE videos__Lip Balm__Grapefruit lip balm.mp4"
+      ],
+      "updatedAt": "2026-09-11T03:59:03.455Z"
+    },
+    "2461": {
+      "videos": [
+        "/staging-media/product-videos/How To USE videos__Lip Balm__lemon lip balm.mp4"
+      ],
+      "updatedAt": "2026-09-11T03:59:03.455Z"
+    },
+    "2465": {
+      "videos": [
+        "/staging-media/product-videos/How To USE videos__Lip Balm__orange lip balm.mp4"
+      ],
+      "updatedAt": "2026-09-11T03:59:03.455Z"
+    },
+    "2508": {
+      "videos": [
+        "/staging-media/product-videos/How To USE videos__Hair Serum__Hair serum .MOV"
+      ],
+      "updatedAt": "2026-09-11T03:59:03.455Z"
+    },
+    "2542": {
+      "videos": [
+        "/staging-media/product-videos/How To USE videos__Soaps__rose scrub soap.mp4"
+      ],
+      "updatedAt": "2026-09-11T03:59:03.455Z"
+    },
+    "2572": {
+      "videos": [
+        "/staging-media/product-videos/How To USE videos__Soaps__Turmeric scrub soap.mp4"
+      ],
+      "updatedAt": "2026-09-11T03:59:03.455Z"
+    },
+    "4008": {
+      "videos": [
+        "/staging-media/product-videos/How To USE videos__Serum__Turmeric Serum.mp4"
+      ],
+      "updatedAt": "2026-09-11T03:59:03.455Z"
+    },
+    "4017": {
+      "videos": [
+        "/staging-media/product-videos/How To USE videos__Serum__saffron serum.mp4"
+      ],
+      "updatedAt": "2026-09-11T03:59:03.455Z"
+    },
+    "4040": {
+      "videos": [
+        "/staging-media/product-videos/How To USE videos__Serum__moringa serum.mp4"
+      ],
+      "updatedAt": "2026-09-11T03:59:03.455Z"
+    },
+    "4056": {
+      "videos": [
+        "/staging-media/product-videos/How To USE videos__Under Eye Gel__under eye gel with aloe extract.mp4"
+      ],
+      "updatedAt": "2026-09-11T03:59:03.455Z"
+    },
+    "8681": {
+      "videos": [
+        "/staging-media/product-videos/How To USE videos__Body Lotion__Lavender body lotion.MOV"
+      ],
+      "updatedAt": "2026-09-11T03:59:03.455Z"
+    },
+    "9049": {
+      "videos": [
+        "/staging-media/product-videos/How To USE videos__Deo Rollon__Lavender and bergamot deo.mp4"
+      ],
+      "updatedAt": "2026-09-11T03:59:03.455Z"
+    },
+    "9054": {
+      "videos": [
+        "/staging-media/product-videos/How To USE videos__Deo Rollon__Rose and Pomegranate Deo.mp4"
+      ],
+      "updatedAt": "2026-09-11T03:59:03.455Z"
+    },
+    "9099": {
+      "videos": [
+        "/staging-media/product-videos/How To USE videos__Serum__pomegranate serum.mp4"
+      ],
+      "updatedAt": "2026-09-11T03:59:03.455Z"
+    },
+    "11648": {
+      "videos": [
+        "/staging-media/product-videos/How To USE videos__Shampoo__Bamboo charcoal shampoo.MOV"
+      ],
+      "updatedAt": "2026-09-11T03:59:03.455Z"
+    },
+    "11652": {
+      "videos": [
+        "/staging-media/product-videos/How To USE videos__Showergel__bamboo charcoal shower gel.mp4"
+      ],
+      "updatedAt": "2026-09-11T03:59:03.455Z"
+    },
+    "11656": {
+      "videos": [
+        "/staging-media/product-videos/How To USE videos__Conditioner__Bamboo charcoal conditioner.MOV"
+      ],
+      "updatedAt": "2026-09-11T03:59:03.455Z"
+    },
+    "11660": {
+      "videos": [
+        "/staging-media/product-videos/How To USE videos__Conditioner__Coconut conditioner.MOV"
+      ],
+      "updatedAt": "2026-09-11T03:59:03.455Z"
+    },
+    "11664": {
+      "videos": [
+        "/staging-media/product-videos/How To USE videos__Shampoo__Coconut shampoo.MOV"
+      ],
+      "updatedAt": "2026-09-11T03:59:03.455Z"
+    },
+    "11668": {
+      "videos": [
+        "/staging-media/product-videos/How To USE videos__Showergel__Coconut Shower Gel.mp4"
+      ],
+      "updatedAt": "2026-09-11T03:59:03.455Z"
+    },
+    "11676": {
+      "videos": [
+        "/staging-media/product-videos/How To USE videos__Shampoo__Lavender shampoo.MOV"
+      ],
+      "updatedAt": "2026-09-11T03:59:03.455Z"
+    },
+    "11680": {
+      "videos": [
+        "/staging-media/product-videos/How To USE videos__Showergel__Lavender Shower Gel.mp4"
+      ],
+      "updatedAt": "2026-09-11T03:59:03.455Z"
+    },
+    "11684": {
+      "videos": [
+        "/staging-media/product-videos/How To USE videos__Conditioner__Rose conditioner.MOV"
+      ],
+      "updatedAt": "2026-09-11T03:59:03.455Z"
+    },
+    "11688": {
+      "videos": [
+        "/staging-media/product-videos/How To USE videos__Shampoo__Rose Shampoo.mp4"
+      ],
+      "updatedAt": "2026-09-11T03:59:03.455Z"
+    },
+    "11692": {
+      "videos": [
+        "/staging-media/product-videos/How To USE videos__Showergel__Rose Shower Gel.mp4"
+      ],
+      "updatedAt": "2026-09-11T03:59:03.455Z"
+    },
+    "14728": {
+      "videos": [
+        "/staging-media/product-videos/How To USE videos__Hair and Body Mist__Strawberry Blush Hair - Body Mistmp4.mp4"
+      ],
+      "updatedAt": "2026-09-11T03:59:03.455Z"
+    },
+    "14732": {
+      "videos": [
+        "/staging-media/product-videos/How To USE videos__Hair and Body Mist__Pink Berries Hair - Body Mist.mp4"
+      ],
+      "updatedAt": "2026-09-11T03:59:03.455Z"
+    },
+    "14736": {
+      "videos": [
+        "/staging-media/product-videos/How To USE videos__Hair and Body Mist__Cherry Blossom Hair - Body Mist.mp4"
+      ],
+      "updatedAt": "2026-09-11T03:59:03.455Z"
+    },
+    "14740": {
+      "videos": [
+        "/staging-media/product-videos/How To USE videos__Hair and Body Mist__Wild Pomegranate Hair - Body Mist.mp4"
+      ],
+      "updatedAt": "2026-09-11T03:59:03.455Z"
+    },
+    "21418": {
+      "videos": [
+        "/staging-media/product-videos/How To USE videos__Shampoo__Tea tree shampoo.MOV"
+      ],
+      "updatedAt": "2026-09-11T03:59:03.455Z"
+    },
+    "21421": {
+      "videos": [
+        "/staging-media/product-videos/How To USE videos__Showergel__Tea Tree Shower Gel.mp4"
+      ],
+      "updatedAt": "2026-09-11T03:59:03.455Z"
+    },
+    "21425": {
+      "videos": [
+        "/staging-media/product-videos/How To USE videos__Showergel__Peach Blossom Shower Gel.mp4"
+      ],
+      "updatedAt": "2026-09-11T03:59:03.455Z"
+    },
+    "21639": {
+      "videos": [
+        "/staging-media/product-videos/How To USE videos__Showergel__3-in-1 Shower Gel.mp4"
+      ],
+      "updatedAt": "2026-09-11T03:59:03.455Z"
+    },
+    "21831": {
+      "videos": [
+        "/staging-media/product-videos/How To USE videos__Deo Rollon__Strawberry Blush Deo.mp4"
+      ],
+      "updatedAt": "2026-09-11T03:59:03.455Z"
+    },
+    "21832": {
+      "videos": [
+        "/staging-media/product-videos/How To USE videos__Deo Rollon__Peach Blossom Deo.mp4"
+      ],
+      "updatedAt": "2026-09-11T03:59:03.455Z"
+    },
+    "21833": {
+      "videos": [
+        "/staging-media/product-videos/How To USE videos__Deo Rollon__Cherry Blossom Deo.mp4"
+      ],
+      "updatedAt": "2026-09-11T03:59:03.455Z"
+    },
+    "25010": {
+      "videos": [
+        "/staging-media/product-videos/How To USE videos__Coconut Day Cream__Coconut day cream.MOV"
+      ],
+      "updatedAt": "2026-09-11T03:59:03.455Z"
+    },
+    "25012": {
+      "videos": [
+        "/staging-media/product-videos/How To USE videos__Day Cream SPF 30__Day cream spf 30.MOV"
+      ],
+      "updatedAt": "2026-09-11T03:59:03.455Z"
+    },
+    "25719": {
+      "videos": [
+        "/staging-media/product-videos/How To USE videos__Serum__spf 50 face sunscreen broad spectrum.mp4"
+      ],
+      "updatedAt": "2026-09-11T03:59:03.455Z"
+    },
+    "26246": {
+      "videos": [
+        "/staging-media/product-videos/How To USE videos__Conditioner__Tea tree conditioner.MOV"
+      ],
+      "updatedAt": "2026-09-11T03:59:03.455Z"
+    },
+    "991380": {
+      "videos": [
+        "/staging-media/product-videos/How To USE videos__Sun Stick SPF45__Sun stick.mov"
+      ],
+      "updatedAt": "2026-09-11T03:59:03.455Z"
+    },
+    "1001226": {
+      "videos": [
+        "/staging-media/product-videos/How To USE videos__Conditioner__Peach Blossom Conditioner.mp4"
+      ],
+      "updatedAt": "2026-09-11T03:59:03.455Z"
+    },
+    "1001227": {
+      "videos": [
+        "/staging-media/product-videos/How To USE videos__Body Lotion__Peach Blossom Body  Lotion.mp4"
+      ],
+      "updatedAt": "2026-09-11T03:59:03.455Z"
+    },
+    "1001739": {
+      "videos": [
+        "/staging-media/product-videos/How To USE videos__200 ml Products__Neem shampoo.mp4"
+      ],
+      "updatedAt": "2026-09-11T03:59:03.455Z"
+    },
+    "1001762": {
+      "videos": [
+        "/staging-media/product-videos/How To USE videos__200 ml Products__Neem conditioner.mp4"
+      ],
+      "updatedAt": "2026-09-11T03:59:03.455Z"
+    },
+    "1001767": {
+      "videos": [
+        "/staging-media/product-videos/How To USE videos__200 ml Products__Hibiscus conditioner.mp4"
+      ],
+      "updatedAt": "2026-09-11T03:59:03.455Z"
+    },
+    "1001772": {
+      "videos": [
+        "/staging-media/product-videos/How To USE videos__200 ml Products__moringa and lime shampoo.mp4"
+      ],
+      "updatedAt": "2026-09-11T03:59:03.455Z"
+    },
+    "1001773": {
+      "videos": [
+        "/staging-media/product-videos/How To USE videos__200 ml Products__moringa conditioner.mp4"
+      ],
+      "updatedAt": "2026-09-11T03:59:03.455Z"
+    },
+    "1001774": {
+      "videos": [
+        "/staging-media/product-videos/How To USE videos__200 ml Products__Moringa shower gel.mp4"
+      ],
+      "updatedAt": "2026-09-11T03:59:03.455Z"
+    },
+    "1003683": {
+      "videos": [
+        "/staging-media/product-videos/How To USE videos__Luxury How to Use Video__Radiant Turmeric Day Complex.mov"
+      ],
+      "updatedAt": "2026-09-11T03:59:03.455Z"
+    },
+    "1003686": {
+      "videos": [
+        "/staging-media/product-videos/How To USE videos__Luxury How to Use Video__Radiant turmeric night complex.mov"
+      ],
+      "updatedAt": "2026-09-11T03:59:03.455Z"
+    },
+    "1003688": {
+      "videos": [
+        "/staging-media/product-videos/How To USE videos__Luxury How to Use Video__Coco Essence Day Complex.mov"
+      ],
+      "updatedAt": "2026-09-11T03:59:03.455Z"
+    },
+    "1003691": {
+      "videos": [
+        "/staging-media/product-videos/How To USE videos__Luxury How to Use Video__Coco Essence Night Complex.mov",
+        "/staging-media/product-videos/Product Video - Coco Essence Night Cream.mp4"
+      ],
+      "updatedAt": "2026-09-11T03:59:03.455Z"
+    },
+    "1003700": {
+      "videos": [
+        "/staging-media/product-videos/How To USE videos__Luxury How to Use Video__Saffron elixir.mov"
+      ],
+      "updatedAt": "2026-09-11T03:59:03.455Z"
+    },
+    "1003711": {
+      "videos": [
+        "/staging-media/product-videos/How To USE videos__Luxury How to Use Video__Glow elixir.mov"
+      ],
+      "updatedAt": "2026-09-11T03:59:03.455Z"
+    },
+    "1004142": {
+      "videos": [
+        "/staging-media/product-videos/How To USE videos__Shampoo__Sandalwood Shampoo.mp4"
+      ],
+      "updatedAt": "2026-09-11T03:59:03.455Z"
+    },
+    "1004145": {
+      "videos": [
+        "/staging-media/product-videos/How To USE videos__100ml-cdsandal__Himalayan Cedarwood Conditioner.mp4",
+        "/staging-media/product-videos/How To USE videos__Conditioner__Himalayan Cedarwood Conditioner.mp4"
+      ],
+      "updatedAt": "2026-09-11T03:59:03.455Z"
+    },
+    "1004146": {
+      "videos": [
+        "/staging-media/product-videos/How To USE videos__Shampoo__Himalayan Cedarwood Shampoo.mp4"
+      ],
+      "updatedAt": "2026-09-11T03:59:03.455Z"
+    },
+    "1004150": {
+      "videos": [
+        "/staging-media/product-videos/How To USE videos__100ml-cdsandal__Sandalwood Conditioner.mp4",
+        "/staging-media/product-videos/How To USE videos__Conditioner__Sandalwood Conditioner.mp4"
+      ],
+      "updatedAt": "2026-09-11T03:59:03.455Z"
+    },
+    "1004153": {
+      "videos": [
+        "/staging-media/product-videos/How To USE videos__100ml-cdsandal__Himalayan Cedarwood Showergel.mp4",
+        "/staging-media/product-videos/How To USE videos__Showergel__Himalayan Cedarwood Showergel.mp4"
+      ],
+      "updatedAt": "2026-09-11T03:59:03.455Z"
+    },
+    "1004628": {
+      "videos": [
+        "/staging-media/product-videos/How To USE videos__Aromatherapy Rollon__Inspire.mp4"
+      ],
+      "updatedAt": "2026-09-11T03:59:03.455Z"
+    },
+    "1004655": {
+      "videos": [
+        "/staging-media/product-videos/How To USE videos__Deo Rollon__Summer Berries Roll On deo.mp4"
+      ],
+      "updatedAt": "2026-09-11T03:59:03.455Z"
+    },
+    "1004796": {
+      "videos": [
+        "/staging-media/product-videos/How To USE videos__SPA Products__Multani Mitti Face Scrub.mp4"
+      ],
+      "updatedAt": "2026-09-11T03:59:03.455Z"
+    },
+    "1004798": {
+      "videos": [
+        "/staging-media/product-videos/How To USE videos__SPA Products__Bamboo Charcoal with walnut shell face scrub.mp4"
+      ],
+      "updatedAt": "2026-09-11T03:59:03.455Z"
+    },
+    "1004800": {
+      "videos": [
+        "/staging-media/product-videos/How To USE videos__SPA Products__Turmeric and Walnut Shell Face Scrub.mp4"
+      ],
+      "updatedAt": "2026-09-11T03:59:03.455Z"
+    }
+  }
+}

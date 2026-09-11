@@ -5,8 +5,13 @@ import type { PromoBanner } from "../../lib/promo-types";
 import { promoStripStyleVars } from "../../lib/promo-strip-utils";
 import { PromoBannerCard } from "./PromoBannerCard";
 
+// Survives client-side navigation, but resets on a fresh document load.
+let promoEntranceSeen = false;
+
 type PromoBannerStripProps = {
   initialBanners?: PromoBanner[];
+  /** Allow standalone strips to hydrate themselves when no banners are supplied. */
+  fetchWhenEmpty?: boolean;
   className?: string;
   /** When false, banners render as non-links (admin drag/preview). */
   linkable?: boolean;
@@ -18,11 +23,16 @@ type PromoBannerStripProps = {
   marqueePreviewStart?: boolean;
   marqueePreviewMode?: "start" | "end";
   ctaDraggable?: boolean;
+  thumbnailsDraggable?: boolean;
   onCtaPositionChange?: (position: { x: number; y: number }) => void;
+  onThumbnailsPositionChange?: (position: { x: number; y: number }) => void;
+  mediaEditable?: boolean;
+  onMediaLayoutChange?: (patch: Partial<PromoBanner>) => void;
 };
 
 export function PromoBannerStrip({
   initialBanners = [],
+  fetchWhenEmpty = true,
   className = "",
   linkable = true,
   variant = "default",
@@ -30,7 +40,11 @@ export function PromoBannerStrip({
   marqueePreviewStart = false,
   marqueePreviewMode = "start",
   ctaDraggable = false,
+  thumbnailsDraggable = false,
   onCtaPositionChange,
+  onThumbnailsPositionChange,
+  mediaEditable = false,
+  onMediaLayoutChange,
 }: PromoBannerStripProps) {
   const [banners, setBanners] = useState(initialBanners);
 
@@ -39,7 +53,7 @@ export function PromoBannerStrip({
   }, [initialBanners]);
 
   useEffect(() => {
-    if (initialBanners.length > 0) {
+    if (!fetchWhenEmpty || initialBanners.length > 0) {
       return;
     }
     let cancelled = false;
@@ -57,7 +71,7 @@ export function PromoBannerStrip({
     return () => {
       cancelled = true;
     };
-  }, [initialBanners.length]);
+  }, [fetchWhenEmpty, initialBanners.length]);
 
   if (banners.length === 0) return null;
 
@@ -74,7 +88,11 @@ export function PromoBannerStrip({
           marqueePreviewMode={marqueePreviewMode}
           rememberStripVideoSeen={linkable && variant === "hero"}
           ctaDraggable={ctaDraggable}
+          thumbnailsDraggable={thumbnailsDraggable}
           onCtaPositionChange={onCtaPositionChange}
+          onThumbnailsPositionChange={onThumbnailsPositionChange}
+          mediaEditable={mediaEditable}
+          onMediaLayoutChange={onMediaLayoutChange}
         />
       ))}
     </div>
@@ -82,6 +100,7 @@ export function PromoBannerStrip({
 }
 
 type HeroPromoBannerProps = {
+  entranceReady?: boolean;
   initialBanners?: PromoBanner[];
   editable?: boolean;
   bannerRef?: RefObject<HTMLDivElement>;
@@ -91,10 +110,15 @@ type HeroPromoBannerProps = {
   marqueePreviewMode?: "start" | "end";
   holdMarquee?: boolean;
   ctaDraggable?: boolean;
+  thumbnailsDraggable?: boolean;
   onCtaPositionChange?: (position: { x: number; y: number }) => void;
+  onThumbnailsPositionChange?: (position: { x: number; y: number }) => void;
+  mediaEditable?: boolean;
+  onMediaLayoutChange?: (patch: Partial<PromoBanner>) => void;
 };
 
 export function HeroPromoBanner({
+  entranceReady = true,
   initialBanners = [],
   editable = false,
   bannerRef,
@@ -104,15 +128,39 @@ export function HeroPromoBanner({
   marqueePreviewMode = "start",
   holdMarquee = false,
   ctaDraggable = false,
+  thumbnailsDraggable = false,
   onCtaPositionChange,
+  onThumbnailsPositionChange,
+  mediaEditable = false,
+  onMediaLayoutChange,
 }: HeroPromoBannerProps) {
+  const [playEntrance, setPlayEntrance] = useState(false);
+  const [entrancePending, setEntrancePending] = useState(() => !promoEntranceSeen);
+  const hasBanner = initialBanners.length > 0;
+  useEffect(() => {
+    if (editable || mediaEditable) {
+      setPlayEntrance(false);
+      setEntrancePending(false);
+      return;
+    }
+    if (promoEntranceSeen) {
+      setEntrancePending(false);
+      return;
+    }
+    if (!entranceReady || !hasBanner) return;
+    promoEntranceSeen = true;
+    setEntrancePending(false);
+    if (!window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+      setPlayEntrance(true);
+    }
+  }, [entranceReady, hasBanner, editable, mediaEditable]);
   const stripStyle =
     initialBanners.length > 0 ? promoStripStyleVars(initialBanners[0]) : undefined;
 
   return (
     <div
       ref={bannerRef}
-      className={`hero-promo-banner${editable ? " hero-promo-drag" : ""}`}
+      className={`hero-promo-banner${editable ? " hero-promo-drag" : ""}${mediaEditable ? " is-promo-content-editing" : ""}`}
       aria-label="Homepage announcement"
       style={stripStyle}
       onPointerDown={onPointerDown}
@@ -121,14 +169,20 @@ export function HeroPromoBanner({
       onPointerCancel={onPointerUp}
     >
       <PromoBannerStrip
+        className={!editable && !mediaEditable ? (playEntrance ? undefined : entrancePending ? "promo-elements-pending" : "promo-elements-finished") : undefined}
         initialBanners={initialBanners}
+        fetchWhenEmpty={false}
         linkable={!editable}
         variant="hero"
         startHeld={holdMarquee}
         marqueePreviewStart={editable}
         marqueePreviewMode={marqueePreviewMode}
         ctaDraggable={ctaDraggable}
+        thumbnailsDraggable={thumbnailsDraggable}
         onCtaPositionChange={onCtaPositionChange}
+        onThumbnailsPositionChange={onThumbnailsPositionChange}
+        mediaEditable={mediaEditable}
+        onMediaLayoutChange={onMediaLayoutChange}
       />
     </div>
   );

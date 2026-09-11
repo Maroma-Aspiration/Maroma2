@@ -79,7 +79,8 @@
 }
 
 .report-kpis strong {
-  font: 600 clamp(1.7rem, 2.5vw, 2.6rem) / 1 var(--font-serif, "Cormorant Garamond", Georgia, serif);
+  font: 700 clamp(1.7rem, 2.5vw, 2.6rem) / 1 var(--font-sans, "Montserrat", "Helvetica", sans-serif);
+  font-variant-numeric: tabular-nums;
   color: var(--ink);
 }
 
@@ -198,16 +199,25 @@
   background: white;
 }
 
-.stock-ring span {
+.stock-ring-label {
+  position: relative;
   z-index: 1;
-  font: 700 2rem / 1 var(--font-serif, "Cormorant Garamond", Georgia, serif);
+  display: grid;
+  place-items: center;
+  gap: 5px;
   text-align: center;
   color: var(--ink);
 }
 
-.stock-ring small {
+.stock-ring-label strong {
   display: block;
-  font: 700 0.65rem / 1.5 var(--font-body);
+  font: 700 2rem / 1 var(--font-sans, "Montserrat", "Helvetica", sans-serif);
+  font-variant-numeric: tabular-nums;
+}
+
+.stock-ring-label small {
+  display: block;
+  font: 700 0.65rem / 1 var(--font-sans, "Montserrat", "Helvetica", sans-serif);
   letter-spacing: 0.1em;
   text-transform: uppercase;
   color: var(--soft-ink);
@@ -226,6 +236,17 @@
   grid-template-columns: auto 1fr auto;
   gap: 9px;
   align-items: center;
+}
+
+.report-sales header > strong,
+.sales-bar-wrap > span,
+.stock-visual li b,
+.top-products li > b,
+.top-products li > strong,
+.top-products small,
+.low-stock-list strong {
+  font-family: var(--font-sans, "Montserrat", "Helvetica", sans-serif);
+  font-variant-numeric: tabular-nums;
 }
 
 .stock-visual i {
@@ -391,6 +412,14 @@
 
   .stock-ring {
     width: 120px;
+  }
+
+  .stock-ring-label strong {
+    font-size: 1.65rem;
+  }
+
+  .stock-ring-label small {
+    font-size: 0.58rem;
   }
 }
 

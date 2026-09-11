@@ -181,13 +181,13 @@ function clampCanvasToolbarPosition(
   };
 }
 
-/** Pin to the right of the viewport so the panel does not cover the newsletter text. */
+/** Pin editing controls to the left rail, outside the newsletter frame. */
 function defaultCanvasToolbarPosition(
   elRect: DOMRect,
   panelW: number,
   panelH: number,
 ): { left: number; top: number } {
-  const left = window.innerWidth - panelW - CANVAS_RIGHT_PAD;
+  const left = CANVAS_RIGHT_PAD;
   const maxH = Math.min(panelH, window.innerHeight - CANVAS_TOOLBAR_PAD * 2);
   const top = Math.max(
     CANVAS_TOP_TOOLS_TOP,
@@ -505,16 +505,19 @@ function ResizeHandle({
 }
 
 function ImageElView({
-  el, selected, canEdit, onPointerDown, onCropPan, uploadRef, onReplace, onResize, allElements,
+  el, selected, canEdit, onPointerDown, onCropPan, uploadRef, onReplace, onSelectSavedImage, onDelete, onResize, allElements,
 }: {
   el: CanvasImageEl; selected: boolean; canEdit: boolean;
   onPointerDown?: (e: React.PointerEvent) => void;
   onCropPan?: (objectPositionX: number, objectPositionY: number) => void;
   uploadRef?: React.RefObject<HTMLInputElement>;
   onReplace?: (files: File[]) => void;
+  onSelectSavedImage?: (src: string) => void;
+  onDelete?: () => void;
   onResize?: (edge: string, dx: number, dy: number) => void;
   allElements: CanvasEl[];
 }) {
+  const imageLibraryRef = useRef<HTMLDialogElement>(null);
   const inMontage = !!el.montageGroup && !MASTHEAD_OVERLAY_IDS.has(el.id);
   const br = (() => {
     const r = inMontage ? montageTileBorderRadius(el) : (el.borderRadius ?? 0);
@@ -522,6 +525,7 @@ function ImageElView({
   })();
   const ox = el.objectPositionX ?? 0;
   const oy = el.objectPositionY ?? 0;
+  const hasImage = Boolean(el.src?.trim());
   const isCircle =
     el.borderRadius >= Math.min(el.w, el.h) / 2 - 2 && Math.abs(el.w - el.h) < 8;
   const isPortrait = el.id === "migrated-portrait" || isCircle;
@@ -559,13 +563,14 @@ function ImageElView({
         overflow: "hidden",
         isolation: "isolate",
         cursor: canEdit ? (inMontage && selected ? "default" : "grab") : "default",
-        background: el.src ? undefined : "rgba(167,199,188,0.1)",
+        background: hasImage ? undefined : "rgba(167,199,188,0.1)",
+        border: !inMontage ? "2px solid rgba(76, 197, 215, 0.85)" : undefined,
         boxShadow: isPortrait || el.shadow ? "0 10px 32px rgba(0,0,0,0.42)" : undefined,
         boxSizing: "border-box",
       }}
       onPointerDown={canEdit ? onPointerDown : undefined}
     >
-      {el.src ? (
+      {hasImage ? (
         <img
           src={el.src} alt=""
           draggable={false}
@@ -581,18 +586,52 @@ function ImageElView({
           }}
         />
       ) : (
-        <div style={{ display: "grid", placeItems: "center", height: "100%", fontSize: 13, opacity: 0.4 }}>
-          No image
+        <div style={{ display: "grid", placeItems: "center", height: "100%", fontSize: 14, opacity: 0.72 }}>
+          Add image
         </div>
       )}
       {canEdit && selected && (
-        <button
-          type="button"
-          className="nl-canvas-img-replace"
-          onClick={() => uploadRef?.current?.click()}
+        <div className="nl-canvas-img-actions" onPointerDown={(e) => e.stopPropagation()}>
+          {inMontage && onDelete ? (
+            <button type="button" className="nl-canvas-img-delete" onClick={onDelete}>Delete</button>
+          ) : null}
+          <button type="button" className="nl-canvas-img-replace" onClick={() => imageLibraryRef.current?.showModal()}>
+            Replace{inMontage ? "" : " / Add"}
+          </button>
+        </div>
+      )}
+      {canEdit && (
+        <dialog
+          ref={imageLibraryRef}
+          aria-label="Choose a newsletter image"
+          onPointerDown={(e) => e.stopPropagation()}
+          onClick={(e) => e.stopPropagation()}
+          style={{ width: "min(760px, 90vw)", maxHeight: "80vh", overflow: "auto", padding: 24, border: "1px solid #aac9c3", borderRadius: 16, background: "#f4faf8", color: "#234b48" }}
         >
-          Replace{inMontage ? "" : " / Add"}
-        </button>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 16 }}>
+            <h2 style={{ margin: 0 }}>July newsletter images</h2>
+            <button type="button" className="button secondary" onClick={() => imageLibraryRef.current?.close()}>Close</button>
+          </div>
+          <p>Select an image to use in this space.</p>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: 12 }}>
+            {["Vegan Cafe", "Friendship Day", "Echoes", "Staff Collage", "Staff1", "Staff6", "Staff7", "8", "9"].map((name) => {
+              const src = `/newsletter/july/${encodeURIComponent(name)}.png`;
+              return (
+                <button key={name} type="button" onClick={() => {
+                  onSelectSavedImage?.(src);
+                  imageLibraryRef.current?.close();
+                }} style={{ padding: 8, border: "1px solid #aac9c3", borderRadius: 8, background: "white", color: "#234b48", cursor: "pointer" }}>
+                  <img src={src} alt={name} loading="lazy" style={{ width: "100%", height: 120, objectFit: "contain", display: "block", marginBottom: 8 }} />
+                  {name}
+                </button>
+              );
+            })}
+          </div>
+          <button type="button" className="button secondary" style={{ marginTop: 20 }} onClick={() => {
+            imageLibraryRef.current?.close();
+            uploadRef?.current?.click();
+          }}>Upload from computer</button>
+        </dialog>
       )}
       {canEdit && onReplace && (
         <input
@@ -1849,8 +1888,41 @@ export const NewsletterCanvas = forwardRef<NewsletterCanvasHandle, CanvasProps>(
   const delEl = useCallback((id: string) => {
     setSelectedId(null);
     setEditingId(null);
-    upd({ elements: elements.filter((e) => e.id !== id) });
-  }, [elements, upd]);
+    const current = elementsRef.current;
+    const target = current.find((e) => e.id === id);
+    if (target && isImage(target) && target.montageGroup) {
+      const group = current.filter(
+        (e): e is CanvasImageEl => isImage(e) && e.montageGroup === target.montageGroup,
+      );
+      const frame = montageGroupBounds(group);
+      const remaining = group.filter((e) => e.id !== id);
+      if (remaining.length === 1) {
+        const survivor = { ...remaining[0] };
+        delete survivor.montageGroup;
+        delete survivor.montageIndex;
+        delete survivor.montageFrameW;
+        delete survivor.montageFrameH;
+        upd({
+          elements: current
+            .filter((e) => !group.some((tile) => tile.id === e.id))
+            .concat({ ...survivor, x: frame.minX, y: frame.minY, w: frame.w, h: frame.h }),
+        });
+        return;
+      }
+      if (remaining.length > 1) {
+        upd({
+          elements: relayoutMontageGroupElements(
+            current.filter((e) => e.id !== id),
+            target.montageGroup,
+            remaining,
+            frame,
+          ),
+        });
+        return;
+      }
+    }
+    upd({ elements: current.filter((e) => e.id !== id) });
+  }, [upd]);
 
   const addEl = useCallback((el: CanvasEl) => {
     const next = [...elementsRef.current, el];
@@ -2374,6 +2446,8 @@ export const NewsletterCanvas = forwardRef<NewsletterCanvasHandle, CanvasProps>(
                   }
                   uploadRef={ref}
                   onReplace={(files) => handleImageFiles(el.id, files)}
+                  onSelectSavedImage={(src) => updEl(el.id, { src, objectPositionX: 0, objectPositionY: 0, imageZoom: 1 })}
+                  onDelete={() => delEl(el.id)}
                 />
                 {sel && canEdit && !el.montageGroup && (() => {
                   const origW = el.w, origH = el.h;

@@ -5,6 +5,14 @@
   position: relative;
   z-index: var(--page-layer-z-loved-overlap, var(--page-layer-z-loved, 10)) !important;
   isolation: isolate;
+  /* Keep readable content above every configurable decorative layer. */
+  --collections-content-z: max(var(--loved-z-content, 0), calc(var(--loved-z-florals, -3) + 1), calc(var(--loved-z-wash, -2) + 1), calc(var(--loved-z-band, -1) + 1));
+}
+
+.home-collections-section .home-collections-hero,
+.home-collections-section .home-collections-grid {
+  position: relative;
+  z-index: var(--collections-content-z, 1);
 }
 
 /* The hero deliberately overlaps this section. During admin editing, lift the
@@ -266,11 +274,13 @@
 .page.maroma:not(.is-mobile-layout):not(.is-mobile-document-flow)
   .scroller-section.scroller-loved-for-a-reason.home-collections-section {
   position: relative;
-  z-index: var(--page-layer-z-loved-overlap, var(--page-layer-z-loved, 10)) !important;
+  /* This section overlaps the hero. Its entire stacking context must clear
+     the hero and ritual band; raising only the heading cannot escape it. */
+  z-index: max(var(--page-layer-z-loved-overlap, 10), calc(var(--page-layer-z-hero, 1) + 1), calc(var(--page-layer-z-ritual-band, 1) + 1), calc(var(--page-layer-z-rituals, 1) + 1)) !important;
   isolation: isolate;
   overflow: visible !important;
   background: transparent !important;
-  padding: clamp(20px, 3vw, 32px) 0 clamp(24px, 4vw, 40px) !important;
+  padding: 9px 0 clamp(24px, 4vw, 40px) !important;
   margin-top: calc(clamp(24px, 4vw, 40px) - 5.7cm) !important;
 }
 
@@ -284,13 +294,13 @@
 
 .page.maroma:not(.is-mobile-layout):not(.is-mobile-document-flow) .home-collections-hero {
   position: relative;
-  z-index: 3;
+  z-index: var(--collections-content-z, 1);
   display: block;
   height: auto;
   width: 100%;
   max-width: none;
   margin-inline: 0;
-  margin-bottom: 3mm;
+  margin-bottom: 0;
   overflow: visible;
   background: none;
   pointer-events: none;
@@ -313,7 +323,7 @@
   margin-top: 0;
   color: var(--ink, #134a57);
   opacity: 1 !important;
-  transform: translateY(-2mm) !important;
+  transform: none !important;
   filter: none !important;
   visibility: visible !important;
 }
@@ -321,12 +331,12 @@
 .page.maroma:not(.is-mobile-layout):not(.is-mobile-document-flow)
   .home-collections-section.scroller-loved-for-a-reason .home-collections-grid {
   position: relative;
-  z-index: 1;
+  z-index: var(--collections-content-z, 1);
   box-sizing: border-box;
   width: 100%;
   max-width: none;
   margin-inline: 0;
-  margin-top: clamp(12px, 2vw, 24px);
+  margin-top: 18px;
   padding-inline: clamp(8px, 1.25vw, 18px);
   pointer-events: auto;
 }
@@ -357,4 +367,80 @@
   position: static;
   margin: 0 !important;
   padding-inline: 16px;
+}
+
+/* Reserve a full first-screen promo area independently of Frame Y. */
+.page.maroma:has(.hero.is-promo-homepage) .hero.is-promo-homepage {
+  min-height: 0 !important;
+  padding-bottom: 0;
+}
+.page.maroma .hero.is-promo-homepage .hero-artboard {
+  min-height: 100svh !important;
+  height: auto !important;
+  margin-bottom: 0 !important;
+  overflow: visible;
+}
+.page.maroma .hero.is-promo-homepage .hero-artboard .hero-promo-banner {
+  position: relative;
+  top: auto;
+  bottom: auto;
+  left: auto;
+  right: auto;
+  flex-shrink: 0;
+  width: var(--hero-promo-width-pct, 100%);
+  max-width: none;
+  align-self: center;
+  margin-inline: 0;
+  /* Reserve the unshifted frame height so Y never repositions Collections. */
+  margin-top: 0;
+  transform: translate(var(--promo-frame-x, 0px), var(--promo-frame-y, var(--hero-promo-nudge-y, 0px)));
+}
+.page.maroma:not(.is-mobile-layout):not(.is-mobile-document-flow) .scroller-section.scroller-loved-for-a-reason.home-collections-section.is-after-promo,
+.page.maroma.is-mobile-layout .scroller-section.scroller-loved-for-a-reason.home-collections-section.is-after-promo,
+.page.maroma.is-mobile-document-flow .scroller-section.scroller-loved-for-a-reason.home-collections-section.is-after-promo {
+  margin-top: 0 !important;
+  padding-top: clamp(8px, .7vw, 14px) !important;
+}
+.page.maroma .home-collections-section.is-after-promo .home-collections-grid {
+  margin-top: 0 !important;
+}
+.page.maroma .home-collections-section.is-after-promo .home-collections-hero {
+  display: block;
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  transform: translateY(-100%);
+  padding-bottom: clamp(12px, 1vw, 22px);
+  box-sizing: border-box;
+}
+.page.maroma .home-collections-section.is-after-promo .scroller-title {
+  margin: 0;
+  width: 100%;
+  text-align: center;
+  font-size: clamp(28px, 3.2vw, 64px);
+  line-height: 1.15;
+}
+
+.page.maroma .home-collections-section.is-after-promo .home-collections-header {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  text-align: center;
+}
+
+.page.maroma .hero.is-promo-homepage .hero-artboard {
+  padding-bottom: 0 !important;
+  /* Image scale uses the page canvas, independently of the adjustable frame. */
+  container-type: inline-size;
+}
+.page.maroma .hero.is-promo-homepage .promo-banner::before {
+  background-size: var(--promo-frame-image-size, 100cqw auto);
+  background-position: var(--promo-frame-image-position, center);
+}
+.page.maroma:not(.is-mobile-layout):not(.is-mobile-document-flow) .hero.is-promo-homepage .promo-banner--aspect-fixed {
+  height: clamp(min(280px, var(--promo-strip-height)), var(--promo-responsive-height, var(--promo-strip-height)), var(--promo-strip-height));
+  min-height: clamp(min(280px, var(--promo-strip-height)), var(--promo-responsive-height, var(--promo-strip-height)), var(--promo-strip-height));
 }

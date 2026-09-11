@@ -337,6 +337,56 @@ function appendStorySections(
   return ensureMastheadZOrder(next);
 }
 
+/** Restore an empty image frame when an existing story section has lost it. */
+function ensureStoryImageFrames(elements: CanvasEl[], stories: StoryRecord[]): CanvasEl[] {
+  const next = [...elements];
+  const ids = new Set(next.map((element) => element.id));
+  const grid = next.find(
+    (element): element is CanvasStoryGridEl =>
+      element.id === "migrated-story-grid" && element.kind === "story-grid",
+  );
+
+  for (let index = 0; index < 50; index++) {
+    const imageId = `migrated-si-${index}`;
+    if (ids.has(imageId)) continue;
+
+    const headline = next.find(
+      (element): element is CanvasTextEl => element.id === `migrated-st-${index}` && element.kind === "text",
+    );
+    const body = next.find((element) => element.id === `migrated-sb-${index}`);
+    if (!headline && !body) continue;
+
+    const story = stories[index];
+    const gridStory = grid?.stories[index];
+    const frame = normalizeStoryImageFrame(story?.imageFrame);
+    const width = 660;
+    const height = storyFrameCanvasHeight(frame, width);
+    const y = headline
+      ? headline.y + measureElementHeight(headline) + 10
+      : Math.max(0, (body?.y ?? 0) - height - 16);
+
+    next.push({
+      id: imageId,
+      kind: "image",
+      x: 28,
+      y,
+      w: width,
+      h: height,
+      zIndex: 5,
+      src: story?.imageUrl || gridStory?.imageUrl || "",
+      borderRadius: 8,
+      objectFit: frame.objectFit ?? "cover",
+      objectPositionX: frame.offsetX ?? 0,
+      objectPositionY: frame.offsetY ?? 0,
+      imageZoom: frame.zoom ?? 1,
+      shadow: false,
+    });
+    ids.add(imageId);
+  }
+
+  return next;
+}
+
 /** Fix grid height drift, re-anchor sections, and rebuild missing story blocks. */
 export function reconcileNewsletterCanvasState(state: StoriesState): StoriesState {
   const canvas = state.newsletterCanvas;
@@ -361,6 +411,10 @@ export function reconcileNewsletterCanvasState(state: StoriesState): StoriesStat
 
   if (hasGrid && !hasSections && stories.length > 0) {
     elements = appendStorySections(elements, stories, bodyTextColorFromCanvas(elements));
+  }
+
+  if (stories.length > 0) {
+    elements = ensureStoryImageFrames(elements, stories);
   }
 
   const synced = syncCanvasStoryLayout(elements, canvas.storySpacingGaps, measuredHeights);

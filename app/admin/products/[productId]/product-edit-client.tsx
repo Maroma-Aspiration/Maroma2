@@ -32,6 +32,7 @@ export default function ProductEditClient({ productId }: ProductEditClientProps)
   const [sku, setSku] = useState("");
   const [price, setPrice] = useState("");
   const [salePrice, setSalePrice] = useState("");
+  const [saleEnabled, setSaleEnabled] = useState(false);
   const [stock, setStock] = useState(0);
   const [published, setPublished] = useState(true);
   const [shortDescription, setShortDescription] = useState("");
@@ -46,6 +47,7 @@ export default function ProductEditClient({ productId }: ProductEditClientProps)
     setSku(detail.sku);
     setPrice(detail.price);
     setSalePrice(detail.salePrice ?? "");
+    setSaleEnabled(Boolean(detail.salePrice));
     setStock(detail.stock);
     setPublished(detail.published);
     setShortDescription(detail.shortDescription);
@@ -101,7 +103,7 @@ export default function ProductEditClient({ productId }: ProductEditClientProps)
           name,
           sku,
           price,
-          salePrice,
+          salePrice: saleEnabled ? salePrice : "",
           stock,
           published,
           shortDescription,
@@ -325,18 +327,42 @@ export default function ProductEditClient({ productId }: ProductEditClientProps)
                 <span>Price (INR)</span>
                 <input type="text" inputMode="decimal" value={price} onChange={(e) => setPrice(e.target.value)} />
               </label>
+              <div className="catalog-admin-sale-status">
+                <span>Sale pricing</span>
+                <div className="catalog-admin-sale-toggle" role="group" aria-label="Sale pricing status">
+                  <button
+                    type="button"
+                    className={!saleEnabled ? "is-active" : ""}
+                    aria-pressed={!saleEnabled}
+                    onClick={() => setSaleEnabled(false)}
+                  >
+                    Disabled
+                  </button>
+                  <button
+                    type="button"
+                    className={saleEnabled ? "is-active" : ""}
+                    aria-pressed={saleEnabled}
+                    onClick={() => setSaleEnabled(true)}
+                  >
+                    Enabled
+                  </button>
+                </div>
+              </div>
               <label className="catalog-admin-field">
-                <span>Sale price (INR, optional)</span>
+                <span>Sale price (INR)</span>
                 <input
                   type="text"
                   inputMode="decimal"
                   value={salePrice}
                   onChange={(e) => setSalePrice(e.target.value)}
-                  placeholder="Leave blank for no sale"
+                  placeholder={saleEnabled ? "Enter a sale price" : "Sale pricing is disabled"}
+                  disabled={!saleEnabled}
                 />
               </label>
               <p className="catalog-admin-card-copy">
-                When lower than the regular price, the storefront shows the regular price crossed out and uses this sale price in the bag and checkout.
+                {saleEnabled
+                  ? "When lower than the regular price, the storefront shows the regular price crossed out and uses this sale price in the bag and checkout."
+                  : "Enable sale pricing to enter a discounted storefront price."}
               </p>
             </section>
 

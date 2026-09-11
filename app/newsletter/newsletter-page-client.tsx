@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { formatStoryDate } from "../../lib/story-format";
 import {
@@ -43,7 +43,7 @@ import {
   parseEmailList,
   saveTestMailingList,
 } from "../../lib/test-mailing-list";
-import { MASTHEAD_BANNER_W, MASTHEAD_PORTRAIT_SIZE, mastheadCenterX, estimateStoryGridHeight, ensureMastheadZOrder, measureElementHeight, GREETING_TO_NEXT_GAP } from "../../lib/canvas-layout";
+import { MASTHEAD_BANNER_W, MASTHEAD_PORTRAIT_SIZE, mastheadCenterX, estimateStoryGridHeight, ensureMastheadZOrder, measureElementHeight, GREETING_TO_NEXT_GAP, STORY_GRID_TO_SECTION_GAP } from "../../lib/canvas-layout";
 import { NewsletterCanvas, makeTextEl, makeImageEl, makeDividerEl, makeStoryGridEl, makeCtaEl, type NewsletterCanvasHandle } from "./newsletter-canvas";
 import StorySpacingControls from "./story-spacing-controls";
 import { useAdminSession } from "../../lib/use-admin-session";
@@ -1545,6 +1545,7 @@ export default function NewsletterPageClient({
   // Always-current ref so saveStories never captures a stale closure
   const stateRef = useRef<StoriesState>(initialState);
   const canvasRef = useRef<NewsletterCanvasHandle>(null);
+  const newsletterShellRef = useRef<HTMLElement>(null);
   const { isAdminUser, canEditNewsletter: canEditNewsletterSession, sessionReady } = useAdminSession();
   const newsletterEditor = Boolean(
     sessionReady ? canEditNewsletterSession : canEditNewsletterProp || isAdmin,
@@ -1573,6 +1574,34 @@ export default function NewsletterPageClient({
     } catch { /* ignore */ }
     return withCanvasStoryGaps(initialState);
   });
+
+  // Browser drafts hydrate after the server render. Run the structural repair
+  // once on the mounted draft so missing story image frames are restored too.
+  useEffect(() => {
+    setState((current) => withCanvasStoryGaps(current));
+  }, []);
+
+  // Size the fixed side controls from the newsletter's real painted gutters.
+  // This stays accurate with browser zoom, split-screen windows and scrollbars.
+  useLayoutEffect(() => {
+    if (!canEdit) return;
+    const shell = newsletterShellRef.current;
+    if (!shell) return;
+    const updateGutter = () => {
+      const rect = shell.getBoundingClientRect();
+      const available = Math.max(36, Math.floor(Math.min(rect.left, window.innerWidth - rect.right) - 6));
+      document.documentElement.style.setProperty("--newsletter-editor-side-gutter", `${available}px`);
+    };
+    updateGutter();
+    const observer = new ResizeObserver(updateGutter);
+    observer.observe(shell);
+    window.addEventListener("resize", updateGutter);
+    return () => {
+      observer.disconnect();
+      window.removeEventListener("resize", updateGutter);
+      document.documentElement.style.removeProperty("--newsletter-editor-side-gutter");
+    };
+  }, [canEdit]);
 
   const storyGaps =
     state.newsletterCanvas?.storySpacingGaps ?? DEFAULT_STORY_SPACING_GAPS;
@@ -4245,7 +4274,7 @@ export default function NewsletterPageClient({
       } else {
         y += gridH;
       }
-      y += 48; // gap after TOP STORIES before first story section
+      y += STORY_GRID_TO_SECTION_GAP; // 2 cm after TOP STORIES before first story section
 
       // ── Individual story sections: divider → headline → image → body → CTA ──
       // Professional newsletter spacing:
@@ -5362,6 +5391,7 @@ export default function NewsletterPageClient({
       {renderStoryEditPortal()}
       {renderLayoutDividerPortal()}
       <section
+        ref={newsletterShellRef}
         className={`newsletter-shell ${state.newsletterTextAlign === "left" ? "is-align-left" : "is-align-center"}${canEdit ? " is-preview" : ""}${state.newsletterCanvas?.enabled ? " newsletter-shell--canvas" : ""} newsletter-font-${state.newsletterFontFamily ?? "serif"}`}
         style={
           {
@@ -5377,6 +5407,7 @@ export default function NewsletterPageClient({
       >
         {canEdit && showGlobalControls ? (
           <div className="newsletter-top-tools">
+          <strong className="newsletter-side-panel-title">Admin</strong>
           <div className="newsletter-inline-toolbar">
             <div className="newsletter-primary-action-stack">
               <button
@@ -6934,6 +6965,7 @@ export default function NewsletterPageClient({
       </section>
       {canEdit && showGlobalControls ? (
         <div className="newsletter-lifecycle-panel">
+          <strong className="newsletter-side-panel-title">Editing</strong>
           <div className="newsletter-lifecycle-action-stack">
             <button
               type="button"

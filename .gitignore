@@ -11,6 +11,7 @@ yarn-error.log*
 .vercel
 .env*.local
 .env.vercel.*
+.env*.tmp
 data/commerce-carts.json
 data/commerce-stock.json
 data/product-catalog-edits.json

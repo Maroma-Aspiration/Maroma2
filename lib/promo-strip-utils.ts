@@ -3,11 +3,11 @@ import type { PromoBanner } from "./promo-types";
 import { visibleCtaBuyLinks } from "./promo-buy-links-utils";
 
 export const PROMO_STRIP_HEIGHT_MIN = 48;
-export const PROMO_STRIP_HEIGHT_MAX = 720;
+export const PROMO_STRIP_HEIGHT_MAX = 1440;
 export const PROMO_STRIP_POSITION_CM_MIN = -20;
 export const PROMO_STRIP_POSITION_CM_MAX = 40;
-export const PROMO_STRIP_POSITION_PX_MIN = -600;
-export const PROMO_STRIP_POSITION_PX_MAX = 600;
+export const PROMO_STRIP_POSITION_PX_MIN = -1200;
+export const PROMO_STRIP_POSITION_PX_MAX = 1200;
 export const PROMO_STRIP_ASPECT_21_9 = "21:9" as const;
 export const PROMO_STRIP_ASPECT_FIXED = "fixed" as const;
 
@@ -51,6 +51,9 @@ export type PromoStripFields = {
   stripBackgroundImageOffsetX: number;
   stripBackgroundImageOffsetY: number;
   stripHeightPx: number;
+  stripWidthPct?: number;
+  stripFrameScale?: number;
+  stripPositionOffsetX?: number;
   stripPositionOffsetCm: number;
   stripPositionOffsetPx: number;
   stripAspectRatio: "fixed" | "21:9";
@@ -173,6 +176,9 @@ export function normalizePromoStripFields(banner: Partial<PromoBanner>): PromoSt
       100,
       PROMO_STRIP_DEFAULTS.stripBackgroundImageOffsetY
     ),
+    stripPositionOffsetX: clampNum(banner.stripPositionOffsetX, -1200, 1200, 0),
+    stripFrameScale: clampNum(banner.stripFrameScale, 25, 150, 100),
+    stripWidthPct: banner.stripWidthPct == null ? undefined : clampNum(banner.stripWidthPct, 20, 150, 100),
     stripHeightPx: clampNum(
       typeof banner.stripHeightPx === "number" && banner.stripHeightPx === LEGACY_STRIP_HEIGHT_PX
         ? PROMO_STRIP_DEFAULTS.stripHeightPx
@@ -260,18 +266,31 @@ export function promoStripVideoThenCta(banner: Partial<PromoBanner> | null | und
 
 export function promoStripStyleVars(banner: Partial<PromoBanner>): CSSProperties {
   const strip = normalizePromoStripFields(banner);
+  const frameScale = (strip.stripFrameScale ?? 100) / 100;
+  const frameHeight = strip.stripHeightPx * frameScale;
+  const hasBackgroundImage = Boolean(strip.stripBackgroundImageUrl && strip.stripBackgroundMediaKind === "image");
   const bgImage =
     strip.stripBackgroundImageUrl && strip.stripBackgroundMediaKind === "image"
       ? `url(${JSON.stringify(strip.stripBackgroundImageUrl)})`
-      : "none";
+      : typeof banner.stripBackgroundGradient === "string" && banner.stripBackgroundGradient.trim()
+        ? banner.stripBackgroundGradient.trim()
+        : "none";
   return {
-    ["--promo-strip-height" as string]: `${strip.stripHeightPx}px`,
-    ["--promo-strip-min-height" as string]: `${strip.stripHeightPx}px`,
+    ...(strip.stripWidthPct == null && frameScale === 1 ? {} : { ["--hero-promo-width-pct" as string]: `${(strip.stripWidthPct ?? 100) * frameScale}%` }),
+    ["--promo-strip-height" as string]: `${frameHeight}px`,
+    ["--promo-frame-x" as string]: `${strip.stripPositionOffsetX ?? 0}px`,
+    ["--promo-frame-y" as string]: `${strip.stripPositionOffsetPx}px`,
+    ["--promo-responsive-height" as string]: `${frameHeight / 14.4}vw`,
+    ["--promo-strip-min-height" as string]: `${frameHeight}px`,
     ["--promo-strip-bg" as string]: strip.stripBackground,
-    ["--promo-strip-bg-fill" as string]: promoStripFillColor(strip.stripBackground, strip.stripOpacity),
+    ["--promo-strip-bg-fill" as string]: bgImage !== "none" || strip.stripBackgroundMediaKind === "video"
+      ? "transparent"
+      : promoStripFillColor(strip.stripBackground, strip.stripOpacity),
     ["--promo-strip-bg-image" as string]: bgImage,
-    ["--promo-strip-bg-image-size" as string]: `${strip.stripBackgroundImageScale}% auto`,
-    ["--promo-strip-bg-image-position" as string]: `${strip.stripBackgroundImageOffsetX}% ${strip.stripBackgroundImageOffsetY}%`,
+    ["--promo-strip-bg-image-size" as string]: hasBackgroundImage ? `${strip.stripBackgroundImageScale}% auto` : "100% 100%",
+    ["--promo-frame-image-size" as string]: hasBackgroundImage ? `${strip.stripBackgroundImageScale}cqw auto` : "100% 100%",
+    ["--promo-frame-image-position" as string]: hasBackgroundImage ? `calc(50% + ${strip.stripBackgroundImageOffsetX - 50}cqw) calc(50% + ${(strip.stripBackgroundImageOffsetY - 50) * 0.416667}cqw)` : "center",
+    ["--promo-strip-bg-image-position" as string]: hasBackgroundImage || strip.stripBackgroundMediaKind === "video" ? `${strip.stripBackgroundImageOffsetX}% ${strip.stripBackgroundImageOffsetY}%` : "center",
     ["--promo-strip-bg-video-scale" as string]: String(strip.stripBackgroundImageScale / 100),
     ["--promo-strip-opacity" as string]: String(strip.stripOpacity),
     ["--promo-media-offset-x" as string]: `${strip.mediaOffsetXCm}cm`,

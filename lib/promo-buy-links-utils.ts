@@ -145,6 +145,7 @@ function normalizeOne(raw: unknown, side: "left" | "right", index: number): Prom
   return {
     id: typeof row.id === "string" && row.id.trim() ? row.id.trim() : emptySlot(side, index).id,
     side: row.side === "right" ? "right" : "left",
+    visible: row.visible !== false,
     label: typeof row.label === "string" ? row.label : "",
     subtitleLabel: typeof row.subtitleLabel === "string" ? row.subtitleLabel : "",
     priceLabel: typeof row.priceLabel === "string" ? row.priceLabel : "",
@@ -187,7 +188,7 @@ export function splitCtaBuyLinks(links: PromoCtaBuyLink[]) {
 }
 
 export function isPromoBuyLinkVisible(link: PromoCtaBuyLink): boolean {
-  return Boolean(link.href.trim() && link.imageUrl.trim());
+  return link.visible !== false && Boolean(link.href.trim() && link.imageUrl.trim());
 }
 
 export function visibleCtaBuyLinks(links: PromoCtaBuyLink[]) {

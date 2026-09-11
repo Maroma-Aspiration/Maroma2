@@ -24,6 +24,7 @@ export function CompactShopNavigation({ experiencesUrl, spaUrl }: { experiencesU
   return <div ref={root} className="compact-shop-links" onKeyDown={(event) => {
     if (event.key === "Escape") { setOpen(null); root.current?.querySelector<HTMLButtonElement>(`button[aria-expanded="true"]`)?.focus(); }
   }}>
+    <Link href="/" aria-current={pathname === "/" ? "page" : undefined} onClick={() => setOpen(null)}>Home</Link>
     <div className="compact-shop-dropdown">
       <button type="button" aria-expanded={open === "shop"} aria-controls="shop-collections" onClick={() => setOpen(open === "shop" ? null : "shop")}>Shop <span aria-hidden="true">⌄</span></button>
       {open === "shop" ? <nav id="shop-collections" className="compact-shop-menu" aria-label="Shop collections" onClick={() => setOpen(null)}>

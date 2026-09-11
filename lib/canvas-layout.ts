@@ -109,7 +109,7 @@ const GRID_PAD_TOP = 36;
 const GRID_PAD_BOTTOM = 40;
 
 /** Gap between TOP STORIES block and first story section (divider / headline). */
-export const STORY_GRID_TO_SECTION_GAP = 48;
+export const STORY_GRID_TO_SECTION_GAP = 76;
 
 function storyGridCardWidth(columns: number, canvasW = NEWSLETTER_CANVAS_WIDTH): number {
   return (canvasW - GRID_H_PAD - (columns - 1) * GRID_CARD_GAP) / columns;
@@ -181,7 +181,10 @@ export function storyGridLayoutFloor(
   grid: CanvasStoryGridEl,
   heightOf: (el: CanvasEl) => number = measureElementHeight,
 ): number {
-  return grid.y + storyGridVisualHeight(grid, heightOf) + STORY_GRID_TO_SECTION_GAP;
+  // The editor can report a transiently short DOM height while card images and
+  // fonts settle. Always reserve at least the deterministic full grid height so
+  // the first story section cannot rise into the TOP STORIES cards.
+  return grid.y + effectiveStoryGridHeight(grid, heightOf) + STORY_GRID_TO_SECTION_GAP;
 }
 
 export function measureElementHeight(el: CanvasEl, domH?: number): number {
@@ -805,7 +808,7 @@ export function contentOverlapsGreeting(
   );
 }
 
-/** Push story section 0 below TOP STORIES when any block overlaps the grid. */
+/** Push every element ordered after TOP STORIES below the full rendered grid. */
 export function enforceStoryContentBelowGrid(
   elements: CanvasEl[],
   gaps: StorySpacingGaps = DEFAULT_STORY_SPACING_GAPS,
@@ -817,9 +820,10 @@ export function enforceStoryContentBelowGrid(
   if (!grid) return elements;
 
   const floor = storyGridLayoutFloor(grid, heightOf);
+  const gridOrder = canvasLayoutOrder(grid);
   const blockers = elements.filter((e) => {
-    if (!/^migrated-(sdiv|st|si|sb|cta)-0$/.test(e.id)) return false;
-    return e.y < floor - 1;
+    if (e.id === grid.id || MASTHEAD_OVERLAY_IDS.has(e.id)) return false;
+    return canvasLayoutOrder(e) > gridOrder && e.y < floor - 1;
   });
   if (blockers.length === 0) return elements;
 
@@ -827,7 +831,7 @@ export function enforceStoryContentBelowGrid(
   return pushElementsFromLayoutOrder(elements, canvasLayoutOrder(anchor), floor - anchor.y);
 }
 
-/** True when story section 0 sits inside the TOP STORIES vertical band. */
+/** True when any later canvas element sits inside the TOP STORIES band. */
 export function firstStorySectionOverlapsGrid(
   elements: CanvasEl[],
   heightOf: (el: CanvasEl) => number = measureElementHeight,
@@ -837,8 +841,13 @@ export function firstStorySectionOverlapsGrid(
   );
   if (!grid) return false;
   const floor = storyGridLayoutFloor(grid, heightOf);
+  const gridOrder = canvasLayoutOrder(grid);
   return elements.some(
-    (e) => /^migrated-(sdiv|st|si|sb|cta)-0$/.test(e.id) && e.y < floor - 1,
+    (e) =>
+      e.id !== grid.id &&
+      !MASTHEAD_OVERLAY_IDS.has(e.id) &&
+      canvasLayoutOrder(e) > gridOrder &&
+      e.y < floor - 1,
   );
 }
 
@@ -870,9 +879,10 @@ export function compactStorySectionsBelowGrid(
   if (!grid) return elements;
 
   const target = storyGridLayoutFloor(grid, heightOf);
-  const anchor =
-    elements.find((e) => e.id === "migrated-sdiv-0") ??
-    elements.find((e) => e.id === "migrated-st-0");
+  const gridOrder = canvasLayoutOrder(grid);
+  const anchor = elements
+    .filter((e) => !MASTHEAD_OVERLAY_IDS.has(e.id) && canvasLayoutOrder(e) > gridOrder)
+    .sort((a, b) => canvasLayoutOrder(a) - canvasLayoutOrder(b))[0];
   if (!anchor || anchor.y <= target + 8) return elements;
 
   return pushElementsFromLayoutOrder(

@@ -36,7 +36,7 @@ export default function AdminSiteClient() {
           {status || "Hero promo banners and sequences."}
         </p>
         <p style={{ margin: "0 0 20px" }}>
-          <Link className="button secondary" href="/admin/qr-pages">Open product guides & QR creator</Link>
+          <Link className="button secondary" href="https://www.maromashopping.com/admin/products">QR Codes</Link>
         </p>
         <PromoBannerAdminPanel
           banners={banners}

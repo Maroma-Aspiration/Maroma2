@@ -426,7 +426,6 @@ export function CategoryHeroWithAdmin({
           <div
             ref={bannerMediaRef}
             className="category-hero-wide-media category-banner-admin-target"
-            style={{ minHeight, maxHeight }}
           >
             {showEditor ? (
               <button
@@ -589,61 +588,7 @@ export function CategoryHeroWithAdmin({
                     </code>
                   </div>
 
-                  <label className="category-banner-field">
-                    <span>Min height</span>
-                    <select
-                      value={minHeightPresets.some((preset) => preset.value === minHeight) ? minHeight : "__custom__"}
-                      onChange={(event) => {
-                        const value = event.target.value;
-                        if (value !== "__custom__") {
-                          setMinHeight(value);
-                        }
-                      }}
-                      disabled={busy}
-                    >
-                      {minHeightPresets.map((preset) => (
-                        <option key={preset.label} value={preset.value}>
-                          {preset.label}
-                        </option>
-                      ))}
-                      <option value="__custom__">Custom (use field below)</option>
-                    </select>
-                    <input
-                      className="category-banner-custom-css"
-                      value={minHeight}
-                      onChange={(event) => setMinHeight(event.target.value)}
-                      disabled={busy}
-                      placeholder="CSS min-height"
-                    />
-                  </label>
-
-                  <label className="category-banner-field">
-                    <span>Max height</span>
-                    <select
-                      value={maxHeightPresets.some((preset) => preset.value === maxHeight) ? maxHeight : "__custom__"}
-                      onChange={(event) => {
-                        const value = event.target.value;
-                        if (value !== "__custom__") {
-                          setMaxHeight(value);
-                        }
-                      }}
-                      disabled={busy}
-                    >
-                      {maxHeightPresets.map((preset) => (
-                        <option key={preset.label} value={preset.value}>
-                          {preset.label}
-                        </option>
-                      ))}
-                      <option value="__custom__">Custom</option>
-                    </select>
-                    <input
-                      className="category-banner-custom-css"
-                      value={maxHeight}
-                      onChange={(event) => setMaxHeight(event.target.value)}
-                      disabled={busy}
-                      placeholder="CSS max-height"
-                    />
-                  </label>
+                  <p className="category-banner-code">Frame: 2048 × 694 (2.95:1), scaled proportionally to the page width.</p>
                 </>
               ) : null}
 

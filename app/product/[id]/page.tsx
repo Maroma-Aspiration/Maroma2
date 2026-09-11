@@ -2,8 +2,10 @@ import type { Metadata } from "next";
 import { cookies } from "next/headers";
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { ProductPdpTitle } from "../../components/ProductPdpTitle";
 import { ProductPdpBuyRow } from "../../components/ProductPdpBuyRow";
 import { ProductPdpGallery } from "../../components/ProductPdpGallery";
+import { ProductPdpScrollLock } from "./ProductPdpScrollLock";
 import { ProductReviews } from "../../components/ProductReviews";
 import { ProductAdminToolbar } from "../../components/ProductAdminToolbar";
 import { ProductIngredientGallery } from "../../components/ProductIngredientGallery";
@@ -133,6 +135,7 @@ export default async function ProductPage({ params, searchParams }: Props) {
 
   return (
     <main className="product-pdp-page">
+      <ProductPdpScrollLock />
       <JsonLd
         data={[
           productJsonLd(product, { availability }),
@@ -174,83 +177,95 @@ export default async function ProductPage({ params, searchParams }: Props) {
         data-review-id="pdp-layout"
         data-review-files="app/product/[id]/page.tsx,app/components/ProductPdpBuyRow.tsx,app/components/ProductPdpGallery.tsx"
       >
-        <h1 className="product-pdp-title">{displayName}</h1>
+        <ProductPdpTitle>{displayName}</ProductPdpTitle>
         <div className="product-pdp-left-column">
           <ProductPdpGallery images={gallery} videos={product.videos} productId={product.id} productName={displayName} ready3d={isGiftingProduct(product) && gift3dReady} />
-          <ProductReviews productId={product.id} />
         </div>
 
-        <div className="product-pdp-info">
-          <div className="product-currency-control"><span>Currency</span><CurrencySelector compact /></div>
-          {subtitleText ? <p className="product-pdp-subtitle">{subtitleText}</p> : null}
-          {productPriceState(product).onSale ? (
-            <p className="product-pdp-price is-on-sale"><s><CurrencyPrice raw={productPriceState(product).regular} /></s><span><CurrencyPrice raw={productPriceState(product).active} /></span></p>
-          ) : <p className="product-pdp-price"><CurrencyPrice raw={product.price} /></p>}
+        <div className="product-pdp-details-column">
+          <div className="product-pdp-info">
+            {subtitleText ? <p className="product-pdp-subtitle">{subtitleText}</p> : null}
+            <div className="product-pdp-price-row">
+            {productPriceState(product).onSale ? (
+              <p className="product-pdp-price is-on-sale"><s><CurrencyPrice raw={productPriceState(product).regular} /></s><span><CurrencyPrice raw={productPriceState(product).active} /></span></p>
+            ) : <p className="product-pdp-price"><CurrencyPrice raw={product.price} /></p>}
 
-          <ProductPdpBuyRow product={product} />
+              <CurrencySelector compact />
+            </div>
 
-          {factRows.length > 0 ? (
-            <section className="product-pdp-facts" aria-labelledby="pdp-facts-heading">
-              <h2 id="pdp-facts-heading" className="product-pdp-facts-title">
-                Product details
-              </h2>
-              <dl className="product-pdp-facts-list">
-                {factRows.map((fact) => (
-                  <div key={fact.label} className="product-pdp-facts-row">
-                    <dt>{fact.label}</dt>
-                    <dd>{fact.value}</dd>
-                  </div>
-                ))}
-              </dl>
-            </section>
-          ) : null}
+            <ProductPdpBuyRow product={product} />
 
-          {suggested.length > 0 ? (
-            <section className="product-pdp-suggestions-inline" aria-labelledby="pdp-suggestions-inline">
-              <h2 id="pdp-suggestions-inline" className="product-pdp-suggestions-inline-title">
-                You may also like
-              </h2>
-              <div className="product-pdp-suggestions-track">
-                {suggested.map((item) => (
-                  <SuggestedCard key={item.id} product={item} />
-                ))}
-              </div>
-            </section>
-          ) : null}
-
-          <ul className="product-pdp-service-list">
-            <li>100% vegan formulations</li>
-            <li>Free shipping in India on orders over ₹500</li>
-            <li>Free 7-day return on eligible items</li>
-          </ul>
-
-          <div className="product-pdp-accordions">
+            <div className="product-pdp-accordions">
             <details className="product-pdp-accordion" open>
               <summary>Description</summary>
               <div className="product-pdp-accordion-body">{sections.description}</div>
             </details>
             <details className="product-pdp-accordion">
-              <summary>Key ingredients</summary>
-              {keyIngredients.length ? <ul className="product-pdp-key-ingredients">{keyIngredients.map((item, index) => <li key={`${item}-${index}`}>{decodeBasicHtmlEntities(item)}</li>)}</ul> : <div className="product-pdp-accordion-body">Key ingredients are listed on the product label.</div>}
-            </details>
-            <details className="product-pdp-accordion">
               <summary>Ingredients (full INCI)</summary>
               <div className="product-pdp-accordion-body">{sections.ingredients}</div>
             </details>
-            <details className="product-pdp-accordion">
-              <summary>Benefits</summary>
-              <div className="product-pdp-accordion-body">{sections.benefits}</div>
-            </details>
-            {sections.howToUse ? (
               <details className="product-pdp-accordion">
-                <summary>How to use</summary>
-                <div className="product-pdp-accordion-body">{sections.howToUse}</div>
+                <summary>Benefits</summary>
+                <div className="product-pdp-accordion-body">{sections.benefits}</div>
               </details>
-            ) : null}
-          </div>
+              {sections.howToUse ? (
+                <details className="product-pdp-accordion">
+                  <summary>How to use</summary>
+                  <div className="product-pdp-accordion-body">{sections.howToUse}</div>
+                </details>
+              ) : null}
+            </div>
 
+            {factRows.length > 0 ? (
+              <section className="product-pdp-facts" aria-labelledby="pdp-facts-heading">
+                <h2 id="pdp-facts-heading" className="product-pdp-facts-title">
+                  Product details
+                </h2>
+                <dl className="product-pdp-facts-list">
+                  {factRows.map((fact) => (
+                    <div key={fact.label} className="product-pdp-facts-row">
+                      <dt>{fact.label}</dt>
+                      <dd>{fact.value}</dd>
+                    </div>
+                  ))}
+                </dl>
+              </section>
+            ) : null}
+
+            {suggested.length > 0 ? (
+              <section className="product-pdp-suggestions-inline" aria-labelledby="pdp-suggestions-inline">
+                <h2 id="pdp-suggestions-inline" className="product-pdp-suggestions-inline-title">
+                  You may also like
+                </h2>
+                <div className="product-pdp-suggestions-track">
+                  {suggested.map((item) => (
+                    <SuggestedCard key={item.id} product={item} />
+                  ))}
+                </div>
+              </section>
+            ) : null}
+
+            <ul className="product-pdp-service-list">
+              <li>100% vegan formulations</li>
+              <li>Free shipping in India on orders over ₹500</li>
+              <li>Free 7-day return on eligible items</li>
+            </ul>
+          </div>
         </div>
       </div>
+
+      <section className="product-pdp-key-ingredients-section" aria-labelledby="pdp-key-ingredients-heading">
+        <h2 id="pdp-key-ingredients-heading" className="product-pdp-key-ingredients-title">
+          Key ingredients
+        </h2>
+      {keyIngredients.length ? (
+        <ul className="product-pdp-key-ingredients">
+          {keyIngredients.map((item, index) => <li key={`${item}-${index}`}>{decodeBasicHtmlEntities(item)}</li>)}
+        </ul>
+      ) : (
+        <p className="product-pdp-accordion-body">Key ingredients are listed on the product label.</p>
+      )}
+      </section>
 
       <ProductIngredientGallery productId={product.id} ingredients={keyIngredients} isAdmin={isAdmin} />
 
@@ -261,6 +276,7 @@ export default async function ProductPage({ params, searchParams }: Props) {
         <div className="product-pdp-trust-badge">Conscious ingredients</div>
         <div className="product-pdp-trust-badge">Earth friendly</div>
       </footer>
+      <ProductReviews productId={product.id} />
     </main>
   );
 }

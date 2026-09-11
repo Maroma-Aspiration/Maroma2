@@ -10,6 +10,7 @@ import {
 } from "../../lib/promo-sequence-utils";
 import { normalizePromoStripFields, promoStripStyleVars, promoStripBannerClass, promoStripVideoThenCta } from "../../lib/promo-strip-utils";
 import {
+  readPromoStripVideoPaused,
   readPromoStripVideoSeen,
   writePromoStripVideoSeen,
 } from "../../lib/promo-strip-video-session";
@@ -58,6 +59,8 @@ type PromoBannerSequenceProps = {
     | "stripAspectRatio"
     | "ctaOffsetX"
     | "ctaOffsetY"
+    | "thumbnailOffsetX"
+    | "thumbnailOffsetY"
   >;
   linkable?: boolean;
   variant?: "default" | "hero";
@@ -70,7 +73,9 @@ type PromoBannerSequenceProps = {
   /** Skip autoplay when strip video was already seen this session (live homepage). */
   rememberStripVideoSeen?: boolean;
   ctaDraggable?: boolean;
+  thumbnailsDraggable?: boolean;
   onCtaPositionChange?: (position: { x: number; y: number }) => void;
+  onThumbnailsPositionChange?: (position: { x: number; y: number }) => void;
 };
 
 function renderCta(frame: PromoFrame, linkable: boolean, scale: number) {
@@ -137,8 +142,12 @@ function renderFrameBody(
   marqueePreviewMode?: "start" | "end",
   ctaOffsetX = 0,
   ctaOffsetY = 0,
+  thumbnailOffsetX = 0,
+  thumbnailOffsetY = 0,
   ctaDraggable = false,
+  thumbnailsDraggable = false,
   onCtaPositionChange?: (position: { x: number; y: number }) => void,
+  onThumbnailsPositionChange?: (position: { x: number; y: number }) => void,
 ) {
   switch (frame.kind) {
     case "empty":
@@ -188,10 +197,14 @@ function renderFrameBody(
             buyLinks={ctaBuyLinks}
             linkable={linkable}
             cta={renderCta(frame, linkable, frame.ctaScale ?? 1)}
-            offsetX={ctaOffsetX}
-            offsetY={ctaOffsetY}
-            draggable={ctaDraggable}
-            onPositionChange={onCtaPositionChange}
+            ctaOffsetX={ctaOffsetX}
+            ctaOffsetY={ctaOffsetY}
+            thumbnailOffsetX={thumbnailOffsetX}
+            thumbnailOffsetY={thumbnailOffsetY}
+            ctaDraggable={ctaDraggable}
+            thumbnailsDraggable={thumbnailsDraggable}
+            onCtaPositionChange={onCtaPositionChange}
+            onThumbnailsPositionChange={onThumbnailsPositionChange}
           />
         </div>
       );
@@ -210,7 +223,9 @@ export function PromoBannerSequence({
   marqueePreviewMode = "start",
   rememberStripVideoSeen = false,
   ctaDraggable = false,
+  thumbnailsDraggable = false,
   onCtaPositionChange,
+  onThumbnailsPositionChange,
 }: PromoBannerSequenceProps) {
   const frames = useMemo(
     () => resolvePromoFrames(banner, { heroVariant: variant === "hero" }),
@@ -222,21 +237,23 @@ export function PromoBannerSequence({
     [banner, variant]
   );
   const stripVideoUrl = strip.stripBackgroundImageUrl;
+  const stripVideoPausedOnLoad = Boolean(
+    !linkable && banner.id && stripVideoUrl && readPromoStripVideoPaused(banner.id, stripVideoUrl)
+  );
   const stripVideoSeenOnLoad =
     rememberStripVideoSeen &&
     Boolean(banner.id && stripVideoUrl && readPromoStripVideoSeen(banner.id, stripVideoUrl));
   const ctaBuyLinks = useMemo(() => banner.ctaBuyLinks ?? [], [banner.ctaBuyLinks]);
   const transition = "fade";
-  const loop = banner.sequenceLoop !== false;
   const [activeIndex, setActiveIndex] = useState(0);
   const [phase, setPhase] = useState<FramePhase>("hold");
   const [runId, setRunId] = useState(0);
   const [playback, setPlayback] = useState<PromoPlayback>(
-    startHeld || marqueePreviewStart ? "held" : "playing"
+    stripVideoPausedOnLoad ? "paused" : startHeld || marqueePreviewStart ? "held" : "playing"
   );
   const [stripVideoPhase, setStripVideoPhase] = useState<StripVideoPhase>(() => {
     if (!stripVideoThenCta) return "ended";
-    if (startHeld || marqueePreviewStart) return "idle";
+    if (startHeld || marqueePreviewStart || stripVideoPausedOnLoad) return "idle";
     if (stripVideoSeenOnLoad) return "ended";
     return "playing";
   });
@@ -255,14 +272,16 @@ export function PromoBannerSequence({
   }, []);
 
   const shouldAutoPlayStripVideo =
-    !startHeld && !marqueePreviewStart && !(stripVideoThenCta && stripVideoSeenOnLoad);
+    !stripVideoPausedOnLoad && !startHeld && !marqueePreviewStart && !(stripVideoThenCta && stripVideoSeenOnLoad);
 
   useEffect(() => {
     if (userStartedRef.current) return;
     const shouldHold = startHeld || marqueePreviewStart;
-    setPlayback(shouldHold ? "held" : "playing");
+    setPlayback(stripVideoPausedOnLoad ? "paused" : shouldHold ? "held" : "playing");
     if (stripVideoThenCta) {
-      if (stripVideoSeenOnLoad && !shouldHold) {
+      if (stripVideoPausedOnLoad) {
+        setStripVideoPhase("idle");
+      } else if (stripVideoSeenOnLoad && !shouldHold) {
         setStripVideoPhase("ended");
       } else {
         setStripVideoPhase(shouldHold ? "idle" : "playing");
@@ -276,6 +295,7 @@ export function PromoBannerSequence({
   }, [
     startHeld,
     marqueePreviewStart,
+    stripVideoPausedOnLoad,
     stripVideoSeenOnLoad,
     stripVideoThenCta,
   ]);
@@ -621,6 +641,10 @@ export function PromoBannerSequence({
       return clearTimers;
     }
 
+    if (phase === "hold" && activeIndex === frames.length - 1) {
+      return undefined;
+    }
+
     if (phase === "hold") {
       timerRef.current = window.setTimeout(() => setPhase("out"), Math.max(50, holdMs));
       return clearTimers;
@@ -628,7 +652,7 @@ export function PromoBannerSequence({
 
     timerRef.current = window.setTimeout(() => {
       const isLast = activeIndex >= frames.length - 1;
-      if (isLast && !loop && !isPlaying) return;
+      if (isLast) return;
       const nextIndex = isLast ? 0 : activeIndex + 1;
       goToFrame(nextIndex);
     }, Math.max(0, fadeOut));
@@ -642,7 +666,6 @@ export function PromoBannerSequence({
     holdStart,
     isPaused,
     isPlaying,
-    loop,
     marqueeDurationMs,
     phase,
     stripVideoPhase,
@@ -673,6 +696,14 @@ export function PromoBannerSequence({
         videoRef={stripVideoRef}
         className={stripVideoDisplayReady ? "is-strip-video-ready" : ""}
         ended={stripVideoThenCta && stripVideoPhase === "ended"}
+        onReplay={startPlayback}
+        onPlaybackChange={(playing) => {
+          userStartedRef.current = true;
+          clearTimers();
+          setPlayback(playing ? "held" : "paused");
+          if (stripVideoThenCta) setStripVideoPhase(playing ? "playing" : "idle");
+        }}
+        rememberPlayback={!linkable}
       />
       <div
         className={`promo-banner-sequence-stage${
@@ -703,8 +734,12 @@ export function PromoBannerSequence({
                   marqueePreviewMode,
                   banner.ctaOffsetX,
                   banner.ctaOffsetY,
+                  banner.thumbnailOffsetX,
+                  banner.thumbnailOffsetY,
                   ctaDraggable,
-                  onCtaPositionChange
+                  thumbnailsDraggable,
+                  onCtaPositionChange,
+                  onThumbnailsPositionChange
                 )
               : null;
           return (

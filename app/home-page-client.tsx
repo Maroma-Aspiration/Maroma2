@@ -6,6 +6,7 @@ import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, use
 import { HomePageBelowFold } from "./components/HomePageBelowFold";
 import { HomeCollections } from "./components/HomeCollections";
 import { HeroPromoBanner } from "./components/PromoBannerStrip";
+import { HomepagePromoQuickEditor } from "./components/HomepagePromoQuickEditor";
 import { HeroVideoMedia } from "./components/HeroVideoMedia";
 import { isYouTubeUrl } from "../lib/youtube-embed";
 import { MobilePreviewFrame } from "./components/MobilePreviewFrame";
@@ -205,6 +206,61 @@ type HomePageClientProps = {
   initialProductSearch?: string;
 };
 
+function createHomepagePromoDraft(): PromoBanner {
+  const now = new Date().toISOString();
+  return {
+    id: crypto.randomUUID(),
+    adminName: "Homepage promo",
+    title: "A beautiful seasonal offer",
+    body: "Discover botanical care, made with purpose.",
+    mediaUrl: "",
+    mediaKind: "none",
+    animation: "fade",
+    animateEnabled: true,
+    headlineAnimation: "none",
+    headlineAnimationDurationMs: 2400,
+    taglineAnimation: "none",
+    taglineAnimationDurationMs: 2400,
+    ctaLabel: "Shop the offer",
+    ctaHref: "/face-care",
+    ctaStyle: "magical",
+    ctaBuyLinks: [],
+    presentation: "static",
+    sequenceTransition: "crossfade",
+    sequenceLoop: true,
+    frames: [],
+    stripBackground: "#134a57",
+    stripBackgroundGradient: "linear-gradient(135deg,#083f55 0%,#1688a3 45%,#efc85d 100%)",
+    stripBackgroundImageUrl: "",
+    stripBackgroundMediaKind: "none",
+    stripBackgroundVideoLoop: false,
+    stripBackgroundFallbackImageUrl: "",
+    stripBackgroundImageScale: 100,
+    stripBackgroundImageOffsetX: 50,
+    stripBackgroundImageOffsetY: 50,
+    stripHeightPx: 430,
+    stripPositionOffsetCm: 0,
+    stripPositionOffsetPx: 0,
+    stripAspectRatio: "fixed",
+    stripOpacity: 1,
+    overlayImageX: 50,
+    overlayImageY: 48,
+    overlayImageScale: 75,
+    overlayImageRadius: 18,
+    overlayImageShadow: true,
+    ctaOffsetX: 0,
+    ctaOffsetY: 0,
+    thumbnailOffsetX: 0,
+    thumbnailOffsetY: 0,
+    startsAt: "",
+    endsAt: "",
+    active: true,
+    promoModeEnabled: true,
+    createdAt: now,
+    updatedAt: now,
+  };
+}
+
 const FLOATING_ADMIN_CHROME_KEY = "maroma-floating-admin-chrome";
 const ADMIN_DEVICE_PREVIEW_KEY = "maroma-admin-device-preview";
 const RITUAL_STACK_BASELINE_KEY = "maroma-ritual-stack-baseline-v3";
@@ -270,9 +326,66 @@ export default function HomePageClient({
     }
     return initialPromoBanners;
   });
+  const [promoEditorOpen, setPromoEditorOpen] = useState(false);
+  const [promoEditorBanners, setPromoEditorBanners] = useState<PromoBanner[]>([]);
+  const [promoEditorModeOverride, setPromoEditorModeOverride] = useState<boolean | null>(null);
+  const [promoEditorStatus, setPromoEditorStatus] = useState("");
+  const [promoPublishSucceeded, setPromoPublishSucceeded] = useState(false);
   const livePromoBannersRef = useRef(livePromoBanners);
   livePromoBannersRef.current = livePromoBanners;
   const promoPatchTimerRef = useRef<number | null>(null);
+
+  const refreshPromoEditor = useCallback(async () => {
+    const res = await fetch("/api/promos?admin=1", { cache: "no-store", credentials: "same-origin" });
+    if (!res.ok) throw new Error("Unable to load promo controls.");
+    const data = (await res.json()) as { banners?: PromoBanner[] };
+    const banners = data.banners ?? [];
+    setPromoEditorBanners(banners);
+    return banners;
+  }, []);
+
+  const openPromoEditor = useCallback(async () => {
+    setPromoEditorStatus("Loading promo controls…");
+    try {
+      const banners = await refreshPromoEditor();
+      const source = banners[0] ?? livePromoBannersRef.current[0] ?? createHomepagePromoDraft();
+      const editorBanner: PromoBanner = {
+        ...source,
+        presentation: "static",
+        animation: source.animation === "marquee" ? "fade" : source.animation,
+      };
+      setPromoEditorBanners([editorBanner, ...banners.filter((item) => item.id !== editorBanner.id)]);
+      setPromoEditorModeOverride(editorBanner.promoModeEnabled !== false);
+      livePromoBannersRef.current = [
+        editorBanner,
+        ...livePromoBannersRef.current.filter((item) => item.id !== editorBanner.id),
+      ];
+      setLivePromoBanners(livePromoBannersRef.current);
+      setPromoEditorOpen(true);
+      setPromoEditorStatus("");
+    } catch (error) {
+      setPromoEditorStatus(error instanceof Error ? error.message : "Unable to load promo controls.");
+    }
+  }, [refreshPromoEditor]);
+
+  const applyPromoEditorPreview = useCallback((banner: PromoBanner) => {
+    setPromoEditorBanners((current) => [banner, ...current.filter((item) => item.id !== banner.id)]);
+    livePromoBannersRef.current = [
+      banner,
+      ...livePromoBannersRef.current.filter((item) => item.id !== banner.id),
+    ];
+    setLivePromoBanners(livePromoBannersRef.current);
+  }, []);
+
+  const refreshLivePromoBanners = useCallback(async () => {
+    const res = await fetch("/api/promos", { cache: "no-store", credentials: "same-origin" });
+    if (!res.ok) return;
+    const data = (await res.json()) as { banners?: PromoBanner[] };
+    if (data.banners) {
+      livePromoBannersRef.current = data.banners;
+      setLivePromoBanners(data.banners);
+    }
+  }, []);
   const [marqueePreviewMode, setMarqueePreviewMode] = useState<"start" | "end">("start");
   const [heroMarqueeStartOffsetCm, setHeroMarqueeStartOffsetCm] = useState(
     initialHeroVisual.heroMarqueeStartOffsetCm ??
@@ -296,7 +409,7 @@ export default function HomePageClient({
   );
 
   useEffect(() => {
-    if (initialPromoPreview) return;
+    if (initialPromoPreview || promoEditorOpen) return;
     setLivePromoBanners((current) => {
       const local = current[0];
       const incoming = initialPromoBanners[0];
@@ -312,7 +425,7 @@ export default function HomePageClient({
       }
       return initialPromoBanners;
     });
-  }, [initialPromoBanners, initialPromoPreview]);
+  }, [initialPromoBanners, initialPromoPreview, promoEditorOpen]);
 
   useEffect(() => {
     if (!initialPromoPreview) return undefined;
@@ -384,6 +497,15 @@ export default function HomePageClient({
   const [adminDragEnabled, setAdminDragEnabled] = useState(false);
   const { isAdminUser, sessionReady, refreshSession } = useAdminSession();
   const showFloatingAdmin = sessionReady && isAdminUser && !isAdminUiHidden() && !initialPromoPreview;
+
+  useEffect(() => {
+    if (!sessionReady || !isAdminUser || initialPromoPreview) return;
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("openPromoEditor") !== "1") return;
+    params.delete("openPromoEditor");
+    window.history.replaceState(null, "", `${window.location.pathname}?${params.toString()}`);
+    void openPromoEditor();
+  }, [initialPromoPreview, isAdminUser, openPromoEditor, sessionReady]);
   const [saveStatus, setSaveStatus] = useState<"idle" | "saving" | "saved" | "error">("idle");
   const [bgColors, setBgColors] = useState<string[]>(initialHeroVisual.bgColors || ["#dbe3d0", "#cbd5c0", "#d6deca"]);
   const [bgAngle, setBgAngle] = useState<number>(initialHeroVisual.bgAngle || 135);
@@ -1631,7 +1753,13 @@ export default function HomePageClient({
     event.preventDefault();
     event.stopPropagation();
     heroPromoDragStart.current = { x: event.clientX, y: event.clientY };
-    heroPromoBaseRef.current = persistLayoutToMobile
+    heroPromoBaseRef.current = promoHomepageActive
+      ? {
+          x: normalizePromoStripFields(livePromoBannersRef.current[0] ?? {}).stripPositionOffsetX ?? 0,
+          y: normalizePromoStripFields(livePromoBannersRef.current[0] ?? {}).stripPositionOffsetPx,
+          topCm: heroPromoBannerTopCmRef.current,
+        }
+      : persistLayoutToMobile
       ? {
           x: mobileEffective.heroPromoBannerPos.x,
           y: mobileEffective.heroPromoBannerPos.y,
@@ -1654,14 +1782,22 @@ export default function HomePageClient({
       return;
     }
     event.preventDefault();
-    // Vertical-only drag: keep X fixed, move Y with the pointer.
+    const dx = event.clientX - heroPromoDragStart.current.x;
     const dy = event.clientY - heroPromoDragStart.current.y;
     const nextPos = {
-      x: heroPromoBaseRef.current.x,
+      x: heroPromoBaseRef.current.x + dx,
       y: heroPromoBaseRef.current.y + dy,
     };
-    heroPromoBannerPosRef.current = nextPos;
-    if (persistLayoutToMobile) {
+    if (promoHomepageActive) {
+      const framePosition = { ...heroPromoBannerPosRef.current, x: nextPos.x };
+      heroPromoBannerPosRef.current = framePosition;
+      if (persistLayoutToMobile) {
+        setHeroMobileOverrides((prev) => mergeHeroMobileOverrides(prev, { heroPromoBannerPos: framePosition }));
+      } else {
+        setHeroPromoBannerPos(framePosition);
+      }
+      patchLivePromoStrip({ stripPositionOffsetX: Math.max(-1200, Math.min(1200, Math.round(nextPos.x))), stripPositionOffsetPx: Math.max(PROMO_STRIP_POSITION_PX_MIN, Math.min(PROMO_STRIP_POSITION_PX_MAX, Math.round(nextPos.y))) });
+    } else if (persistLayoutToMobile) {
       setHeroMobileOverrides((prev) =>
         mergeHeroMobileOverrides(prev, {
           heroPromoBannerPos: nextPos,
@@ -1683,6 +1819,14 @@ export default function HomePageClient({
     setLayoutDragging(false);
     if (event.currentTarget.hasPointerCapture(event.pointerId)) {
       event.currentTarget.releasePointerCapture(event.pointerId);
+    }
+    if (promoHomepageActive) {
+      if (persistLayoutToMobile) {
+        applyMobilePatch({ heroPromoBannerPos: heroPromoBannerPosRef.current });
+      } else {
+        void persistHeroVisualPatch({ heroPromoBannerPos: heroPromoBannerPosRef.current });
+      }
+      return;
     }
     if (persistLayoutToMobile) {
       applyMobilePatch({
@@ -2799,7 +2943,9 @@ export default function HomePageClient({
     }cm`,
     ["--hero-promo-nudge-x" as string]: `${heroPromoRenderPos.x}px`,
     ["--hero-promo-nudge-y" as string]: `${
-      heroPromoRenderPos.y + livePromoStripLayout.stripPositionOffsetPx
+      livePromoBanners[0] && isPromoModeEnabled(livePromoBanners[0])
+        ? livePromoStripLayout.stripPositionOffsetPx
+        : heroPromoRenderPos.y + livePromoStripLayout.stripPositionOffsetPx
     }px`,
     ["--hero-promo-width-pct" as string]: `${heroPromoWidthPctForRender}%`,
     ["--hero-z-background" as string]: String(heroBackgroundStackZ),
@@ -2936,10 +3082,13 @@ export default function HomePageClient({
     ? normalizePromoStripFields(displayPromoBanners[0])
     : PROMO_STRIP_DEFAULTS;
 
-  const heroPromoBanners = useMemo(
-    () => displayPromoBanners.filter((banner) => isPromoModeEnabled(banner)),
-    [displayPromoBanners]
-  );
+  const heroPromoBanners = useMemo(() => {
+    const selected = (promoEditorOpen ? promoEditorBanners : displayPromoBanners)[0];
+    const enabled = promoEditorOpen && promoEditorModeOverride !== null
+      ? promoEditorModeOverride
+      : isPromoModeEnabled(selected);
+    return selected && enabled ? [selected] : [];
+  }, [displayPromoBanners, promoEditorBanners, promoEditorModeOverride, promoEditorOpen]);
 
   const persistLivePromoStrip = useCallback(async (banner: PromoBanner) => {
     const strip = normalizePromoStripFields(banner);
@@ -4197,7 +4346,12 @@ export default function HomePageClient({
     </div>
   );
 
+  const promoHomepageActive = heroPromoBanners.length > 0;
+  const promoHomepageLayout = promoHomepageActive
+    ? normalizePromoStripFields(heroPromoBanners[0])
+    : null;
   const hidePrimaryForPromoView =
+    promoHomepageActive ||
     (initialPromoPreview &&
       displayPromoBanners[0] &&
       promoStripHidesHeroPrimary(displayPromoBanners[0])) ||
@@ -4208,12 +4362,13 @@ export default function HomePageClient({
   const showHeroPrimaryProductLayer =
     (hasHeroMedia || adminDragEnabled) && !hidePrimaryForPromoView;
   const showHeroMediaOverlayHost =
-    (hasOverlayMedia && overlayInHeroMedia) || (adminDragEnabled && hasOverlayMedia);
+    !promoHomepageActive &&
+    ((hasOverlayMedia && overlayInHeroMedia) || (adminDragEnabled && hasOverlayMedia));
 
   const pageHeroStack = (
     <>
       <section
-        className={`hero ${hasAnyHeroVisualLayer ? "hero-bg" : ""}${showMobileLayout ? " hero-mobile-layout" : ""}`}
+        className={`hero ${hasAnyHeroVisualLayer ? "hero-bg" : ""}${showMobileLayout ? " hero-mobile-layout" : ""}${promoHomepageActive ? " is-promo-homepage" : ""}`}
         id="hero"
         ref={heroSectionRef}
         data-review="Homepage hero"
@@ -4223,11 +4378,18 @@ export default function HomePageClient({
         style={
           showMobileLayout
             ? heroSectionStackStyle
-            : { minHeight: `${safeHeroSectionHeight}vh`, ...heroSectionStackStyle }
+            : {
+                ["--promo-responsive-height" as string]: promoHomepageLayout ? `${promoHomepageLayout.stripHeightPx / 14.4}vw` : undefined,
+                minHeight:
+                  promoHomepageLayout?.stripAspectRatio === "fixed"
+                    ? `${promoHomepageLayout.stripHeightPx}px`
+                    : `${safeHeroSectionHeight}vh`,
+                ...heroSectionStackStyle,
+              }
         }
       >
         <div ref={heroArtboardRef} className={artboardClassName} style={artboardStackStyle}>
-        {backgroundVisible ? (
+        {backgroundVisible && !promoHomepageActive ? (
           <div
             className="hero-background-layer"
             aria-hidden="true"
@@ -4271,16 +4433,34 @@ export default function HomePageClient({
             />
           </div>
         ) : null}
-        {useMobileDocumentFlow && !mobileNudgeActive ? renderHeroOverlayFrame() : null}
+        {useMobileDocumentFlow && !mobileNudgeActive && !promoHomepageActive ? renderHeroOverlayFrame() : null}
         <HeroPromoBanner
+          entranceReady={introPhase === "done" && !initialPromoPreview}
           initialBanners={heroPromoBanners}
           editable={adminDragEnabled && adminEditLayer === "promo-banner"}
           marqueePreviewMode={marqueePreviewMode}
           holdMarquee={initialPromoPreview || introPhase === "playing"}
-          ctaDraggable={adminDragEnabled && adminEditLayer === "promo-cta"}
-          onCtaPositionChange={(position) =>
-            patchLivePromoStrip({ ctaOffsetX: Math.round(position.x), ctaOffsetY: Math.round(position.y) })
-          }
+          ctaDraggable={promoEditorOpen || (adminDragEnabled && adminEditLayer === "promo-cta")}
+          thumbnailsDraggable={promoEditorOpen}
+          onCtaPositionChange={(position) => {
+            const patch = { ctaOffsetX: Math.round(position.x), ctaOffsetY: Math.round(position.y) };
+            if (promoEditorOpen && promoEditorBanners[0]) {
+              applyPromoEditorPreview({ ...promoEditorBanners[0], ...patch, updatedAt: new Date().toISOString() });
+              return;
+            }
+            patchLivePromoStrip(patch);
+          }}
+          onThumbnailsPositionChange={(position) => {
+            const patch = { thumbnailOffsetX: Math.round(position.x), thumbnailOffsetY: Math.round(position.y) };
+            if (promoEditorOpen && promoEditorBanners[0]) {
+              applyPromoEditorPreview({ ...promoEditorBanners[0], ...patch, updatedAt: new Date().toISOString() });
+            }
+          }}
+          mediaEditable={promoEditorOpen}
+          onMediaLayoutChange={(patch) => {
+            if (!promoEditorOpen || !promoEditorBanners[0]) return;
+            applyPromoEditorPreview({ ...promoEditorBanners[0], ...patch, updatedAt: new Date().toISOString() });
+          }}
           bannerRef={heroPromoElRef}
           onPointerDown={
             adminDragEnabled && (canEditLayout || canEditMobilePreview)
@@ -4306,7 +4486,7 @@ export default function HomePageClient({
         {showHeroMediaOverlayHost ? (
           <div className="hero-media">{overlayInHeroMedia ? renderHeroOverlayFrame() : null}</div>
         ) : null}
-        <div className="hero-copy">
+        {!promoHomepageActive ? <div className="hero-copy">
           <div style={showMobileLayout ? { width: "100%", maxWidth: "100%" } : { width: `${copyWidth}vw`, maxWidth: "100%" }}>
           {eyebrowVisible ? (
             <span
@@ -4402,7 +4582,7 @@ export default function HomePageClient({
             </div>
           ) : null}
           </div>
-        </div>
+        </div> : null}
         </div>
       </section>
 
@@ -4445,7 +4625,7 @@ export default function HomePageClient({
 
       {lovedSectionVisible ? (
         <HomeCollections
-          className="scroller-loved-for-a-reason"
+          className={`scroller-loved-for-a-reason${promoHomepageActive ? " is-after-promo" : ""}`}
           initialCategoryBanners={initialCategoryBanners}
           pageLayerZ={lovedOverlapPaintZ}
           adminPositionEditable={(canEditLayout || canEditMobilePreview) && adminEditLayer === "loved-section"}
@@ -4553,19 +4733,45 @@ export default function HomePageClient({
         style={floatingPanelChromeStyle}
       >
         {floatingPanelMinimized ? (
-          <button
-            type="button"
-            className="floating-admin-mini-btn"
-            aria-label="Open admin controls"
-            onClick={() => {
-              setFloatingPanelMinimized(false);
-              window.localStorage.setItem("maroma-floating-admin-minimized", "false");
-            }}
-          >
-            Admin
-          </button>
+          <div className="floating-admin-mini-actions">
+            <button
+              type="button"
+              className="floating-admin-mini-btn is-admin"
+              aria-label="Open admin edit controls"
+              onClick={() => {
+                setFloatingPanelMinimized(false);
+                window.localStorage.setItem("maroma-floating-admin-minimized", "false");
+              }}
+            >
+              Admin
+            </button>
+            <button
+              type="button"
+              className="floating-admin-mini-btn"
+              aria-label="Edit homepage promo"
+              onClick={() => {
+                void openPromoEditor();
+              }}
+            >
+              Edit promo
+            </button>
+          </div>
         ) : (
           <>
+            <div className="floating-admin-workspace-switch" role="group" aria-label="Homepage editor">
+              <button type="button" className="is-active" aria-pressed="true">Admin</button>
+              <button
+                type="button"
+                aria-pressed="false"
+                onClick={() => {
+                  setFloatingPanelMinimized(true);
+                  window.localStorage.setItem("maroma-floating-admin-minimized", "true");
+                  if (!promoEditorOpen) void openPromoEditor();
+                }}
+              >
+                Edit promo
+              </button>
+            </div>
             <div className="floating-admin-head">
               <div className="floating-admin-head-row">
                 <div
@@ -5019,18 +5225,20 @@ export default function HomePageClient({
                     Drag the promo strip up/down on the page (CTAs are locked while editing this layer), or use the
                     Y / Top offset / Height sliders. Width uses the width slider. Click Save All Changes when done.
                   </p>
-                  <label>
-                    Top offset (cm){" "}
-                    <input
-                      type="range"
-                      min={0}
-                      max={40}
-                      step={0.1}
-                      value={editHeroPromoTopCm}
-                      onChange={(e) => setHeroPromoTopCmAndSave(Number(e.target.value))}
-                    />{" "}
-                    <span>{editHeroPromoTopCm.toFixed(1)}cm</span>
-                  </label>
+                  {!promoHomepageActive ? (
+                    <label>
+                      Top offset (cm){" "}
+                      <input
+                        type="range"
+                        min={0}
+                        max={40}
+                        step={0.1}
+                        value={editHeroPromoTopCm}
+                        onChange={(e) => setHeroPromoTopCmAndSave(Number(e.target.value))}
+                      />{" "}
+                      <span>{editHeroPromoTopCm.toFixed(1)}cm</span>
+                    </label>
+                  ) : null}
                   <label>
                     X{" "}
                     <input
@@ -5046,18 +5254,23 @@ export default function HomePageClient({
                     <span>{Math.round(editHeroPromoPos.x)}px</span>
                   </label>
                   <label>
-                    Y{" "}
+                    {promoHomepageActive ? "Banner Y (saved with this promo)" : "Y"}{" "}
                     <input
                       type="range"
-                      min={-1000}
-                      max={1000}
+                      min={promoHomepageActive ? PROMO_STRIP_POSITION_PX_MIN : -1000}
+                      max={promoHomepageActive ? PROMO_STRIP_POSITION_PX_MAX : 1000}
                       step={1}
-                      value={editHeroPromoPos.y}
-                      onChange={(e) =>
-                        setHeroPromoPosAndSave({ ...editHeroPromoPos, y: Number(e.target.value) })
-                      }
+                      value={promoHomepageActive ? editPromoStrip.stripPositionOffsetPx : editHeroPromoPos.y}
+                      onChange={(e) => {
+                        const nextY = Number(e.target.value);
+                        if (promoHomepageActive) {
+                          patchLivePromoStrip({ stripPositionOffsetPx: nextY });
+                          return;
+                        }
+                        setHeroPromoPosAndSave({ ...editHeroPromoPos, y: nextY });
+                      }}
                     />{" "}
-                    <span>{Math.round(editHeroPromoPos.y)}px</span>
+                    <span>{Math.round(promoHomepageActive ? editPromoStrip.stripPositionOffsetPx : editHeroPromoPos.y)}px</span>
                   </label>
                   <label>
                     Width (%){" "}
@@ -5071,7 +5284,31 @@ export default function HomePageClient({
                     />{" "}
                     <span>{Math.round(editHeroPromoWidthPct)}%</span>
                   </label>
-                  {livePromoBanners[0] ? (
+                  {promoHomepageActive ? (
+                    <button
+                      type="button"
+                      className="button"
+                      onClick={() => {
+                        setHeroPromoTopCmAndSave(15);
+                        setHeroPromoPosAndSave({ ...editHeroPromoPos, x: 0 });
+                        patchLivePromoStrip({ stripPositionOffsetCm: 0, stripPositionOffsetPx: 0 });
+                        setHeroPromoWidthPctAndSave(100);
+                      }}
+                    >
+                      Reset banner position
+                    </button>
+                  ) : null}
+                      <button
+                        type="button"
+                        className="button primary"
+                        onClick={() => void openPromoEditor()}
+                      >
+                        Edit promo on homepage
+                      </button>
+                      {promoEditorStatus ? (
+                        <p className="floating-admin-hint">{promoEditorStatus}</p>
+                      ) : null}
+                      {livePromoBanners[0] ? (
                     <>
                       <label className="floating-admin-toggle-row">
                         <input
@@ -5098,7 +5335,7 @@ export default function HomePageClient({
                         <span>{editPromoStrip.stripHeightPx}px</span>
                       </label>
                       <label>
-                        Strip position (cm){" "}
+                        Banner Y (cm){" "}
                         <input
                           type="range"
                           min={PROMO_STRIP_POSITION_CM_MIN}
@@ -5112,7 +5349,7 @@ export default function HomePageClient({
                         <span>{editPromoStrip.stripPositionOffsetCm.toFixed(1)}cm</span>
                       </label>
                       <label>
-                        Fine position (px){" "}
+                        Banner Y fine (px){" "}
                         <input
                           type="range"
                           min={PROMO_STRIP_POSITION_PX_MIN}
@@ -5285,13 +5522,25 @@ export default function HomePageClient({
                         </label>
                       ) : null}
                       <p className="floating-admin-hint" style={{ gridColumn: "1 / -1" }}>
-                        <Link href="/admin/site">Edit banner content, frames, and schedule</Link>
+                        <button
+                          type="button"
+                          className="floating-admin-inline-button"
+                          onClick={() => void openPromoEditor()}
+                        >
+                          Edit banner content, frames, and schedule here
+                        </button>
                       </p>
                     </>
                   ) : (
                     <p className="floating-admin-hint" style={{ gridColumn: "1 / -1" }}>
                       No live banner.{" "}
-                      <Link href="/admin/site">Create one in Site admin</Link>
+                      <button
+                        type="button"
+                        className="floating-admin-inline-button"
+                        onClick={() => void openPromoEditor()}
+                      >
+                        Create a promo banner here
+                      </button>
                     </p>
                   )}
                 </>
@@ -5749,6 +5998,58 @@ export default function HomePageClient({
           </>
         )}
       </div>
+      ) : null}
+      {promoEditorOpen && floatingPanelMinimized && promoEditorBanners[0] ? (
+        <HomepagePromoQuickEditor
+          banner={promoEditorBanners[0]}
+          savedBanners={promoEditorBanners}
+          status={promoEditorStatus}
+          onChange={applyPromoEditorPreview}
+          onModeChange={setPromoEditorModeOverride}
+          onSaved={(banner) => {
+            applyPromoEditorPreview(banner);
+            setPromoEditorModeOverride(banner.promoModeEnabled !== false);
+            setPromoPublishSucceeded(true);
+            setPromoEditorStatus(banner.active ? "Published live." : "Draft saved.");
+          }}
+          onLibrarySaved={(banner) => {
+            setPromoEditorBanners((current) => [
+              current[0],
+              banner,
+              ...current.slice(1).filter((item) => item.id !== banner.id),
+            ]);
+          }}
+          onLoadBanner={(banner) => {
+            const loaded = {
+              ...banner,
+              presentation: "static" as const,
+              animation: banner.animation === "marquee" ? "fade" as const : banner.animation,
+            };
+            setPromoEditorModeOverride(loaded.promoModeEnabled !== false);
+            applyPromoEditorPreview(loaded);
+            setPromoEditorStatus(`Loaded “${loaded.adminName || loaded.title || "Saved promo"}”.`);
+          }}
+          onCreateNew={() => {
+            const fresh = createHomepagePromoDraft();
+            setPromoEditorModeOverride(true);
+            applyPromoEditorPreview(fresh);
+            setPromoEditorStatus("New promo ready. Name it, design it, then save or publish.");
+          }}
+          onClose={() => {
+            setPromoEditorOpen(false);
+            setPromoEditorModeOverride(null);
+            void refreshLivePromoBanners();
+          }}
+        />
+      ) : null}
+      {initialPromoPreview ? (
+        <a
+          className="homepage-promo-preview-edit"
+          href="/?skipIntro=1&openPromoEditor=1"
+          target="_top"
+        >
+          Edit promo
+        </a>
       ) : null}
     </>
   );
