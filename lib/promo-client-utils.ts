@@ -64,15 +64,40 @@ export function promoVisibilityStatus(
   return "live";
 }
 
-/** Label for admin banner lists (prefers adminName over strip headline). */
-export function resolvePromoAdminName(
-  banner: Pick<PromoBanner, "adminName" | "title">
-): string {
-  const adminName = typeof banner.adminName === "string" ? banner.adminName.trim() : "";
-  if (adminName) return adminName.slice(0, 80);
-  const title = typeof banner.title === "string" ? banner.title.trim() : "";
-  if (title) return title.slice(0, 80);
-  return "Untitled banner";
+/** Shown only when a banner has neither a typed name nor any copy to borrow from. */
+export const PROMO_UNNAMED_LABEL = "Untitled banner";
+
+type PromoNameSource = Pick<PromoBanner, "adminName" | "title"> &
+  Partial<Pick<PromoBanner, "body" | "ctaLabel" | "frames">>;
+
+/** Collapse line breaks so a multi-line headline still reads as one label. */
+function toNameLabel(value: unknown): string {
+  return typeof value === "string" ? value.replace(/\s+/g, " ").trim().slice(0, 80) : "";
+}
+
+/**
+ * Name borrowed from the banner copy when no admin name was typed: the headline
+ * first, then the headline of a sequence frame, then the tagline or CTA label.
+ * Returns an empty string when there is nothing to borrow.
+ */
+export function derivePromoNameFromCopy(banner: PromoNameSource): string {
+  const frames = Array.isArray(banner.frames) ? banner.frames : [];
+  const candidates = [
+    toNameLabel(banner.title),
+    ...frames.map((frame) => toNameLabel(frame?.title)),
+    toNameLabel(banner.body),
+    ...frames.map((frame) => toNameLabel(frame?.body)),
+    toNameLabel(banner.ctaLabel),
+  ];
+  return candidates.find((candidate) => candidate.length > 0) ?? "";
+}
+
+/** Label for admin banner lists (prefers adminName over the banner headline). */
+export function resolvePromoAdminName(banner: PromoNameSource): string {
+  const adminName = toNameLabel(banner.adminName);
+  // Older banners stored the placeholder as their name, so treat it as unnamed.
+  if (adminName && adminName !== PROMO_UNNAMED_LABEL) return adminName;
+  return derivePromoNameFromCopy(banner) || PROMO_UNNAMED_LABEL;
 }
 
 export function buildPreviewBannerStack(

@@ -1,6 +1,7 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import type { AdminProductSummary } from "../../lib/product-catalog-admin";
 import { decodeBasicHtmlEntities } from "../../lib/decode-html-entities";
 import { formatPromoBuyLinkPrice, splitPromoBuyLinkName } from "../../lib/promo-buy-links-utils";
@@ -32,13 +33,17 @@ export function MaromaCatalogPicker({
   const [error, setError] = useState("");
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [selectedProductsById, setSelectedProductsById] = useState<Record<string, AdminProductSummary>>({});
+  const [mounted, setMounted] = useState(false);
+  const searchInputRef = useRef<HTMLInputElement | null>(null);
+
+  useEffect(() => setMounted(true), []);
 
   const searchProducts = useCallback(async (searchQuery = query) => {
     setLoading(true);
     setError("");
     try {
       const params = new URLSearchParams({
-        limit: "30",
+        limit: "60",
         sortBy: "product",
         sortDirection: "asc",
       });
@@ -67,9 +72,16 @@ export function MaromaCatalogPicker({
       if (event.key === "Escape") onClose();
     };
     window.addEventListener("keydown", onKey);
-    void searchProducts("");
+    searchInputRef.current?.focus();
     return () => window.removeEventListener("keydown", onKey);
-  }, [open, onClose, searchProducts]);
+  }, [open, onClose]);
+
+  /** Results follow the typing, so the dialog behaves like a search box rather than a form. */
+  useEffect(() => {
+    if (!open) return undefined;
+    const timer = setTimeout(() => void searchProducts(query), query ? 260 : 0);
+    return () => clearTimeout(timer);
+  }, [open, query, searchProducts]);
 
   useEffect(() => {
     if (!open) {
@@ -120,9 +132,11 @@ export function MaromaCatalogPicker({
     onClose();
   };
 
-  if (!open) return null;
+  if (!open || !mounted) return null;
 
-  return (
+  // Portalled to the body because the promo editor sits inside transformed hero layers, which
+  // would otherwise become the containing block for this fixed dialog and clip it.
+  return createPortal(
     <div className="maroma-catalog-picker-root" role="presentation">
       <button
         type="button"
@@ -148,23 +162,26 @@ export function MaromaCatalogPicker({
 
         <div className="maroma-catalog-picker-search">
           <input
+            ref={searchInputRef}
             type="search"
             value={query}
+            autoFocus
             placeholder="Search by product name or SKU"
             onChange={(event) => setQuery(event.target.value)}
             onKeyDown={(event) => {
               if (event.key === "Enter") void searchProducts(query);
             }}
           />
-          <button type="button" className="button secondary" onClick={() => void searchProducts(query)}>
-            Search
-          </button>
+          <span className="maroma-catalog-picker-count">
+            {loading ? "Searching…" : `${results.length} product${results.length === 1 ? "" : "s"}`}
+          </span>
         </div>
 
         {error ? <p className="maroma-catalog-picker-error">{error}</p> : null}
-        {loading ? <p className="maroma-catalog-picker-loading">Loading catalog…</p> : null}
 
-        {!loading && results.length === 0 ? (
+        {loading && results.length === 0 ? (
+          <p className="maroma-catalog-picker-loading">Loading catalog…</p>
+        ) : results.length === 0 ? (
           <p className="maroma-catalog-picker-empty">No products found. Try another search.</p>
         ) : (
           <div className="maroma-catalog-picker-body">
@@ -230,7 +247,8 @@ export function MaromaCatalogPicker({
           </div>
         )}
       </aside>
-    </div>
+    </div>,
+    document.body
   );
 }
 

@@ -25,9 +25,9 @@ export function ProductPdpGallery({ images, videos = [], productId = "", product
     setUploadError("");
     try {
       if (file.size > 100 * 1024 * 1024) throw new Error("Choose a video under 100 MB.");
-      const { upload } = await import("@vercel/blob/client");
-      const blob = await upload(`admin-product-videos/${productId}/${Date.now()}-${file.name.replace(/[^a-zA-Z0-9._-]/g, "-")}`, file, { access: "public", handleUploadUrl: "/api/products/upload", clientPayload: JSON.stringify({ productId }) });
-      const response = await fetch("/api/products/upload", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "attach-video", productId, url: blob.url }) });
+      const { uploadFileToFirebase } = await import("../../lib/client-firebase-upload");
+      const url = await uploadFileToFirebase(file, `admin-product-videos/${productId}`);
+      const response = await fetch("/api/products/upload", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "attach-video", productId, url }) });
       const data = await response.json();
       if (!response.ok) throw new Error(data.error || "Could not save video.");
       setUploadedVideos(data.videos);
@@ -35,7 +35,7 @@ export function ProductPdpGallery({ images, videos = [], productId = "", product
     } catch (error) { setUploadError(error instanceof Error ? error.message : "Video upload failed."); }
     finally { setUploading(false); }
   };
-  const [active, setActive] = useState(videos.length ? images.length : 0);
+  const [active, setActive] = useState(0);
   const main = list[active];
   const badge = ready3d ? <span className="product-pdp-3d-badge">3D</span> : null;
 
@@ -55,7 +55,7 @@ export function ProductPdpGallery({ images, videos = [], productId = "", product
   return (
     <div className="product-pdp-gallery" aria-label="Product gallery">
       <div className="product-pdp-main-visual">
-        {main.type === "video" ? <video src={main.src} controls playsInline autoPlay muted preload="auto" onEnded={() => setActive(0)} aria-label={`${decodedName} product video`} /> : <img src={main.src} alt={`${decodedName} — Maroma product photo`} style={{ transform: `${productImageTransform(productId) ?? ""} scale(1.21)`.trim(), transformOrigin: "center" }} fetchPriority="high" />}
+        {main.type === "video" ? <video src={main.src} controls playsInline autoPlay muted preload="auto" onEnded={() => setActive(0)} aria-label={`${decodedName} product video`} /> : <img src={main.src} alt={`${decodedName}, Maroma product photo`} style={{ transform: `${productImageTransform(productId) ?? ""} scale(1.331)`.trim(), transformOrigin: "center" }} fetchPriority="high" />}
         {badge}
       </div>
       {list.length > 1 || isAdminUser ? (
@@ -66,10 +66,16 @@ export function ProductPdpGallery({ images, videos = [], productId = "", product
               type="button"
               role="tab"
               aria-selected={index === active}
-              className={`product-pdp-thumb ${index === active ? "is-active" : ""}`}
+              className={`product-pdp-thumb${item.type === "video" ? " is-video" : ""}${index === active ? " is-active" : ""}`}
               onClick={() => setActive(index)}
+              aria-label={item.type === "video" ? `${decodedName} video` : undefined}
             >
-              {item.type === "video" ? <span className="product-pdp-video-thumb" aria-label={`${decodedName} video`}>▶<small>Video</small></span> : <img src={item.src} alt={`${decodedName} view ${index + 1}`} loading="lazy" />}
+              {item.type === "video" ? (
+                <>
+                  <video src={`${item.src}#t=0.1`} muted playsInline preload="metadata" aria-hidden="true" />
+                  <span className="product-pdp-video-thumb-badge" aria-hidden="true">▶</span>
+                </>
+              ) : <img src={item.src} alt={`${decodedName} view ${index + 1}`} loading="lazy" />}
             </button>
           ))}
           {isAdminUser && productId ? <label className="product-pdp-video-upload">

@@ -11,6 +11,7 @@ type CartContextType = {
   cart: CartItem[];
   cartId: string | null;
   couponCode: string | null;
+  promoAvailable: boolean;
   loading: boolean;
   error: string | null;
   addToCart: (product: ProductRecord | { id: string }, variant?: string, quantity?: number) => Promise<boolean>;
@@ -39,6 +40,7 @@ function applyCartView(
     setCart: (items: CartItemView[]) => void;
     setCartId: (id: string | null) => void;
     setCouponCode: (code: string | null) => void;
+    setPromoAvailable: (value: boolean) => void;
     setSubtotal: (n: number) => void;
     setDiscount: (n: number) => void;
     setDiscountAmount: (n: number) => void;
@@ -50,6 +52,7 @@ function applyCartView(
   setState.setCart(view.items);
   setState.setCartId(view.id);
   setState.setCouponCode(view.couponCode ?? null);
+  setState.setPromoAvailable(view.promoAvailable === true);
   setState.setSubtotal(view.subtotal);
   setState.setDiscount(view.discountRate);
   setState.setDiscountAmount(view.discountAmount);
@@ -77,6 +80,7 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
   const [cart, setCart] = useState<CartItemView[]>([]);
   const [cartId, setCartId] = useState<string | null>(null);
   const [couponCode, setCouponCode] = useState<string | null>(null);
+  const [promoAvailable, setPromoAvailable] = useState(false);
   const [subtotal, setSubtotal] = useState(0);
   const [discount, setDiscountState] = useState(0);
   const [discountAmount, setDiscountAmount] = useState(0);
@@ -90,6 +94,7 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
     setCart,
     setCartId,
     setCouponCode,
+    setPromoAvailable,
     setSubtotal,
     setDiscount: setDiscountState,
     setDiscountAmount,
@@ -215,6 +220,7 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
         cart,
         cartId,
         couponCode,
+        promoAvailable,
         loading,
         error,
         addToCart,

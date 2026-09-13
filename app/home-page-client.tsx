@@ -17,6 +17,11 @@ import type { CategoryBannerStore } from "../lib/category-banner-types";
 import type { ProductRecord } from "../lib/product-types";
 import type { PromoBanner } from "../lib/promo-types";
 import {
+  applyPromoMobileLayout,
+  PROMO_MOBILE_PREVIEW_MESSAGE,
+  type PromoMobilePreviewMessage,
+} from "../lib/promo-mobile-layout";
+import {
   normalizePromoStripFields,
   PROMO_STRIP_DEFAULTS,
   PROMO_STRIP_ASPECT_21_9,
@@ -59,6 +64,7 @@ import { buildMobilePersistenceSnapshot, MOBILE_DESIGN_WIDTH_PX } from "../lib/m
 import { mergeHeroMobileOverrides, resolveHeroMobileLayout, clampMobileRitualBandLayout } from "../lib/hero-mobile-layout";
 import { readHeroVisualLocalBackup, writeHeroVisualLocalBackup } from "../lib/hero-visual-local-backup";
 import { getVisualStateUpdatedAt, mergeHeroVisualStates } from "../lib/hero-visual-state-merge";
+import { hasHeroIntroBeenSeen, markHeroIntroSeen } from "../lib/hero-intro-seen";
 import { requestShopScroll, SCROLL_TO_SHOP_EVENT } from "../lib/scroll-to-shop";
 import { parseHeroVisualState } from "../lib/hero-visual-state-parse";
 import { heroNudgeStyle } from "../lib/hero-visual-css";
@@ -203,6 +209,8 @@ type HomePageClientProps = {
   initialViewportIsMobile?: boolean;
   initialSkipIntro?: boolean;
   initialPromoPreview?: boolean;
+  /** Phone-frame preview used by /admin/mobile-promo: forces the mobile layout on a desktop. */
+  initialMobilePromoPreview?: boolean;
   initialProductSearch?: string;
 };
 
@@ -309,11 +317,13 @@ export default function HomePageClient({
   initialViewportIsMobile = false,
   initialSkipIntro = false,
   initialPromoPreview = false,
+  initialMobilePromoPreview = false,
   initialProductSearch = "",
 }: HomePageClientProps) {
   const [introPhase, setIntroPhase] = useState<"playing" | "fading" | "skip-fading" | "done">(
     initialSkipIntro || initialPromoPreview ? "done" : "playing"
   );
+  const [heroIntroSeen, setHeroIntroSeen] = useState(false);
   const [introVideoReady, setIntroVideoReady] = useState(false);
   const introFinishTimerRef = useRef<number | null>(null);
   const introScrollRevealRef = useRef(0);
@@ -331,6 +341,7 @@ export default function HomePageClient({
   const [promoEditorModeOverride, setPromoEditorModeOverride] = useState<boolean | null>(null);
   const [promoEditorStatus, setPromoEditorStatus] = useState("");
   const [promoPublishSucceeded, setPromoPublishSucceeded] = useState(false);
+  const [mobilePromoPreviewBanner, setMobilePromoPreviewBanner] = useState<PromoBanner | null>(null);
   const livePromoBannersRef = useRef(livePromoBanners);
   livePromoBannersRef.current = livePromoBanners;
   const promoPatchTimerRef = useRef<number | null>(null);
@@ -496,7 +507,8 @@ export default function HomePageClient({
   const [floatingPanelMinimized, setFloatingPanelMinimized] = useState(false);
   const [adminDragEnabled, setAdminDragEnabled] = useState(false);
   const { isAdminUser, sessionReady, refreshSession } = useAdminSession();
-  const showFloatingAdmin = sessionReady && isAdminUser && !isAdminUiHidden() && !initialPromoPreview;
+  const showFloatingAdmin =
+    sessionReady && isAdminUser && !isAdminUiHidden() && !initialPromoPreview && !initialMobilePromoPreview;
 
   useEffect(() => {
     if (!sessionReady || !isAdminUser || initialPromoPreview) return;
@@ -639,6 +651,7 @@ export default function HomePageClient({
     !isRealPhoneViewport &&
     (!isNarrowViewport || isDesktopLikePointer);
   const showMobileLayout =
+    initialMobilePromoPreview ||
     adminMobilePreviewActive ||
     isRealPhoneViewport ||
     (isMobileViewport && !adminDesktopEditActive && !isDesktopLikePointer);
@@ -1254,16 +1267,17 @@ export default function HomePageClient({
 
   useEffect(() => {
     if (!sessionReady) return;
-    if (!isAdminUser) {
+    // The phone frame is driven by sliders, so it never shows drag chrome.
+    if (!isAdminUser || initialMobilePromoPreview) {
       setAdminDragEnabled(false);
       return;
     }
     const stored = window.localStorage.getItem(ADMIN_DRAG_STORAGE_KEY);
     setAdminDragEnabled(stored === "true");
-  }, [sessionReady, isAdminUser]);
+  }, [sessionReady, isAdminUser, initialMobilePromoPreview]);
 
   useEffect(() => {
-    if (!isAdminUser) return;
+    if (!isAdminUser || initialMobilePromoPreview) return;
     const sync = () => {
       setAdminDragEnabled(window.localStorage.getItem(ADMIN_DRAG_STORAGE_KEY) === "true");
     };
@@ -1273,7 +1287,7 @@ export default function HomePageClient({
       window.removeEventListener("maroma-admin-changed", sync);
       window.removeEventListener("storage", sync);
     };
-  }, [isAdminUser]);
+  }, [isAdminUser, initialMobilePromoPreview]);
 
   useEffect(() => {
     const stored = window.localStorage.getItem("maroma-floating-admin-minimized");
@@ -1605,6 +1619,26 @@ export default function HomePageClient({
       window.removeEventListener("pagehide", flushPendingBandSave);
     };
   }, []);
+
+  /** Phone frame on /admin/mobile-promo: take the banner draft straight from the editor panel. */
+  useEffect(() => {
+    if (!initialMobilePromoPreview) {
+      return;
+    }
+    const onMessage = (event: MessageEvent) => {
+      if (event.origin !== window.location.origin) return;
+      const data = event.data as PromoMobilePreviewMessage | null;
+      if (!data || data.type !== PROMO_MOBILE_PREVIEW_MESSAGE) return;
+      setMobilePromoPreviewBanner(data.banner);
+    };
+    window.addEventListener("message", onMessage);
+    document.body.classList.add("mobile-promo-frame");
+    window.parent?.postMessage({ type: `${PROMO_MOBILE_PREVIEW_MESSAGE}:ready` }, window.location.origin);
+    return () => {
+      window.removeEventListener("message", onMessage);
+      document.body.classList.remove("mobile-promo-frame");
+    };
+  }, [initialMobilePromoPreview]);
 
   useEffect(() => {
     document.body.classList.toggle("admin-mobile-preview-active", adminMobilePreviewActive);
@@ -2621,7 +2655,13 @@ export default function HomePageClient({
     window.localStorage.setItem("maroma-floating-admin-pos", JSON.stringify(next));
   };
 
+  const rememberHeroIntro = useCallback(() => {
+    markHeroIntroSeen();
+    setHeroIntroSeen(true);
+  }, []);
+
   const finishHomepageIntro = useCallback((mode: "end" | "skip" = "end") => {
+    rememberHeroIntro();
     setIntroPhase((current) => {
       if (current !== "playing") return current;
       const durationMs = mode === "skip" ? 400 : 4500;
@@ -2631,7 +2671,7 @@ export default function HomePageClient({
       }, durationMs);
       return mode === "skip" ? "skip-fading" : "fading";
     });
-  }, []);
+  }, [rememberHeroIntro]);
 
   useLayoutEffect(() => {
     const root = document.documentElement;
@@ -2662,6 +2702,12 @@ export default function HomePageClient({
   useEffect(() => {
     if (initialSkipIntro) skipHomepageIntroNow();
   }, [initialSkipIntro, skipHomepageIntroNow]);
+
+  useLayoutEffect(() => {
+    if (!hasHeroIntroBeenSeen()) return;
+    setHeroIntroSeen(true);
+    skipHomepageIntroNow();
+  }, [skipHomepageIntroNow]);
 
   useEffect(() => {
     const onShop = () => skipHomepageIntroNow();
@@ -2724,6 +2770,7 @@ export default function HomePageClient({
 
         setReveal(introScrollRevealRef.current);
         if (introScrollHoldRef.current >= homepageHoldDistance) {
+          rememberHeroIntro();
           setIntroPhase("done");
         }
       };
@@ -2778,7 +2825,7 @@ export default function HomePageClient({
         "homepage-intro-scroll-revealed"
       );
     };
-  }, [introPhase]);
+  }, [introPhase, rememberHeroIntro]);
 
   useEffect(
     () => () => {
@@ -3083,12 +3130,22 @@ export default function HomePageClient({
     : PROMO_STRIP_DEFAULTS;
 
   const heroPromoBanners = useMemo(() => {
-    const selected = (promoEditorOpen ? promoEditorBanners : displayPromoBanners)[0];
+    // The mobile edit page pushes an unsaved banner in, so its sliders preview live.
+    const selected =
+      mobilePromoPreviewBanner ?? (promoEditorOpen ? promoEditorBanners : displayPromoBanners)[0];
     const enabled = promoEditorOpen && promoEditorModeOverride !== null
       ? promoEditorModeOverride
       : isPromoModeEnabled(selected);
-    return selected && enabled ? [selected] : [];
-  }, [displayPromoBanners, promoEditorBanners, promoEditorModeOverride, promoEditorOpen]);
+    if (!selected || !enabled) return [];
+    return [showMobileLayout ? applyPromoMobileLayout(selected) : selected];
+  }, [
+    displayPromoBanners,
+    mobilePromoPreviewBanner,
+    promoEditorBanners,
+    promoEditorModeOverride,
+    promoEditorOpen,
+    showMobileLayout,
+  ]);
 
   const persistLivePromoStrip = useCallback(async (banner: PromoBanner) => {
     const strip = normalizePromoStripFields(banner);
@@ -4327,7 +4384,7 @@ export default function HomePageClient({
           aria-hidden="true"
           style={{ objectFit: heroPrimarySettings.fit }}
         />
-      ) : introPhase === "playing" && !adminDragEnabled && hero.video.poster ? (
+      ) : (introPhase === "playing" || heroIntroSeen) && !adminDragEnabled && hero.video.poster ? (
         <img
           className="hero-media-image"
           src={hero.video.poster}
@@ -4340,6 +4397,8 @@ export default function HomePageClient({
           src={heroVideoSrcForRender}
           poster={hero.video.poster}
           objectFit={heroPrimarySettings.fit}
+          loop={!heroIntroSeen}
+          autoPlay={!heroIntroSeen}
           portrait={Boolean(showMobileLayout && hero.video.mobileSrc?.trim())}
         />
       )}
@@ -6010,7 +6069,8 @@ export default function HomePageClient({
             applyPromoEditorPreview(banner);
             setPromoEditorModeOverride(banner.promoModeEnabled !== false);
             setPromoPublishSucceeded(true);
-            setPromoEditorStatus(banner.active ? "Published live." : "Draft saved.");
+            // The Publish button reports success itself, so no status line is needed.
+            setPromoEditorStatus("");
           }}
           onLibrarySaved={(banner) => {
             setPromoEditorBanners((current) => [
@@ -6018,6 +6078,12 @@ export default function HomePageClient({
               banner,
               ...current.slice(1).filter((item) => item.id !== banner.id),
             ]);
+          }}
+          onLibraryDeleted={(bannerId) => {
+            // Keep the first entry so the editor keeps its in-progress design on screen.
+            setPromoEditorBanners((current) =>
+              current.filter((item, index) => index === 0 || item.id !== bannerId)
+            );
           }}
           onLoadBanner={(banner) => {
             const loaded = {

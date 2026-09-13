@@ -24,6 +24,21 @@ type PlacedOrder = {
   total: number;
 };
 
+type CcavenuePayment = {
+  action: string;
+  accessCode: string;
+  encRequest: string;
+};
+
+function goToCcavenue(orderNumber: string) {
+  const host = window.location.hostname;
+  const origin =
+    host === "localhost" || host === "127.0.0.1"
+      ? window.location.origin
+      : "https://maromashopping.com";
+  window.location.assign(`${origin}/api/checkout/ccavenue/redirect?order=${encodeURIComponent(orderNumber)}`);
+}
+
 const DEFAULT_FORM: CheckoutShippingDraft = {
   email: "",
   phone: "",
@@ -202,10 +217,15 @@ export default function CheckoutClient() {
       const data = (await res.json()) as {
         ok?: boolean;
         order?: PlacedOrder;
+        payment?: CcavenuePayment | null;
         error?: string;
       };
       if (!res.ok || !data.order) {
         throw new Error(data.error || "Could not place your order.");
+      }
+      if (data.payment?.action && data.payment.encRequest && data.payment.accessCode) {
+        goToCcavenue(data.order.orderNumber);
+        return;
       }
       setPlacedOrder(data.order);
       setStep(3);
@@ -396,7 +416,7 @@ export default function CheckoutClient() {
             {step === 2 && (
               <section className="maroma-checkout-panel">
                 <div className="maroma-checkout-panel-head">
-                  <h2 className="maroma-checkout-panel-title">Review &amp; place order</h2>
+                  <h2 className="maroma-checkout-panel-title">Review &amp; pay</h2>
                 </div>
 
                 <div className="maroma-checkout-review">
@@ -422,7 +442,7 @@ export default function CheckoutClient() {
                       <span className="maroma-payment-badge">Next step</span>
                     </div>
                     <p className="maroma-payment-copy">
-                      CCAvenue payment will be enabled when the merchant credentials and approved currencies are connected. You will not be charged until then.
+                      You will go to CCAvenue to pay securely with UPI, cards, or net banking. The charge is in INR.
                     </p>
                   </div>
                 </div>
@@ -434,7 +454,7 @@ export default function CheckoutClient() {
                   </div>
                   <div className="maroma-checkout-trust-item">
                     <span aria-hidden="true">🚚</span>
-                    <span>Delivery in 3–5 business days across India</span>
+                    <span>Delivery in 3-5 business days across India</span>
                   </div>
                 </div>
 
@@ -450,7 +470,7 @@ export default function CheckoutClient() {
                       void handlePlaceOrder();
                     }}
                   >
-                    {submitting ? "Placing order…" : `Place order · ${formatItemPrice(total)}`}
+                    {submitting ? "Opening CCAvenue…" : `Pay securely · ${formatItemPrice(total)}`}
                   </button>
                 </div>
               </section>
@@ -487,8 +507,8 @@ export default function CheckoutClient() {
                     </span>
                   </div>
                 </div>
-                <Link href="/" className="maroma-btn maroma-btn-primary">
-                  Return to home
+                <Link href="/?skipIntro=1#shop" className="maroma-btn maroma-btn-primary">
+                  Continue shopping
                 </Link>
               </section>
             )}

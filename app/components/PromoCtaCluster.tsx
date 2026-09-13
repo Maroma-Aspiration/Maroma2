@@ -4,6 +4,16 @@ import { resolvePromoBuyLinkLabelLines, visibleCtaBuyLinks } from "../../lib/pro
 
 type Position = { x: number; y: number };
 
+/** The promo units are calc()s, so measure a throwaway probe to read them back as pixels. */
+function measureUnitPx(host: HTMLElement): Position {
+  const probe = document.createElement("span");
+  probe.style.cssText = "position:absolute;visibility:hidden;pointer-events:none;width:calc(1000 * var(--promo-unit, 1px));height:calc(1000 * var(--promo-unit-y, 1px));";
+  host.appendChild(probe);
+  const rect = probe.getBoundingClientRect();
+  probe.remove();
+  return { x: rect.width > 0 ? rect.width / 1000 : 1, y: rect.height > 0 ? rect.height / 1000 : 1 };
+}
+
 type PromoCtaClusterProps = {
   buyLinks?: PromoCtaBuyLink[];
   cta: ReactNode;
@@ -32,6 +42,7 @@ function DraggableLayer({ className, children, offsetX = 0, offsetY = 0, draggab
   const [position, setPosition] = useState<Position>({ x: offsetX, y: offsetY });
   const positionRef = useRef(position);
   const dragStart = useRef<{ x: number; y: number; offsetX: number; offsetY: number } | null>(null);
+  const unitPx = useRef<Position>({ x: 1, y: 1 });
 
   useEffect(() => {
     const next = { x: offsetX, y: offsetY };
@@ -46,6 +57,7 @@ function DraggableLayer({ className, children, offsetX = 0, offsetY = 0, draggab
     event.preventDefault();
     event.stopPropagation();
     dragStart.current = { x: event.clientX, y: event.clientY, offsetX: positionRef.current.x, offsetY: positionRef.current.y };
+    unitPx.current = measureUnitPx(event.currentTarget);
     event.currentTarget.setPointerCapture(event.pointerId);
   };
 
@@ -60,9 +72,10 @@ function DraggableLayer({ className, children, offsetX = 0, offsetY = 0, draggab
   };
   const onPointerMove = (event: PointerEvent<HTMLDivElement>) => {
     if (!dragStart.current) return;
+    // Offsets are stored in desktop pixels, so convert the pointer travel back out of --promo-unit.
     const next = {
-      x: dragStart.current.offsetX + event.clientX - dragStart.current.x,
-      y: dragStart.current.offsetY + event.clientY - dragStart.current.y,
+      x: Math.round(dragStart.current.offsetX + (event.clientX - dragStart.current.x) / unitPx.current.x),
+      y: Math.round(dragStart.current.offsetY + (event.clientY - dragStart.current.y) / unitPx.current.y),
     };
     positionRef.current = next;
     setPosition(next);
@@ -77,7 +90,7 @@ function DraggableLayer({ className, children, offsetX = 0, offsetY = 0, draggab
   return (
     <div
       className={`${className}${draggable ? " is-admin-draggable" : ""}`}
-      style={{ transform: `translate(${position.x}px, ${position.y}px)` }}
+      style={{ transform: `translate(calc(${position.x} * var(--promo-unit, 1px)), calc(${position.y} * var(--promo-unit-y, 1px)))` }}
       onPointerDown={onPointerDown}
       onPointerMove={onPointerMove}
       onPointerUp={finishDrag}

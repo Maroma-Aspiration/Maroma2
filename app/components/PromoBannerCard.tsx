@@ -1,9 +1,10 @@
 "use client";
 
-import { useRef, type PointerEvent as ReactPointerEvent } from "react";
+import { useRef, type CSSProperties, type PointerEvent as ReactPointerEvent } from "react";
 import type { PromoBanner, PromoOverlayImage } from "../../lib/promo-types";
+import { promoOverlayDepthZIndex } from "../../lib/promo-overlay-utils";
 import { usesPromoSequence } from "../../lib/promo-sequence-utils";
-import { promoStripStyleVars, promoStripBannerClass } from "../../lib/promo-strip-utils";
+import { promoStripStyleVars, promoStripBannerClass, promoStripFillColor } from "../../lib/promo-strip-utils";
 import { PromoBannerSequence } from "./PromoBannerSequence";
 import { PromoCtaCluster } from "./PromoCtaCluster";
 import { PromoSequenceMarquee } from "./PromoSequenceMarquee";
@@ -25,6 +26,10 @@ export type PromoBannerLike = Pick<
   | "textBannerOffsetX"
   | "textBannerOffsetY"
   | "textBannerScale"
+  | "textBannerWidthPct"
+  | "textBannerHeightPct"
+  | "textBannerColor"
+  | "textBannerOpacity"
 
   | "textBannerStyle"
   | "headlineOffsetX"
@@ -66,6 +71,7 @@ export type PromoBannerLike = Pick<
   | "overlayImageAnimation"
   | "overlayImageAnimationDurationMs"
   | "overlayImages"
+  | "mobileTuned"
 >;
 
 type PromoBannerCardProps = {
@@ -117,6 +123,7 @@ function PromoSecondaryLayer({
   const y = layer?.y ?? banner.overlayImageY ?? 50;
   const scale = layer?.scale ?? banner.overlayImageScale ?? 75;
   const crop = layer?.crop ?? "none";
+  const hasShadow = (layer?.shadow ?? banner.overlayImageShadow) !== false;
   const cropAspect = crop === "square" ? "1 / 1" : crop === "portrait" ? "4 / 5" : crop === "landscape" ? "16 / 9" : "auto";
   const start = (event: ReactPointerEvent<HTMLElement>, mode: "move" | "resize") => {
     if (!editable) return;
@@ -158,9 +165,12 @@ function PromoSecondaryLayer({
       style={{
         left: `${x}%`,
         top: `${y}%`,
+        zIndex: promoOverlayDepthZIndex(layer?.depth),
         ["--promo-overlay-scale" as string]: String(scale / 100),
         ["--promo-overlay-radius" as string]: `${layer?.radius ?? banner.overlayImageRadius ?? 18}px`,
-        ["--promo-overlay-shadow" as string]: (layer?.shadow ?? banner.overlayImageShadow) === false ? "none" : "0 18px 38px rgba(0,0,0,.28)",
+        ["--promo-overlay-shadow" as string]: hasShadow ? "0 18px 38px rgba(0,0,0,.28)" : "none",
+        // Uncropped layers use a filter so the shadow traces a transparent PNG's edges.
+        ["--promo-overlay-drop-shadow" as string]: hasShadow ? "drop-shadow(0 12px 22px rgba(0,0,0,.28))" : "none",
         ["--promo-overlay-animation-duration" as string]: `${layer?.animationDurationMs ?? banner.overlayImageAnimationDurationMs ?? 2400}ms`,
         ["--promo-overlay-crop-aspect" as string]: cropAspect,
         ["--promo-overlay-crop-position" as string]: `${layer?.cropX ?? 50}% ${layer?.cropY ?? 50}%`,
@@ -204,6 +214,19 @@ function PromoBannerStatic({
       ? [{ id: "legacy-overlay", imageUrl: banner.mediaUrl, x: banner.overlayImageX ?? 50, y: banner.overlayImageY ?? 50, scale: banner.overlayImageScale ?? 75, radius: banner.overlayImageRadius ?? 18, shadow: banner.overlayImageShadow !== false, animation: banner.overlayImageAnimation ?? "none", animationDurationMs: banner.overlayImageAnimationDurationMs ?? 2400, crop: "none", cropX: 50, cropY: 50 }]
       : [];
 
+  const customTextBannerFill = (banner.textBannerColor ?? "").trim()
+    ? promoStripFillColor((banner.textBannerColor ?? "").trim(), (banner.textBannerOpacity ?? 86) / 100)
+    : "";
+  const textBannerVars: CSSProperties = {
+    // Offsets travel as plain numbers so CSS can scale them by --promo-unit on narrow screens.
+    ["--text-banner-x-num" as string]: String(banner.textBannerOffsetX ?? 0),
+    ["--text-banner-y-num" as string]: String(banner.textBannerOffsetY ?? 0),
+    ["--text-banner-scale" as string]: String((banner.textBannerScale ?? 100) / 100),
+    ["--text-banner-width" as string]: String((banner.textBannerWidthPct ?? 100) / 100),
+    ["--text-banner-height" as string]: String((banner.textBannerHeightPct ?? 100) / 100),
+    ...(customTextBannerFill ? { ["--text-banner-color" as string]: customTextBannerFill } : {}),
+  };
+
   const cta =
     banner.ctaLabel && banner.ctaLabel.trim() ? (
       linkable && banner.ctaHref ? (
@@ -227,7 +250,7 @@ function PromoBannerStatic({
       <PromoStripBackgroundMedia banner={banner} rememberPlayback={!linkable} />
       {overlayImages.map((layer) => (
         <PromoSecondaryLayer
-          key={layer.id}
+          key={`${layer.id}:${layer.replayToken ?? 0}`}
           banner={banner}
           layer={layer}
           editable={mediaEditable}
@@ -240,16 +263,16 @@ function PromoBannerStatic({
         </div>
       ) : null}
       <div className="promo-banner-content">
-        <div style={{ ["--text-banner-x" as string]: `${banner.textBannerOffsetX ?? 0}px`, ["--text-banner-y" as string]: `${banner.textBannerOffsetY ?? 0}px`, ["--text-banner-scale" as string]: String((banner.textBannerScale ?? 100) / 100) }} className={`promo-banner-copy${banner.textBannerEnabled ? ` has-text-banner is-${banner.textBannerStyle ?? "glass"}` : ""}`}>
+        <div style={textBannerVars} className={`promo-banner-copy${banner.textBannerEnabled ? ` has-text-banner is-${banner.textBannerStyle ?? "glass"}` : ""}`}>
           {banner.title ? (
-            <span className="promo-copy-layer promo-headline-layer" style={{ transform: `translate(${banner.headlineOffsetX ?? 0}px, ${banner.headlineOffsetY ?? 0}px) scale(${(banner.headlineScale ?? 100) / 100})` }}>
+            <span className="promo-copy-layer promo-headline-layer" style={{ ["--promo-copy-x-num" as string]: String(banner.headlineOffsetX ?? 0), ["--promo-copy-y-num" as string]: String(banner.headlineOffsetY ?? 0), ["--promo-copy-scale" as string]: String((banner.headlineScale ?? 100) / 100) }}>
               <span className={`promo-copy-animated-content promo-copy-animated-content--${banner.headlineAnimation ?? "none"}`} style={{ ["--promo-copy-animation-duration" as string]: `${banner.headlineAnimationDurationMs ?? 2400}ms` }}>
                 <strong className="promo-banner-title">{banner.title}</strong>
               </span>
             </span>
           ) : null}
           {banner.body ? (
-            <span className="promo-copy-layer promo-tagline-layer" style={{ transform: `translate(${banner.taglineOffsetX ?? 0}px, ${banner.taglineOffsetY ?? 0}px) scale(${(banner.taglineScale ?? 100) / 100})` }}>
+            <span className="promo-copy-layer promo-tagline-layer" style={{ ["--promo-copy-x-num" as string]: String(banner.taglineOffsetX ?? 0), ["--promo-copy-y-num" as string]: String(banner.taglineOffsetY ?? 0), ["--promo-copy-scale" as string]: String((banner.taglineScale ?? 100) / 100) }}>
               <span className={`promo-copy-animated-content promo-copy-animated-content--${banner.taglineAnimation ?? "none"}`} style={{ ["--promo-copy-animation-duration" as string]: `${banner.taglineAnimationDurationMs ?? 2400}ms` }}>
                 {isHero && useMarquee ? (
                 <PromoSequenceMarquee

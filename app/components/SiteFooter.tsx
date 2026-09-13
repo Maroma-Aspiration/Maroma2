@@ -37,7 +37,7 @@ export function SiteFooter() {
     user?.role === "admin"
       ? { href: "/?skipIntro=1", label: "Site editor" }
       : user?.role === "newsletter"
-        ? { href: "/newsletter?edit=1", label: "Newsletter" }
+        ? { href: "/newsletter", label: "Newsletter editor" }
         : user
           ? { href: "/account", label: "Account" }
           : { href: loginHref, label: "Sign in" };
@@ -72,8 +72,11 @@ export function SiteFooter() {
         <nav aria-label="Company">
           <h2>Company</h2>
           <Link href="/about">About</Link>
+          <Link href="/ingredient">Ingredients</Link>
           <Link href="/blog">Journal</Link>
-          <Link href="/newsletter/archive">Past newsletters</Link>
+          <Link href={user?.role === "admin" || user?.role === "newsletter" ? "/newsletter" : "/newsletter/archive"}>
+            Newsletter
+          </Link>
           <Link href={accountLink.href}>{accountLink.label}</Link>
         </nav>
         <nav aria-label="Social">
@@ -94,6 +97,7 @@ export function SiteFooter() {
           <Link href="/terms">Terms</Link>
           <Link href="/shipping">Shipping</Link>
           <Link href="/returns">Returns</Link>
+          <Link href="/safety-guidelines">Safety guidelines</Link>
         </nav>
       </div>
     </footer>

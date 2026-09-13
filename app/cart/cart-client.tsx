@@ -18,6 +18,7 @@ export default function CartClient() {
     shipping,
     total,
     couponCode,
+    promoAvailable,
     applyCoupon,
     removeCoupon,
     error,
@@ -47,8 +48,7 @@ export default function CartClient() {
       data-review-files="app/cart/cart-client.tsx,context/CartContext.tsx"
     >
       <div className="maroma-commerce-shell">
-        <header className="maroma-commerce-hero">
-          <span className="maroma-commerce-eyebrow">Ritual Selection</span>
+        <header className="maroma-commerce-hero is-centred">
           <h1 className="maroma-commerce-title">{basketTitle}</h1>
         </header>
 
@@ -133,39 +133,41 @@ export default function CartClient() {
 
             <aside className="maroma-order-summary" aria-label="Order summary">
               <h2 className="maroma-order-summary-title">Order summary</h2>
-              <div className="maroma-coupon-field">
-                {couponCode ? (
-                  <div className="maroma-coupon-applied">
-                    <span>Promo: {couponCode}</span>
-                    <button type="button" onClick={() => void removeCoupon()}>
-                      Remove
-                    </button>
-                  </div>
-                ) : (
-                  <form
-                    className="maroma-coupon-form"
-                    onSubmit={(e) => {
-                      e.preventDefault();
-                      void (async () => {
-                        const ok = await applyCoupon(promoInput);
-                        setPromoStatus(ok ? "Promo applied." : null);
-                      })();
-                    }}
-                  >
-                    <input
-                      type="text"
-                      placeholder="Promo code"
-                      value={promoInput}
-                      onChange={(e) => setPromoInput(e.target.value)}
-                      aria-label="Promo code"
-                    />
-                    <button type="submit" className="maroma-btn maroma-btn-secondary">
-                      Apply
-                    </button>
-                  </form>
-                )}
-                {promoStatus || error ? <p className="maroma-coupon-note">{promoStatus || error}</p> : null}
-              </div>
+              {promoAvailable || couponCode ? (
+                <div className="maroma-coupon-field">
+                  {couponCode ? (
+                    <div className="maroma-coupon-applied">
+                      <span>Promo: {couponCode}</span>
+                      <button type="button" onClick={() => void removeCoupon()}>
+                        Remove
+                      </button>
+                    </div>
+                  ) : (
+                    <form
+                      className="maroma-coupon-form"
+                      onSubmit={(e) => {
+                        e.preventDefault();
+                        void (async () => {
+                          const ok = await applyCoupon(promoInput);
+                          setPromoStatus(ok ? "Promo applied." : null);
+                        })();
+                      }}
+                    >
+                      <input
+                        type="text"
+                        placeholder="Promo code"
+                        value={promoInput}
+                        onChange={(e) => setPromoInput(e.target.value)}
+                        aria-label="Promo code"
+                      />
+                      <button type="submit" className="maroma-btn maroma-btn-secondary">
+                        Apply
+                      </button>
+                    </form>
+                  )}
+                  {promoStatus || error ? <p className="maroma-coupon-note">{promoStatus || error}</p> : null}
+                </div>
+              ) : null}
               <div className="maroma-order-summary-rows">
                 <div className="maroma-order-row">
                   <span>Subtotal</span>

@@ -8,6 +8,8 @@ import {
 } from "./promo-sequence-utils";
 import { normalizePromoStripFields } from "./promo-strip-utils";
 import { normalizeCtaBuyLinks } from "./promo-buy-links-utils";
+import { clampPromoOverlayDepth, PROMO_OVERLAY_IMAGE_MAX } from "./promo-overlay-utils";
+import { normalizePromoMobileLayout } from "./promo-mobile-layout";
 import type { PromoAnimation, PromoBanner, PromoMediaKind, PromoOverlayImage } from "./promo-types";
 
 export type { PromoAnimation, PromoBanner, PromoMediaKind } from "./promo-types";
@@ -21,15 +23,17 @@ const empty = (): PromoStore => ({ banners: [] });
 
 function normalizeOverlayImages(value: unknown): PromoOverlayImage[] {
   if (!Array.isArray(value)) return [];
-  return value.slice(0, 8).flatMap((raw, index) => {
+  return value.slice(0, PROMO_OVERLAY_IMAGE_MAX).flatMap((raw, index) => {
     if (!raw || typeof raw !== "object") return [];
     const row = raw as Record<string, unknown>;
     const imageUrl = typeof row.imageUrl === "string" ? row.imageUrl.trim() : "";
-    if (!imageUrl) return [];
+    const name = typeof row.name === "string" ? row.name.trim().slice(0, 80) : "";
+    if (!imageUrl && !name) return [];
     const animation = row.animation === "fade" || row.animation === "slide" || row.animation === "pulse" || row.animation === "zoom" ? row.animation : "none";
     const crop = row.crop === "square" || row.crop === "portrait" || row.crop === "landscape" ? row.crop : "none";
     return [{
       id: typeof row.id === "string" && row.id.trim() ? row.id : `overlay-${index + 1}`,
+      ...(name ? { name } : {}),
       imageUrl,
       x: Math.min(100, Math.max(0, Number(row.x) || 50)),
       y: Math.min(100, Math.max(0, Number(row.y) || 50)),
@@ -41,6 +45,7 @@ function normalizeOverlayImages(value: unknown): PromoOverlayImage[] {
       crop,
       cropX: Math.min(100, Math.max(0, Number.isFinite(Number(row.cropX)) ? Number(row.cropX) : 50)),
       cropY: Math.min(100, Math.max(0, Number.isFinite(Number(row.cropY)) ? Number(row.cropY) : 50)),
+      depth: clampPromoOverlayDepth(row.depth),
     }];
   });
 }
@@ -95,6 +100,10 @@ function parseBanner(raw: unknown): PromoBanner | null {
     textBannerOffsetX: Math.min(1200, Math.max(-1200, Number.isFinite(Number(row.textBannerOffsetX)) ? Number(row.textBannerOffsetX) : 0)),
     textBannerOffsetY: Math.min(900, Math.max(-900, Number.isFinite(Number(row.textBannerOffsetY)) ? Number(row.textBannerOffsetY) : 0)),
     textBannerScale: Math.min(220, Math.max(20, Number.isFinite(Number(row.textBannerScale)) ? Number(row.textBannerScale) : 100)),
+    textBannerWidthPct: Math.min(300, Math.max(20, Number.isFinite(Number(row.textBannerWidthPct)) ? Number(row.textBannerWidthPct) : 100)),
+    textBannerHeightPct: Math.min(300, Math.max(20, Number.isFinite(Number(row.textBannerHeightPct)) ? Number(row.textBannerHeightPct) : 100)),
+    textBannerColor: typeof row.textBannerColor === "string" ? row.textBannerColor.trim() : "",
+    textBannerOpacity: Math.min(100, Math.max(0, Number.isFinite(Number(row.textBannerOpacity)) ? Number(row.textBannerOpacity) : 86)),
 
     textBannerStyle:
       row.textBannerStyle === "ivory" || row.textBannerStyle === "teal" ? row.textBannerStyle : "glass",
@@ -129,6 +138,7 @@ function parseBanner(raw: unknown): PromoBanner | null {
     endsAt: typeof row.endsAt === "string" ? row.endsAt : "",
     active: row.active !== false,
     promoModeEnabled: row.promoModeEnabled !== false,
+    mobile: normalizePromoMobileLayout(row.mobile),
     createdAt: typeof row.createdAt === "string" ? row.createdAt : new Date().toISOString(),
     updatedAt: typeof row.updatedAt === "string" ? row.updatedAt : new Date().toISOString(),
   };
@@ -204,6 +214,10 @@ export async function upsertPromoBanner(
     textBannerOffsetX: Math.min(1200, Math.max(-1200, input.textBannerOffsetX ?? existing?.textBannerOffsetX ?? 0)),
     textBannerOffsetY: Math.min(900, Math.max(-900, input.textBannerOffsetY ?? existing?.textBannerOffsetY ?? 0)),
     textBannerScale: Math.min(220, Math.max(20, input.textBannerScale ?? existing?.textBannerScale ?? 100)),
+    textBannerWidthPct: Math.min(300, Math.max(20, input.textBannerWidthPct ?? existing?.textBannerWidthPct ?? 100)),
+    textBannerHeightPct: Math.min(300, Math.max(20, input.textBannerHeightPct ?? existing?.textBannerHeightPct ?? 100)),
+    textBannerColor: (input.textBannerColor ?? existing?.textBannerColor ?? "").trim(),
+    textBannerOpacity: Math.min(100, Math.max(0, input.textBannerOpacity ?? existing?.textBannerOpacity ?? 86)),
 
     textBannerStyle:
       input.textBannerStyle === "ivory" || input.textBannerStyle === "teal" || input.textBannerStyle === "glass"
@@ -242,6 +256,7 @@ export async function upsertPromoBanner(
     endsAt: input.endsAt ?? existing?.endsAt ?? "",
     active: input.active ?? existing?.active ?? true,
     promoModeEnabled: input.promoModeEnabled ?? existing?.promoModeEnabled ?? true,
+    mobile: normalizePromoMobileLayout(input.mobile ?? existing?.mobile),
     createdAt: existing?.createdAt ?? now,
     updatedAt: now,
   };

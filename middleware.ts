@@ -14,6 +14,10 @@ function isPreviewExempt(pathname: string): boolean {
     pathname === "/favicon.ico" ||
     pathname === "/robots.txt" ||
     pathname === "/api/webhooks/razorpay" ||
+    pathname === "/api/checkout/ccavenue/callback" ||
+    pathname === "/api/checkout/ccavenue/start" ||
+    pathname === "/api/checkout/ccavenue/redirect" ||
+    pathname === "/checkout/complete" ||
     pathname.startsWith("/api/newsletter/track/") ||
     // Email clients must fetch cropped images + "view in browser" without the site preview cookie.
     pathname === "/api/newsletter/render-image" ||
@@ -76,6 +80,9 @@ function requiresAdmin(pathname: string, method: string): boolean {
     return true;
   }
   if (pathname.startsWith("/api/site-media-gallery/upload")) {
+    return true;
+  }
+  if (pathname.startsWith("/api/public-media/")) {
     return true;
   }
   if (pathname === "/api/site-media-gallery" && method !== "GET") {

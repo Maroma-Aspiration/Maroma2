@@ -19,11 +19,13 @@ export async function AdminBar() {
 
   const links = [
     { href: "/?skipIntro=1", label: "Home" },
-    { href: "/newsletter?edit=1", label: "Newsletter" },
+    { href: "/newsletter", label: "Newsletter" },
     { href: "/admin/products", label: "Products" },
     { href: "/admin/restricted-areas", label: "Regional limits" },
     { href: "/admin/gift-3d", label: "3D products" },
     { href: "/admin/site", label: "Promo" },
+    { href: "/admin/mobile-promo", label: "Phone layout" },
+    { href: "/admin/qr-pages", label: "QR / guides" },
     { href: "/admin/media", label: "Media" },
     { href: "/admin/orders", label: "Orders" },
     { href: "/admin/users", label: "Manage users" },

@@ -4,13 +4,57 @@ import { createPortal } from "react-dom";
 import { useEffect, useMemo, useRef, useState, type PointerEvent } from "react";
 import type { PromoBanner, PromoCtaBuyLink, PromoCtaStyle } from "../../lib/promo-types";
 import type { SiteMediaItem } from "../../lib/site-media-gallery-types";
-import { resolvePromoAdminName } from "../../lib/promo-client-utils";
+import {
+  derivePromoNameFromCopy,
+  formatScheduleLabel,
+  resolvePromoAdminName,
+  toDatetimeLocalValue,
+  toIsoScheduleValue,
+} from "../../lib/promo-client-utils";
+import {
+  clampPromoOverlayDepth,
+  promoOverlayDepthLabel,
+  PROMO_OVERLAY_DEPTH_DEFAULT,
+  PROMO_OVERLAY_DEPTH_MAX,
+  PROMO_OVERLAY_DEPTH_MIN,
+  PROMO_OVERLAY_IMAGE_MAX,
+} from "../../lib/promo-overlay-utils";
 import {
   catalogProductToBuyLinkFields,
   MaromaCatalogPicker,
   type MaromaCatalogPickerProduct,
 } from "./MaromaCatalogPicker";
 import "../admin/site/admin-promo-banners.css";
+
+/** Half-hour slots for the schedule pickers, labelled in 12-hour time. */
+const TIME_SLOTS = Array.from({ length: 48 }, (_, index) => {
+  const hours = Math.floor(index / 2);
+  const minutes = index % 2 === 0 ? "00" : "30";
+  return {
+    value: `${String(hours).padStart(2, "0")}:${minutes}`,
+    label: `${((hours + 11) % 12) + 1}:${minutes} ${hours < 12 ? "AM" : "PM"}`,
+  };
+});
+
+function todayLocalDate(): string {
+  const now = new Date();
+  const pad = (part: number) => String(part).padStart(2, "0");
+  return `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
+}
+
+/** Split a stored schedule value into the date and time halves the inputs need. */
+function splitScheduleValue(value: string | undefined) {
+  const local = toDatetimeLocalValue(value ?? "");
+  if (!local) return { date: "", time: "" };
+  const [date = "", time = ""] = local.split("T");
+  return { date, time: time.slice(0, 5) };
+}
+
+/** Keep a stored time that is not on a half-hour boundary selectable. */
+function timeSlotsFor(time: string) {
+  if (!time || TIME_SLOTS.some((slot) => slot.value === time)) return TIME_SLOTS;
+  return [{ value: time, label: time }, ...TIME_SLOTS];
+}
 
 const GRADIENTS = [
   { name: "Auroville Sunrise", value: "linear-gradient(135deg,#083f55 0%,#1688a3 45%,#efc85d 100%)" },
@@ -28,26 +72,20 @@ const OCCASION_TEMPLATES = [
   { id: "wellness", label: "Wellness edit", title: "A softer rhythm for every day", body: "Restore, replenish, and reconnect with purposeful botanical care.", ctaLabel: "Discover wellness", ctaHref: "/shop", gradient: "linear-gradient(135deg,#dbe8df 0%,#d3e6e8 52%,#f3dfb5 100%)", textStyle: "teal" as const, animation: "slide" as const, keywords: ["wellness", "face", "body", "oil", "cream"] },
 ];
 
-function uploadPath(file: File) {
-  const ext = file.name.includes(".") ? `.${file.name.split(".").pop()?.toLowerCase()}` : ".bin";
-  const base = file.name.replace(/\.[^.]+$/, "").replace(/[^a-z0-9-]+/gi, "-").slice(0, 42).toLowerCase();
-  return `homepage-promo/${base || "media"}-${Date.now()}${ext}`;
-}
-
-async function uploadPromoMedia(file: File, kind: "image" | "video") {
-  if (kind === "video") {
-    const { upload } = await import("@vercel/blob/client");
-    const result = await upload(uploadPath(file), file, {
-      access: "public",
-      handleUploadUrl: "/api/promo-strip-background/upload",
-      multipart: file.size > 5 * 1024 * 1024,
-      contentType: file.type || undefined,
-    });
-    return result.url;
+async function uploadPromoMedia(
+  file: File,
+  kind: "image" | "video",
+  options?: { skipGallery?: boolean }
+) {
+  const skipGallery = options?.skipGallery === true;
+  if (kind === "video" || file.size > 4 * 1024 * 1024) {
+    const { uploadFileToFirebase } = await import("../../lib/client-firebase-upload");
+    return uploadFileToFirebase(file, "homepage-promo", { skipGallery });
   }
   const form = new FormData();
   form.append("file", file);
   form.append("mediaKind", "image");
+  if (skipGallery) form.append("skipGallery", "1");
   const res = await fetch("/api/promo-strip-background/upload", { method: "POST", body: form, credentials: "same-origin" });
   const data = (await res.json()) as { url?: string; error?: string };
   if (!res.ok || !data.url) throw new Error(data.error || "Upload failed.");
@@ -62,16 +100,19 @@ type Props = {
   onModeChange?: (enabled: boolean) => void;
   onSaved: (banner: PromoBanner) => void;
   onLibrarySaved?: (banner: PromoBanner) => void;
+  onLibraryDeleted?: (bannerId: string) => void;
   onLoadBanner?: (banner: PromoBanner) => void;
   onCreateNew?: () => void;
   onClose: () => void;
 };
 
-export function HomepagePromoQuickEditor({ banner, savedBanners = [], status = "", onChange, onModeChange, onSaved, onLibrarySaved, onLoadBanner, onCreateNew, onClose }: Props) {
+export function HomepagePromoQuickEditor({ banner, savedBanners = [], status = "", onChange, onModeChange, onSaved, onLibrarySaved, onLibraryDeleted, onLoadBanner, onCreateNew, onClose }: Props) {
   const [draft, setDraft] = useState(banner);
   const [panelDragging, setPanelDragging] = useState(false);
   const [dragLeft, setDragLeft] = useState<number | null>(null);
   const [busy, setBusy] = useState(false);
+  const [saved, setSaved] = useState(false);
+  const [published, setPublished] = useState(false);
   const [message, setMessage] = useState(status);
   const [loadId, setLoadId] = useState("");
   const [productPickerLinkId, setProductPickerLinkId] = useState<string | null>(null);
@@ -81,7 +122,13 @@ export function HomepagePromoQuickEditor({ banner, savedBanners = [], status = "
   const [mediaLoading, setMediaLoading] = useState(false);
   const [mediaError, setMediaError] = useState("");
   const [occasionId, setOccasionId] = useState("mothers-day");
+  const [scheduleMode, setScheduleMode] = useState<"now" | "window">(
+    banner.startsAt || banner.endsAt ? "window" : "now"
+  );
+  const [selectedMediaIds, setSelectedMediaIds] = useState<string[]>([]);
   const mediaDialogRef = useRef<HTMLDialogElement | null>(null);
+  const overlayFileInputRef = useRef<HTMLInputElement | null>(null);
+  const insertAfterLayerRef = useRef<string | null>(null);
 
   useEffect(() => {
     if (!mediaPickerOpen) return;
@@ -98,7 +145,10 @@ export function HomepagePromoQuickEditor({ banner, savedBanners = [], status = "
   const panelRef = useRef<HTMLElement | null>(null);
   const dragRef = useRef<{ pointerId: number; offsetX: number; width: number } | null>(null);
 
-  useEffect(() => setDraft(banner), [banner]);
+  useEffect(() => {
+    setDraft(banner);
+    setScheduleMode(banner.startsAt || banner.endsAt ? "window" : "now");
+  }, [banner]);
   useEffect(() => setMessage(status), [status]);
 
   const update = (patch: Partial<PromoBanner>) => {
@@ -107,21 +157,37 @@ export function HomepagePromoQuickEditor({ banner, savedBanners = [], status = "
     onChange(next);
   };
 
+  const scheduleStart = splitScheduleValue(draft.startsAt);
+  const scheduleEnd = splitScheduleValue(draft.endsAt);
+  const isScheduled = scheduleMode === "window" && Boolean(draft.startsAt || draft.endsAt);
+
+  const setScheduleStart = (date: string, time: string) =>
+    update({ startsAt: date ? toIsoScheduleValue(`${date}T${time || "00:00"}`) : "" });
+  const setScheduleEnd = (date: string, time: string) =>
+    update({ endsAt: date ? toIsoScheduleValue(`${date}T${time || "23:30"}`) : "" });
+
   const publish = async () => {
+    if (isScheduled && draft.startsAt && draft.endsAt && new Date(draft.endsAt) <= new Date(draft.startsAt)) {
+      setMessage("The end time has to be after the start time.");
+      return;
+    }
     setBusy(true);
-    setMessage("Publishing…");
+    setMessage(isScheduled ? "Scheduling…" : "Publishing…");
     try {
       const res = await fetch("/api/promos", {
         method: "POST",
         credentials: "same-origin",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ ...draft, publishNow: true, active: true }),
+        // publishNow clears the schedule server-side, so only send it for an immediate publish.
+        body: JSON.stringify({ ...draft, publishNow: !isScheduled, active: true }),
       });
       const data = (await res.json()) as { banner?: PromoBanner; error?: string };
       if (!res.ok || !data.banner) throw new Error(data.error || "Unable to save promo.");
       setDraft(data.banner);
       onSaved(data.banner);
-      setMessage("Published live.");
+      setMessage("");
+      setPublished(true);
+      window.setTimeout(() => setPublished(false), 2200);
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Unable to save promo.");
     } finally {
@@ -130,9 +196,9 @@ export function HomepagePromoQuickEditor({ banner, savedBanners = [], status = "
   };
 
   const saveCurrentPromo = async () => {
-    const name = draft.adminName?.trim();
+    const name = draft.adminName?.trim() || derivePromoNameFromCopy(draft);
     if (!name) {
-      setMessage("Enter a promo name first.");
+      setMessage("Add a promo name or a headline first.");
       return;
     }
     setBusy(true);
@@ -148,17 +214,52 @@ export function HomepagePromoQuickEditor({ banner, savedBanners = [], status = "
           ...(draft.active === false ? { id: draft.id } : {}),
           adminName: name,
           active: false,
-          startsAt: "",
-          endsAt: "",
+          // Keep the schedule with the draft so publishing it later keeps the chosen window.
+          startsAt: draft.startsAt ?? "",
+          endsAt: draft.endsAt ?? "",
         }),
       });
       const data = (await res.json()) as { banner?: PromoBanner; error?: string };
       if (!res.ok || !data.banner) throw new Error(data.error || "Unable to save promo.");
       onLibrarySaved?.(data.banner);
       setLoadId(data.banner.id);
-      setMessage(`Saved “${resolvePromoAdminName(data.banner)}”.`);
+      setMessage("");
+      setSaved(true);
+      window.setTimeout(() => setSaved(false), 2200);
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Unable to save promo.");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const deleteSelectedPromo = async () => {
+    const target = savedBanners.find((item) => item.id === loadId);
+    if (!target) {
+      setMessage("Choose a saved promo to delete first.");
+      return;
+    }
+    const label = resolvePromoAdminName(target);
+    const liveWarning = target.active ? " It is live on the homepage right now." : "";
+    if (!window.confirm(`Delete “${label}” from the promo library?${liveWarning} This cannot be undone.`)) {
+      return;
+    }
+    setBusy(true);
+    setMessage("Deleting promo…");
+    try {
+      const res = await fetch("/api/promos", {
+        method: "POST",
+        credentials: "same-origin",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ deleteId: target.id }),
+      });
+      const data = (await res.json()) as { ok?: boolean; error?: string };
+      if (!res.ok) throw new Error(data.error || "Unable to delete promo.");
+      setLoadId("");
+      onLibraryDeleted?.(target.id);
+      setMessage(`Deleted “${label}”. The design stays here until you close the editor.`);
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "Unable to delete promo.");
     } finally {
       setBusy(false);
     }
@@ -215,23 +316,163 @@ export function HomepagePromoQuickEditor({ banner, savedBanners = [], status = "
   };
   const buyLinks = useMemo(() => draft.ctaBuyLinks ?? [], [draft.ctaBuyLinks]);
   const overlayImages = useMemo(() => draft.overlayImages?.length ? draft.overlayImages : draft.mediaUrl ? [{ id: "legacy-overlay", imageUrl: draft.mediaUrl, x: draft.overlayImageX ?? 50, y: draft.overlayImageY ?? 50, scale: draft.overlayImageScale ?? 75, radius: draft.overlayImageRadius ?? 18, shadow: draft.overlayImageShadow !== false, animation: draft.overlayImageAnimation ?? "none" as const, animationDurationMs: draft.overlayImageAnimationDurationMs ?? 2400, crop: "none" as const, cropX: 50, cropY: 50 }] : [], [draft]);
+  const makeOverlayLayer = (imageUrl: string, name = "") => ({
+    id: crypto.randomUUID(),
+    name,
+    imageUrl,
+    x: 50,
+    y: 50,
+    scale: 75,
+    radius: 18,
+    shadow: true,
+    animation: "none" as const,
+    animationDurationMs: 2400,
+    crop: "none" as const,
+    cropX: 50,
+    cropY: 50,
+    depth: PROMO_OVERLAY_DEPTH_DEFAULT,
+  });
+  const commitOverlayImages = (next: typeof overlayImages) => {
+    const firstUrl = next.find((item) => item.imageUrl)?.imageUrl ?? "";
+    update({ overlayImages: next, mediaUrl: firstUrl, mediaKind: firstUrl ? "image" : "none" });
+  };
+  /**
+   * Places new layers after the card the admin used, or at the end when they
+   * started from the buttons at the top of the section.
+   */
+  const insertOverlayLayers = (imageUrls: string[], names: string[] = []) => {
+    const anchorId = insertAfterLayerRef.current;
+    insertAfterLayerRef.current = null;
+    const emptyTarget = overlayImages.find((item) => item.id === anchorId && !item.imageUrl);
+    const occupied = overlayImages.length - (emptyTarget ? 1 : 0);
+    const usable = imageUrls.filter(Boolean).slice(0, Math.max(0, PROMO_OVERLAY_IMAGE_MAX - occupied));
+    if (usable.length === 0) return 0;
+    if (emptyTarget) {
+      const [firstUrl, ...rest] = usable;
+      const filled = overlayImages.map((item) =>
+        item.id === emptyTarget.id
+          ? { ...item, imageUrl: firstUrl, name: item.name?.trim() || names[0] || "" }
+          : item
+      );
+      const extra = rest.map((url, index) => makeOverlayLayer(url, names[index + 1] || ""));
+      const anchorIndex = filled.findIndex((item) => item.id === emptyTarget.id);
+      commitOverlayImages(
+        extra.length
+          ? [...filled.slice(0, anchorIndex + 1), ...extra, ...filled.slice(anchorIndex + 1)]
+          : filled
+      );
+      return usable.length;
+    }
+    const anchorIndex = anchorId ? overlayImages.findIndex((item) => item.id === anchorId) : -1;
+    const layers = usable.map((url, index) => makeOverlayLayer(url, names[index] || ""));
+    commitOverlayImages(
+      anchorIndex >= 0
+        ? [...overlayImages.slice(0, anchorIndex + 1), ...layers, ...overlayImages.slice(anchorIndex + 1)]
+        : [...overlayImages, ...layers]
+    );
+    return layers.length;
+  };
+  const addEmptyOverlayAfter = (afterId: string) => {
+    if (overlayImages.length >= PROMO_OVERLAY_IMAGE_MAX) {
+      setMessage(`You can add up to ${PROMO_OVERLAY_IMAGE_MAX} second-layer images.`);
+      return;
+    }
+    const afterIndex = overlayImages.findIndex((item) => item.id === afterId);
+    const layer = makeOverlayLayer("", `Image ${overlayImages.length + 1}`);
+    commitOverlayImages(
+      afterIndex >= 0
+        ? [...overlayImages.slice(0, afterIndex + 1), layer, ...overlayImages.slice(afterIndex + 1)]
+        : [...overlayImages, layer]
+    );
+    setMessage("New image added. Name it, then upload or pick a picture and use the sliders.");
+  };
   const addOverlayImage = (imageUrl: string, label = "Image") => {
     if (!imageUrl) {
       setMessage(`${label} does not have an image.`);
       return;
     }
-    if (overlayImages.length >= 8) {
-      setMessage("You can add up to eight second-layer images.");
+    const targetId = insertAfterLayerRef.current;
+    const fillingEmpty = overlayImages.some((item) => item.id === targetId && !item.imageUrl);
+    if (!fillingEmpty && overlayImages.length >= PROMO_OVERLAY_IMAGE_MAX) {
+      setMessage(`You can add up to ${PROMO_OVERLAY_IMAGE_MAX} second-layer images.`);
       return;
     }
-    const next = [...overlayImages, { id: crypto.randomUUID(), imageUrl, x: 50, y: 50, scale: 75, radius: 18, shadow: true, animation: "none" as const, animationDurationMs: 2400, crop: "none" as const, cropX: 50, cropY: 50 }];
-    update({ overlayImages: next, mediaUrl: next[0]?.imageUrl ?? "", mediaKind: "image" });
-    setMessage(`${label} added—position it with the sliders or drag it on the promo.`);
+    insertOverlayLayers([imageUrl], [label]);
+    setMessage(`${label} added. Position it with the sliders or drag it on the promo.`);
+  };
+  /** Adds several images in one update so a multi-file pick cannot read stale state. */
+  const addOverlayImages = (imageUrls: string[], names: string[] = []) => {
+    insertOverlayLayers(imageUrls, names);
+  };
+  const pickOverlayImageFile = (insertAfterLayerId: string | null) => {
+    insertAfterLayerRef.current = insertAfterLayerId;
+    overlayFileInputRef.current?.click();
+  };
+  /** Uploads straight from the device, deliberately bypassing the media gallery. */
+  const uploadOverlayImagesFromDevice = async (files: File[]) => {
+    const fillingEmpty = overlayImages.some((item) => item.id === insertAfterLayerRef.current && !item.imageUrl);
+    const room = PROMO_OVERLAY_IMAGE_MAX - overlayImages.length + (fillingEmpty ? 1 : 0);
+    if (room <= 0) {
+      setMessage(`You can add up to ${PROMO_OVERLAY_IMAGE_MAX} second-layer images.`);
+      return;
+    }
+    const batch = files.slice(0, room);
+    setBusy(true);
+    setMessage(batch.length > 1 ? `Uploading ${batch.length} images…` : "Uploading image…");
+    try {
+      const urls: string[] = [];
+      for (const file of batch) {
+        urls.push(await uploadPromoMedia(file, "image", { skipGallery: true }));
+      }
+      addOverlayImages(
+        urls,
+        batch.map((file) => file.name.replace(/\.[^.]+$/, ""))
+      );
+      const skipped = files.length - batch.length;
+      setMessage(
+        `${batch.length} image${batch.length === 1 ? "" : "s"} added from your device.${skipped > 0 ? ` ${skipped} skipped, ${PROMO_OVERLAY_IMAGE_MAX} is the maximum.` : ""}`
+      );
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "Upload failed.");
+    } finally {
+      setBusy(false);
+    }
+  };
+  const toggleMediaSelection = (id: string) =>
+    setSelectedMediaIds((current) =>
+      current.includes(id) ? current.filter((value) => value !== id) : [...current, id]
+    );
+  const deleteSelectedMedia = async () => {
+    const count = selectedMediaIds.length;
+    if (count === 0) return;
+    if (!window.confirm(`Delete ${count} image${count === 1 ? "" : "s"} from the media gallery? This cannot be undone.`)) {
+      return;
+    }
+    setBusy(true);
+    setMediaError("");
+    try {
+      const response = await fetch("/api/site-media-gallery", {
+        method: "POST",
+        credentials: "same-origin",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ deleteIds: selectedMediaIds }),
+      });
+      const data = (await response.json()) as { items?: SiteMediaItem[]; error?: string };
+      if (!response.ok) throw new Error(data.error || "Could not delete the selected images.");
+      setMediaItems(Array.isArray(data.items) ? data.items : []);
+      setSelectedMediaIds([]);
+      setMessage(`Deleted ${count} image${count === 1 ? "" : "s"} from the media gallery.`);
+    } catch (error) {
+      setMediaError(error instanceof Error ? error.message : "Could not delete the selected images.");
+    } finally {
+      setBusy(false);
+    }
   };
   const openMediaBrowser = async () => {
     setMediaPickerOpen(true);
     setMediaLoading(true);
     setMediaError("");
+    setSelectedMediaIds([]);
     try {
       const response = await fetch("/api/site-media-gallery", { cache: "no-store", credentials: "same-origin" });
       const data = (await response.json()) as { items?: SiteMediaItem[]; error?: string };
@@ -348,22 +589,56 @@ export function HomepagePromoQuickEditor({ banner, savedBanners = [], status = "
           {(draft.taglineAnimation ?? "none") !== "none" ? <label><span>Tagline animation speed <b>{((draft.taglineAnimationDurationMs ?? 2400) / 1000).toFixed(1)}s</b></span><input type="range" min={500} max={8000} step={100} value={draft.taglineAnimationDurationMs ?? 2400} onChange={(event) => update({ taglineAnimationDurationMs: Number(event.target.value) })} /></label> : null}
           <label className="homepage-promo-check"><input type="checkbox" checked={draft.textBannerEnabled === true} onChange={(event) => update({ textBannerEnabled: event.target.checked })} /><span>Banner strip behind text</span></label>
           {draft.textBannerEnabled ? <label><span>Banner appearance</span><select value={draft.textBannerStyle ?? "glass"} onChange={(event) => update({ textBannerStyle: event.target.value as NonNullable<PromoBanner["textBannerStyle"]> })}><option value="glass">Soft glass</option><option value="ivory">Warm ivory</option><option value="teal">Maroma teal</option></select></label> : null}
+          {draft.textBannerEnabled ? <div className="homepage-promo-colour-row">
+            <label><span>Strip colour</span><input type="color" value={(draft.textBannerColor ?? "").trim() || "#0d5360"} onChange={event => update({ textBannerColor: event.target.value })} /></label>
+            <label><span>Strip opacity <b>{draft.textBannerOpacity ?? 86}%</b></span><input type="range" min={0} max={100} value={draft.textBannerOpacity ?? 86} onChange={event => update({ textBannerOpacity: Number(event.target.value) })} /></label>
+            {(draft.textBannerColor ?? "").trim() ? <button type="button" className="homepage-promo-centre-button" onClick={() => update({ textBannerColor: "" })}>Use the preset colour</button> : <small className="homepage-promo-note">Pick a colour to override the appearance preset.</small>}
+          </div> : null}
           {draft.textBannerEnabled ? <div className="homepage-promo-range-grid">
             <label><span>Strip X <b>{draft.textBannerOffsetX ?? 0}px</b></span><input type="range" min={-1200} max={1200} value={draft.textBannerOffsetX ?? 0} onChange={event => update({ textBannerOffsetX: Number(event.target.value) })} /></label>
             <label><span>Strip Y <b>{draft.textBannerOffsetY ?? 0}px</b></span><input type="range" min={-900} max={900} value={draft.textBannerOffsetY ?? 0} onChange={event => update({ textBannerOffsetY: Number(event.target.value) })} /></label>
+            <label><span>Strip width <b>{draft.textBannerWidthPct ?? 100}%</b></span><input type="range" min={20} max={300} value={draft.textBannerWidthPct ?? 100} onChange={event => update({ textBannerWidthPct: Number(event.target.value) })} /></label>
+            <label><span>Strip height <b>{draft.textBannerHeightPct ?? 100}%</b></span><input type="range" min={20} max={300} value={draft.textBannerHeightPct ?? 100} onChange={event => update({ textBannerHeightPct: Number(event.target.value) })} /></label>
             <label><span>Strip scale <b>{draft.textBannerScale ?? 100}%</b></span><input type="range" min={20} max={220} value={draft.textBannerScale ?? 100} onChange={event => update({ textBannerScale: Number(event.target.value) })} /></label>
             <button type="button" className="homepage-promo-centre-button" onClick={() => update({ textBannerOffsetX: 0, textBannerOffsetY: 0 })}>Centre strip X/Y</button>
+            <button type="button" className="homepage-promo-centre-button" onClick={() => update({ textBannerWidthPct: 100, textBannerHeightPct: 100, textBannerScale: 100 })}>Reset strip size</button>
           </div> : null}
         </details>
 
         <details className="homepage-promo-control-section">
           <summary>Second image layer</summary>
-          <p>Add several images. Each one can be positioned, resized and animated independently.</p>
+          <p>Add up to {PROMO_OVERLAY_IMAGE_MAX} images. Each one can be positioned, resized and animated independently.</p>
+          {overlayImages.length < PROMO_OVERLAY_IMAGE_MAX ? <div className="homepage-image-source-grid"><button type="button" className="homepage-image-source-button" disabled={busy} onClick={() => pickOverlayImageFile(null)}>Upload image</button><button type="button" className="homepage-image-source-button" disabled={busy} onClick={() => { insertAfterLayerRef.current = null; setOverlayCatalogPickerOpen(true); }}>Select from catalogue</button><button type="button" className="homepage-image-source-button" disabled={busy} onClick={() => { insertAfterLayerRef.current = null; void openMediaBrowser(); }}>Select from media</button></div> : <p className="homepage-promo-note">{`That is all ${PROMO_OVERLAY_IMAGE_MAX} image slots used. Remove one to add another.`}</p>}
+          <input
+            ref={overlayFileInputRef}
+            type="file"
+            accept="image/*"
+            multiple
+            hidden
+            onChange={(event) => {
+              const input = event.target as HTMLInputElement;
+              const files = Array.from(input.files ?? []);
+              input.value = "";
+              if (files.length) void uploadOverlayImagesFromDevice(files);
+            }}
+          />
           {overlayImages.map((layer, index) => {
-            const updateLayer = (patch: Partial<typeof layer>) => update({ overlayImages: overlayImages.map((item) => item.id === layer.id ? { ...item, ...patch } : item), mediaUrl: overlayImages[0]?.imageUrl ?? "", mediaKind: "image" });
+            const updateLayer = (patch: Partial<typeof layer>) => commitOverlayImages(overlayImages.map((item) => item.id === layer.id ? { ...item, ...patch } : item));
+            const depth = clampPromoOverlayDepth(layer.depth);
+            const nudgeDepth = (step: number) => updateLayer({ depth: clampPromoOverlayDepth(depth + step) });
             return (
               <div className="homepage-overlay-layer-card" key={layer.id}>
-                <div className="homepage-overlay-layer-head"><strong>Image {index + 1}</strong><button type="button" onClick={() => { const next = overlayImages.filter((item) => item.id !== layer.id); update({ overlayImages: next, mediaUrl: next[0]?.imageUrl ?? "", mediaKind: next.length ? "image" : "none" }); }}>Remove</button></div>
+                <div className="homepage-overlay-layer-head"><input className="homepage-overlay-layer-name" value={layer.name ?? ""} placeholder={`Image ${index + 1}`} aria-label={`Name for image ${index + 1}`} onChange={(event) => updateLayer({ name: event.target.value })} /><div className="homepage-overlay-layer-head-actions">{overlayImages.length < PROMO_OVERLAY_IMAGE_MAX ? <button type="button" className="homepage-overlay-add-here" disabled={busy} title="Add another image with the same controls after this one" onClick={() => addEmptyOverlayAfter(layer.id)}>+ Add image here</button> : null}<button type="button" onClick={() => { const next = overlayImages.filter((item) => item.id !== layer.id); commitOverlayImages(next); }}>Remove</button></div></div>
+                {!layer.imageUrl ? <div className="homepage-image-source-grid"><button type="button" className="homepage-image-source-button" disabled={busy} onClick={() => pickOverlayImageFile(layer.id)}>Upload image</button><button type="button" className="homepage-image-source-button" disabled={busy} onClick={() => { insertAfterLayerRef.current = layer.id; setOverlayCatalogPickerOpen(true); }}>Select from catalogue</button><button type="button" className="homepage-image-source-button" disabled={busy} onClick={() => { insertAfterLayerRef.current = layer.id; void openMediaBrowser(); }}>Select from media</button></div> : null}
+                <div className="homepage-overlay-depth-row">
+                  <div className="homepage-overlay-depth-label"><span>Layer depth</span><b>{promoOverlayDepthLabel(depth)}</b></div>
+                  <div className="homepage-overlay-depth-buttons">
+                    <button type="button" disabled={depth <= PROMO_OVERLAY_DEPTH_MIN} onClick={() => nudgeDepth(-1)} title="Send this image back a layer">Send back</button>
+                    <button type="button" disabled={depth === PROMO_OVERLAY_DEPTH_DEFAULT} onClick={() => updateLayer({ depth: PROMO_OVERLAY_DEPTH_DEFAULT })} title="Return to the default layer">Reset</button>
+                    <button type="button" disabled={depth >= PROMO_OVERLAY_DEPTH_MAX} onClick={() => nudgeDepth(1)} title="Bring this image forward a layer">Bring forward</button>
+                  </div>
+                  <small>Move forward to sit on top of the text banner, back to tuck behind it.</small>
+                </div>
                 <div className="homepage-promo-range-grid">
                   <label><span>X <b>{Math.round(layer.x)}%</b></span><input type="range" min={0} max={100} value={layer.x} onChange={(event) => updateLayer({ x: Number(event.target.value) })} /></label>
                   <label><span>Y <b>{Math.round(layer.y)}%</b></span><input type="range" min={0} max={100} value={layer.y} onChange={(event) => updateLayer({ y: Number(event.target.value) })} /></label>
@@ -371,7 +646,7 @@ export function HomepagePromoQuickEditor({ banner, savedBanners = [], status = "
                   <button type="button" className="homepage-promo-centre-button" onClick={() => updateLayer({ x: 50, y: 50 })}>Centre X/Y</button>
                 </div>
                 <label><span>Animation</span><select value={layer.animation} onChange={(event) => updateLayer({ animation: event.target.value as typeof layer.animation })}><option value="none">None</option><option value="fade">Silk fade</option><option value="slide">Gentle glide</option><option value="pulse">Soft glow</option><option value="zoom">Zoom in</option></select></label>
-                {layer.animation !== "none" ? <label><span>Animation speed <b>{(layer.animationDurationMs / 1000).toFixed(1)}s</b></span><input type="range" min={500} max={8000} step={100} value={layer.animationDurationMs} onChange={(event) => updateLayer({ animationDurationMs: Number(event.target.value) })} /></label> : null}
+                {layer.animation !== "none" ? <><label><span>Animation speed <b>{(layer.animationDurationMs / 1000).toFixed(1)}s</b></span><input type="range" min={500} max={8000} step={100} value={layer.animationDurationMs} onChange={(event) => updateLayer({ animationDurationMs: Number(event.target.value) })} /></label><button type="button" className="homepage-promo-centre-button" onClick={() => updateLayer({ replayToken: Date.now() })}>▶ Test animation</button></> : null}
                 <label><span>Crop</span><select value={layer.crop ?? "none"} onChange={(event) => updateLayer({ crop: event.target.value as NonNullable<typeof layer.crop> })}><option value="none">Show full image</option><option value="square">Square</option><option value="portrait">Portrait</option><option value="landscape">Landscape</option></select></label>
                 {(layer.crop ?? "none") !== "none" ? <div className="homepage-promo-range-grid">
                   <label><span>Crop X <b>{Math.round(layer.cropX ?? 50)}%</b></span><input type="range" min={0} max={100} value={layer.cropX ?? 50} onChange={(event) => updateLayer({ cropX: Number(event.target.value) })} /></label>
@@ -383,7 +658,6 @@ export function HomepagePromoQuickEditor({ banner, savedBanners = [], status = "
               </div>
             );
           })}
-          {overlayImages.length < 8 ? <div className="homepage-image-source-grid"><button type="button" className="homepage-image-source-button" disabled={busy} onClick={() => void openMediaBrowser()}>Upload image</button><button type="button" className="homepage-image-source-button" disabled={busy} onClick={() => setOverlayCatalogPickerOpen(true)}>Select from catalogue</button><button type="button" className="homepage-image-source-button" disabled={busy} onClick={() => void openMediaBrowser()}>Select from media</button></div> : null}
         </details>
 
         <details className="homepage-promo-control-section">
@@ -409,6 +683,29 @@ export function HomepagePromoQuickEditor({ banner, savedBanners = [], status = "
           {draft.animateEnabled !== false ? <div className="homepage-animation-options">{[{ id: "fade", label: "Silk fade" }, { id: "slide", label: "Gentle glide" }, { id: "pulse", label: "Soft glow" }].map((item) => <button type="button" key={item.id} className={draft.animation === item.id ? "is-active" : ""} onClick={() => update({ animation: item.id as PromoBanner["animation"] })}>{item.label}</button>)}</div> : null}
           <p>Animations play once and stay on their final frame.</p>
         </details>
+        <details className="homepage-promo-control-section">
+          <summary>Schedule</summary>
+          <p>Go live straight away, or pick a window. Outside the window the promo stays hidden.</p>
+          <div className="homepage-schedule-modes">
+            <button type="button" className={scheduleMode === "now" ? "is-active" : ""} onClick={() => { setScheduleMode("now"); update({ startsAt: "", endsAt: "" }); }}>Publish now</button>
+            <button type="button" className={scheduleMode === "window" ? "is-active" : ""} onClick={() => setScheduleMode("window")}>Choose times</button>
+          </div>
+          {scheduleMode === "window" ? (
+            <>
+              <div className="homepage-schedule-row">
+                <label><span>Start date</span><input type="date" value={scheduleStart.date} onChange={(event) => setScheduleStart(event.target.value, scheduleStart.time || "09:00")} /></label>
+                <label><span>Start time</span><select value={scheduleStart.time || "09:00"} disabled={!scheduleStart.date} onChange={(event) => setScheduleStart(scheduleStart.date || todayLocalDate(), event.target.value)}>{timeSlotsFor(scheduleStart.time).map((slot) => <option key={slot.value} value={slot.value}>{slot.label}</option>)}</select></label>
+              </div>
+              <div className="homepage-schedule-row">
+                <label><span>End date</span><input type="date" min={scheduleStart.date || undefined} value={scheduleEnd.date} onChange={(event) => setScheduleEnd(event.target.value, scheduleEnd.time || "23:30")} /></label>
+                <label><span>End time</span><select value={scheduleEnd.time || "23:30"} disabled={!scheduleEnd.date} onChange={(event) => setScheduleEnd(scheduleEnd.date || todayLocalDate(), event.target.value)}>{timeSlotsFor(scheduleEnd.time).map((slot) => <option key={slot.value} value={slot.value}>{slot.label}</option>)}</select></label>
+              </div>
+              <small className="homepage-schedule-summary">{formatScheduleLabel(draft.startsAt ?? "", draft.endsAt ?? "")}</small>
+              <button type="button" className="homepage-promo-centre-button" onClick={() => update({ startsAt: "", endsAt: "" })}>Clear both times</button>
+            </>
+          ) : null}
+        </details>
+
         <details className="homepage-promo-control-section homepage-promo-library">
           <summary>Saved promos</summary>
           <button type="button" className="homepage-promo-add is-create-new" onClick={() => {
@@ -434,10 +731,10 @@ export function HomepagePromoQuickEditor({ banner, savedBanners = [], status = "
               {savedBanners.map((item) => <option key={item.id} value={item.id}>{resolvePromoAdminName(item)}{item.active ? " · Live" : ""}</option>)}
             </select>
           </label>
+          <button type="button" className="homepage-promo-delete-button" disabled={busy || !loadId} onClick={() => void deleteSelectedPromo()}>Delete</button>
         </details>
       </div>
-
-      <div className="homepage-promo-quick-actions"><span>{message || "Changes preview here only until you publish."}</span><div><button type="button" disabled={busy} className="is-primary" onClick={() => void publish()}>Publish live</button></div></div>
+      <div className="homepage-promo-quick-actions"><span>{saved || published ? "" : message || "Changes preview here only until you publish."}</span><div><button type="button" className={saved ? "is-saved" : undefined} disabled={busy} onClick={() => void saveCurrentPromo()} title="Save to the promo library without publishing">{saved ? "Saved!" : "Save"}</button><button type="button" disabled={busy} className={`is-primary${published ? " is-saved" : ""}`} onClick={() => void publish()}>{published ? (isScheduled ? "Scheduled!" : "Published!") : isScheduled ? "Schedule promo" : "Publish live"}</button></div></div>
       <MaromaCatalogPicker
         open={productPickerLinkId !== null}
         onClose={() => setProductPickerLinkId(null)}
@@ -458,12 +755,24 @@ export function HomepagePromoQuickEditor({ banner, savedBanners = [], status = "
         <dialog ref={mediaDialogRef} className="homepage-media-picker-root" aria-label="Choose an image" onCancel={() => setMediaPickerOpen(false)}>
           <button type="button" className="homepage-media-picker-backdrop" tabIndex={-1} aria-label="Close media browser" onClick={() => setMediaPickerOpen(false)} />
           <div className="homepage-media-picker">
-            <header className="homepage-media-picker-head"><div><span>Media browser</span><h2>Choose an image</h2></div><div className="homepage-media-picker-actions"><label className="homepage-image-source-button"><span>Upload new image</span><input type="file" accept="image/*" disabled={busy} onChange={async (event) => { const input = event.currentTarget; const file = input.files?.[0]; if (!file) return; setBusy(true); try { const url = await uploadPromoMedia(file, "image"); addOverlayImage(url, file.name || "Uploaded image"); setMediaPickerOpen(false); } catch (error) { setMediaError(error instanceof Error ? error.message : "Upload failed."); } finally { setBusy(false); input.value = ""; } }} /></label><button type="button" autoFocus onClick={() => setMediaPickerOpen(false)}>Close</button></div></header>
+            <header className="homepage-media-picker-head"><div><span>Media browser</span><h2>Choose an image</h2></div><div className="homepage-media-picker-actions"><label className="homepage-image-source-button"><span>Upload new image</span><input type="file" accept="image/*" disabled={busy} onChange={async (event) => { const input = event.currentTarget; const file = input.files?.[0]; if (!file) return; setBusy(true); try { const url = await uploadPromoMedia(file, "image"); addOverlayImage(url, file.name || "Uploaded image"); setMediaPickerOpen(false); } catch (error) { setMediaError(error instanceof Error ? error.message : "Upload failed."); } finally { setBusy(false); input.value = ""; } }} /></label>{mediaItems.length > 0 ? <button type="button" className="homepage-media-picker-select-all" onClick={() => setSelectedMediaIds(selectedMediaIds.length === mediaItems.length ? [] : mediaItems.map((item) => item.id))}>{selectedMediaIds.length === mediaItems.length ? "Clear selection" : "Select all"}</button> : null}{selectedMediaIds.length > 0 ? <button type="button" className="homepage-media-picker-delete" disabled={busy} onClick={() => void deleteSelectedMedia()}>{`Delete ${selectedMediaIds.length} selected`}</button> : null}<button type="button" autoFocus onClick={() => setMediaPickerOpen(false)}>Close</button></div></header>
             {mediaLoading ? <p className="homepage-media-picker-message">Loading images…</p> : null}
             {mediaError ? <p className="homepage-media-picker-message is-error">{mediaError}</p> : null}
             {!mediaLoading && !mediaError && mediaItems.length === 0 ? <p className="homepage-media-picker-message">No images are in the media browser yet.</p> : null}
             <div className="homepage-media-picker-grid">
-              {mediaItems.map((item) => <button type="button" key={item.id} onClick={() => { addOverlayImage(item.url, item.label || item.filename); setMediaPickerOpen(false); }}><img src={item.url} alt="" /><span>{item.label || item.filename}</span></button>)}
+              {mediaItems.map((item) => {
+                const itemName = item.label || item.filename;
+                const isSelected = selectedMediaIds.includes(item.id);
+                return (
+                  <div className={`homepage-media-picker-cell${isSelected ? " is-selected" : ""}`} key={item.id}>
+                    <button type="button" onClick={() => { addOverlayImage(item.url, itemName); setMediaPickerOpen(false); }}><img src={item.url} alt="" /><span>{itemName}</span></button>
+                    <label className="homepage-media-picker-select" title={isSelected ? "Deselect image" : "Select image to delete"}>
+                      <input type="checkbox" checked={isSelected} disabled={busy} onChange={() => toggleMediaSelection(item.id)} />
+                      <span className="sr-only">{`Select ${itemName} for deletion`}</span>
+                    </label>
+                  </div>
+                );
+              })}
             </div>
           </div>
         </dialog>,

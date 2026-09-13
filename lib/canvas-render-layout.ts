@@ -8,10 +8,12 @@ import { applyAllMontageLayouts } from "./canvas-montage";
 import {
   canvasLayoutHeightOf,
   clearMastheadMontage,
+  ensureMastheadLayout,
   ensureMastheadZOrder,
   emailRenderStoryBodyInkHeight,
   normalizeEmailBannerWidth,
   paintOrderElements,
+  restoreSpacingLockedY,
   syncCanvasStoryLayout,
 } from "./canvas-layout";
 import {
@@ -32,11 +34,12 @@ export function layoutNewsletterCanvas(
   gapsOverride?: StorySpacingGaps,
 ): LaidOutNewsletterCanvas {
   const gaps = canvas.storySpacingGaps ?? gapsOverride ?? DEFAULT_STORY_SPACING_GAPS;
-  let els = ensureMastheadZOrder(canvas.elements);
+  let els = ensureMastheadLayout(canvas.elements);
   els = applyAllMontageLayouts(els);
   const synced = syncCanvasStoryLayout(els, gaps, canvas.measuredHeights);
   els = applyAllMontageLayouts(synced.elements);
-  els = ensureMastheadZOrder(els);
+  els = ensureMastheadLayout(els);
+  els = restoreSpacingLockedY(canvas.elements, els);
   const measuredHeights = synced.measuredHeights;
   return {
     elements: els,

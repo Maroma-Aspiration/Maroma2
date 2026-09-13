@@ -5,6 +5,7 @@ import { getSessionSecret, SESSION_COOKIE, verifySessionPayload } from "../../..
 import { readLiveStorefrontCatalog } from "../../../../lib/product-catalog-admin";
 import { readQrProductPageStore, writeQrProductPageStore } from "../../../../lib/qr-product-page-store";
 import { generateQrInstructions } from "../../../../lib/qr-instruction-generator";
+import { readSafetyGuidelines } from "../../../../lib/safety-guidelines-store";
 import type { QrProductPage } from "../../../../lib/qr-product-page-types";
 
 export const runtime = "nodejs";
@@ -21,8 +22,12 @@ const cleanLines = (value: unknown) => Array.isArray(value) ? value.map(String).
 
 export async function GET() {
   if (!(await requireAdmin())) return NextResponse.json({ error: "Admin sign-in required." }, { status: 401 });
-  const [{ products }, store] = await Promise.all([readLiveStorefrontCatalog(), readQrProductPageStore()]);
-  return NextResponse.json({ pages: Object.values(store.pages).sort((a, b) => b.updatedAt.localeCompare(a.updatedAt)), products });
+  const [{ products }, store, safety] = await Promise.all([readLiveStorefrontCatalog(), readQrProductPageStore(), readSafetyGuidelines()]);
+  return NextResponse.json({
+    pages: Object.values(store.pages).sort((a, b) => b.updatedAt.localeCompare(a.updatedAt)),
+    products,
+    safetySets: safety.sets.map((set) => ({ id: set.id, label: set.label, languages: Object.keys(set.translations) })),
+  });
 }
 
 export async function POST(request: Request) {
@@ -35,7 +40,8 @@ export async function POST(request: Request) {
       if (!product) return NextResponse.json({ error: "Choose a live catalog product first." }, { status: 400 });
       return NextResponse.json({ generated: generateQrInstructions(product), product });
     }
-    const store = await readQrProductPageStore();
+    const [store, safety] = await Promise.all([readQrProductPageStore(), readSafetyGuidelines()]);
+    const safetySets = safety.sets;
     if (body.action === "delete") {
       const prior = body.id ? store.pages[body.id] : undefined;
       if (prior) { delete store.pages[prior.id]; await writeQrProductPageStore(store); revalidatePath(`/care/${prior.slug}`); }
@@ -56,7 +62,9 @@ export async function POST(request: Request) {
       title: String(patch.title || product.name).trim().slice(0, 140),
       intro: String(patch.intro || "").trim().slice(0, 600),
       instructions: Array.isArray(patch.instructions) ? patch.instructions.map((item, index) => ({ id: String(item.id || `step-${index + 1}`), heading: String(item.heading || "").trim().slice(0, 100), body: String(item.body || "").trim().slice(0, 1400) })).filter((item) => item.heading || item.body).slice(0, 10) : [],
-      safetyNotes: cleanLines(patch.safetyNotes), imageUrl: String(patch.imageUrl || "").trim() || undefined, videoUrl: String(patch.videoUrl || "").trim() || undefined,
+      safetyNotes: cleanLines(patch.safetyNotes),
+      safetySetId: patch.safetySetId === "none" || safetySets.some((set) => set.id === patch.safetySetId) ? patch.safetySetId : undefined,
+      imageUrl: String(patch.imageUrl || "").trim() || undefined, videoUrl: String(patch.videoUrl || "").trim() || undefined,
       relatedProductIds: cleanLines(patch.relatedProductIds).filter((productId) => productId !== product.id && products.some((item) => item.id === productId)).slice(0, 8),
       status: patch.status === "published" ? "published" : "draft", createdAt: prior?.createdAt ?? now, updatedAt: now,
     };

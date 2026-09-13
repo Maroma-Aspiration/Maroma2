@@ -395,6 +395,14 @@
   margin-top: 0;
   transform: translate(var(--promo-frame-x, 0px), var(--promo-frame-y, var(--hero-promo-nudge-y, 0px)));
 }
+/* Phones stack the hero in document flow, so the desktop frame nudge only shunts the promo over
+   the band below it, and an authored width above 100% overflows the screen. Drop both. */
+.page.maroma.is-mobile-layout .hero.is-promo-homepage .hero-artboard .hero-promo-banner,
+.page.maroma.is-mobile-document-flow .hero.is-promo-homepage .hero-artboard .hero-promo-banner {
+  width: 100%;
+  max-width: 100%;
+  transform: none;
+}
 .page.maroma:not(.is-mobile-layout):not(.is-mobile-document-flow) .scroller-section.scroller-loved-for-a-reason.home-collections-section.is-after-promo,
 .page.maroma.is-mobile-layout .scroller-section.scroller-loved-for-a-reason.home-collections-section.is-after-promo,
 .page.maroma.is-mobile-document-flow .scroller-section.scroller-loved-for-a-reason.home-collections-section.is-after-promo {

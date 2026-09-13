@@ -101,7 +101,7 @@ export default async function RootLayout({
       <body className="antialiased">
         <style
           dangerouslySetInnerHTML={{
-            __html: `.site-header .nav.nav-overlay,.site-header .nav.nav-overlay::before,.site-header .nav-end{background:transparent!important}.hero{--hero-nav-lift:calc(88px + var(--admin-bar-height,0px) + var(--nav-bottom-gap,2mm))}.hero-artboard{margin-top:calc(-1 * var(--hero-nav-lift));padding-top:var(--hero-nav-lift)}.site-header .brand-logo{width:160px!important;height:22px!important;max-height:22px!important;object-fit:contain}.site-header .nav-experiences-link img,.site-header .nav-experiences-logo{width:132px!important;height:25px!important;max-width:132px!important;object-fit:contain}.site-header .spa-cta-wrap .spa-book-logo{width:86px!important;height:36px!important;max-height:36px!important;object-fit:contain}.site-header .maroma-nav-shell--desktop .brand{margin-right:10px;flex-shrink:0}.site-header .maroma-nav-shell--desktop .nav-end{flex-shrink:0}`,
+            __html: `.site-header .nav.nav-overlay,.site-header .nav.nav-overlay::before,.site-header .nav-end{background:transparent!important}.hero{--hero-nav-lift:calc(88px + var(--admin-bar-height,0px) + var(--nav-bottom-gap,2mm))}.hero-artboard{margin-top:calc(-1 * var(--hero-nav-lift));padding-top:var(--hero-nav-lift)}.site-header .brand-logo{width:160px!important;height:22px!important;max-height:22px!important;object-fit:contain}@media(max-width:800px){.site-header .brand-logo{width:75px!important;height:auto!important;max-height:none!important}}.site-header .nav-experiences-link img,.site-header .nav-experiences-logo{width:132px!important;height:25px!important;max-width:132px!important;object-fit:contain}.site-header .spa-cta-wrap .spa-book-logo{width:86px!important;height:36px!important;max-height:36px!important;object-fit:contain}.site-header .maroma-nav-shell--desktop .brand{margin-right:10px;flex-shrink:0}.site-header .maroma-nav-shell--desktop .nav-end{flex-shrink:0}`,
           }}
         />
         <JsonLd data={[organizationJsonLd(), websiteJsonLd()]} />
@@ -123,7 +123,7 @@ export default async function RootLayout({
           id="maroma-homepage-intro-boot"
           strategy="beforeInteractive"
           dangerouslySetInnerHTML={{
-            __html: `(function(){try{var p=location.pathname;if(p!=="/"&&p!=="")return;if(location.hash==="#shop")return;var q=location.search;if(q.indexOf("skipIntro=1")>=0||q.indexOf("promoPreview=1")>=0||/[?&]q=/.test(q))return;document.documentElement.classList.add("homepage-intro-experience","homepage-intro-active");}catch(e){}})();`,
+            __html: `(function(){try{var p=location.pathname;if(p!=="/"&&p!=="")return;if(location.hash==="#shop")return;var q=location.search;if(q.indexOf("skipIntro=1")>=0||q.indexOf("promoPreview=1")>=0||/[?&]q=/.test(q))return;var seen=false;try{seen=localStorage.getItem("maroma-hero-intro-seen")==="1";}catch(e){}if(seen){document.documentElement.classList.add("homepage-intro-experience","homepage-intro-seen");return;}document.documentElement.classList.add("homepage-intro-experience","homepage-intro-active");}catch(e){}})();`,
           }}
         />
         <ViewportRootSync />

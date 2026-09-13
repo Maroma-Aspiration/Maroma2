@@ -81,9 +81,20 @@ async function writeStore(store: CouponStore): Promise<void> {
   await fs.writeFile(storagePath, JSON.stringify(store, null, 2), "utf8");
 }
 
+export function couponIsActive(coupon: CouponRecord, now = Date.now()): boolean {
+  if (!coupon.active) return false;
+  if (coupon.expiresAt && new Date(coupon.expiresAt).getTime() < now) return false;
+  return true;
+}
+
 export async function listCoupons(): Promise<CouponRecord[]> {
   const store = await readStore();
   return Object.values(store.coupons).sort((a, b) => a.code.localeCompare(b.code));
+}
+
+export async function hasActivePromo(): Promise<boolean> {
+  const coupons = await listCoupons();
+  return coupons.some((coupon) => couponIsActive(coupon));
 }
 
 export async function getCoupon(code: string): Promise<CouponRecord | null> {

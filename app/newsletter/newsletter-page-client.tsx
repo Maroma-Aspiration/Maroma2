@@ -1475,23 +1475,8 @@ function IssueTitleEditable({
 const CANVAS_LS_KEY = "maroma-newsletter-canvas-draft";
 const CANVAS_LS_SAVED_KEY = "maroma-newsletter-canvas-saved-at";
 
-function canvasLayoutSignature(canvas: StoriesState["newsletterCanvas"]): string {
-  return JSON.stringify(
-    (canvas?.elements ?? []).map((e) => [e.id, Math.round(e.y)]),
-  );
-}
-
 function withCanvasStoryGaps(s: StoriesState): StoriesState {
-  const beforeSig = canvasLayoutSignature(s.newsletterCanvas);
   const reconciled = reconcileNewsletterCanvasState(s);
-  const afterSig = canvasLayoutSignature(reconciled.newsletterCanvas);
-  if (beforeSig !== afterSig && typeof window !== "undefined") {
-    try {
-      localStorage.removeItem(CANVAS_LS_KEY);
-    } catch {
-      // ignore
-    }
-  }
   const existing = parseStorySpacingGaps(reconciled.newsletterCanvas?.storySpacingGaps);
   if (existing) {
     return {

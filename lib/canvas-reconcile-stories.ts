@@ -4,12 +4,11 @@
  */
 
 import {
-  clearSpacingLocks,
   ensureMastheadZOrder,
   estimateStoryGridHeight,
+  isSpacingLocked,
   measureElementHeight,
   storyGridLayoutFloor,
-  syncCanvasStoryLayout,
 } from "./canvas-layout";
 import { plainTextFromHtml } from "./newsletter-archive-utils";
 import { normalizeStoryImageFrame } from "./story-image-frame";
@@ -99,10 +98,12 @@ export function reanchorDetachedStorySections(elements: CanvasEl[]): CanvasEl[] 
   if (!anchor) return elements;
 
   if (anchor.y <= targetTop + 8) return elements;
+  if (isSpacingLocked(anchor)) return elements;
 
   const delta = anchor.y - targetTop;
   return elements.map((e) => {
     if (!STORY_SECTION_RE.test(e.id)) return e;
+    if (isSpacingLocked(e)) return e;
     return { ...e, y: e.y - delta } as CanvasEl;
   });
 }
@@ -399,7 +400,6 @@ export function reconcileNewsletterCanvasState(state: StoriesState): StoriesStat
   measuredHeights = sanitized.measuredHeights;
 
   elements = reanchorDetachedStorySections(elements);
-  elements = clearSpacingLocks(elements);
 
   let stories = (state.stories ?? []).filter((s) => !s.kind || s.kind === "story");
   const hasGrid = elements.some((e) => e.id === "migrated-story-grid");
@@ -417,8 +417,6 @@ export function reconcileNewsletterCanvasState(state: StoriesState): StoriesStat
     elements = ensureStoryImageFrames(elements, stories);
   }
 
-  const synced = syncCanvasStoryLayout(elements, canvas.storySpacingGaps, measuredHeights);
-
   const nextStories =
     stories.length > 0 && (state.stories ?? []).filter((s) => !s.kind || s.kind === "story").length === 0
       ? stories
@@ -429,8 +427,8 @@ export function reconcileNewsletterCanvasState(state: StoriesState): StoriesStat
     stories: nextStories,
     newsletterCanvas: {
       ...canvas,
-      elements: synced.elements,
-      measuredHeights: synced.measuredHeights,
+      elements: ensureMastheadZOrder(elements),
+      measuredHeights,
     },
   };
 }

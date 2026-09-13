@@ -26,6 +26,7 @@ import { isGiftingProduct } from "../../lib/product-gifting";
 import { productPriceState } from "../../lib/product-pricing";
 import type { ProductRecord } from "../../lib/product-types";
 import { useAdminSession } from "../../lib/use-admin-session";
+import { ProductCardBuyNow } from "./ProductCardBuyNow";
 
 type Props = {
   products: ProductRecord[];
@@ -958,15 +959,13 @@ export function ProductListingWithFilters({ products, categorySlug, searchQuery 
             const priceState = productPriceState(product);
             const convertedPrice = formatCatalogPrice(priceState.active);
             const priceLabel = convertedPrice ? `${isEstimated ? "≈ " : ""}${convertedPrice}` : "Price on request";
+            const productHref = searchQuery.trim()
+              ? `/product/${product.id}?search=${encodeURIComponent(searchQuery.trim())}`
+              : `/product/${product.id}`;
             return (
               <div key={product.id} className="product-card-wrap">
-                <Link
-                  href={searchQuery.trim()
-                    ? `/product/${product.id}?search=${encodeURIComponent(searchQuery.trim())}`
-                    : `/product/${product.id}`}
-                  className="product-card-link"
-                >
-                  <article className="product-card">
+                <article className="product-card">
+                  <Link href={productHref} className="product-card-link">
                     <div className="product-card-media">
                       <div className="product-image">
                         {imageSrc ? (
@@ -987,10 +986,13 @@ export function ProductListingWithFilters({ products, categorySlug, searchQuery 
                         {priceState.onSale ? <s>{formatCatalogPrice(priceState.regular)}</s> : null}
                         <span>{priceLabel}</span>
                       </p>
-                      <span className="product-card-cta">Add to Basket</span>
                     </div>
-                  </article>
-                </Link>
+                  </Link>
+                  <div className="product-card-actions">
+                    <Link href={productHref} className="product-card-cta">Add to Basket</Link>
+                    <ProductCardBuyNow product={product} />
+                  </div>
+                </article>
                 {isAdmin && (
                   <div className="product-admin-upload-panel">
                     <div className="admin-upload-label">Upload images</div>

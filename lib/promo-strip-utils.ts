@@ -81,6 +81,13 @@ export function resolvePromoBannerTitle(input: {
   if (Array.isArray(input.frames)) {
     for (const frame of input.frames) {
       if (!frame || typeof frame !== "object") continue;
+      const row = frame as { title?: unknown };
+      if (typeof row.title === "string" && row.title.trim()) {
+        return row.title.replace(/\s+/g, " ").trim().slice(0, 80);
+      }
+    }
+    for (const frame of input.frames) {
+      if (!frame || typeof frame !== "object") continue;
       const row = frame as { kind?: unknown; body?: unknown };
       if (row.kind === "marquee" && typeof row.body === "string" && row.body.trim()) {
         return row.body.trim().slice(0, 80);
@@ -236,9 +243,12 @@ export function normalizePromoStripFields(banner: Partial<PromoBanner>): PromoSt
 
 export function promoStripBannerClass(banner: Partial<PromoBanner>): string {
   const strip = normalizePromoStripFields(banner);
-  return strip.stripAspectRatio === PROMO_STRIP_ASPECT_21_9
-    ? " promo-banner--aspect-21-9"
-    : " promo-banner--aspect-fixed";
+  const aspect =
+    strip.stripAspectRatio === PROMO_STRIP_ASPECT_21_9
+      ? " promo-banner--aspect-21-9"
+      : " promo-banner--aspect-fixed";
+  // A hand-tuned phone layout is authored in real phone pixels, so the auto-fit rescale is off.
+  return banner.mobileTuned ? `${aspect} promo-banner--mobile-tuned` : aspect;
 }
 
 export function isPromoModeEnabled(banner: Partial<PromoBanner> | null | undefined): boolean {

@@ -3,6 +3,7 @@ import { CartError } from "../../../lib/commerce-cart";
 import { createOrderFromCart } from "../../../lib/commerce-checkout";
 import { readCartIdFromCookies } from "../../../lib/commerce-cart-cookie";
 import { getOrCreateCart } from "../../../lib/commerce-cart";
+import { buildCcavenueCheckoutForm, isCcavenueConfigured } from "../../../lib/ccavenue";
 import type { ShippingAddress } from "../../../lib/commerce-types";
 
 export const runtime = "nodejs";
@@ -43,6 +44,7 @@ export async function POST(request: Request) {
     const cartId = readCartIdFromCookies();
     const cart = await getOrCreateCart(cartId);
     const order = await createOrderFromCart({ cartId: cart.id, shipping, notifications }, request);
+    const payment = isCcavenueConfigured() ? buildCcavenueCheckoutForm(order, request) : null;
 
     return NextResponse.json({
       ok: true,
@@ -54,6 +56,7 @@ export async function POST(request: Request) {
         shippingInr: order.shippingInr,
         customerEmail: order.customerEmail,
       },
+      payment,
     });
   } catch (error) {
     if (error instanceof CartError) {

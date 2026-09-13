@@ -11,7 +11,7 @@ import { resolveCommerceProduct, resolveCommerceProducts } from "./commerce-prod
 import { getRitualSet } from "./commerce-ritual-sets";
 import { buildGiftSetProductId, parseGiftSetProductId, validateGiftSet } from "./gift-builder";
 import { giftSetCartDisplayName, encodeGiftSetVariant } from "./gift-set-variant";
-import { validateCouponForSubtotal } from "./commerce-coupons";
+import { hasActivePromo, validateCouponForSubtotal } from "./commerce-coupons";
 import type {
   CartLine,
   CartRecord,
@@ -192,6 +192,7 @@ export async function buildCartView(cart: CartRecord): Promise<CartView> {
     id: cart.id,
     items,
     couponCode: cart.couponCode,
+    promoAvailable: await hasActivePromo(),
     ...totals,
   };
 }

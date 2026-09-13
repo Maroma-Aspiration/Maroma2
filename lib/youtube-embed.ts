@@ -32,6 +32,7 @@ export function isYouTubeUrl(url: string): boolean {
 
 export type YouTubeHeroEmbedOptions = {
   loop?: boolean;
+  autoPlay?: boolean;
   enableJsApi?: boolean;
   origin?: string;
 };
@@ -39,8 +40,9 @@ export type YouTubeHeroEmbedOptions = {
 /** Background-style embed (muted autoplay), matching maroma.com Elementor hero. */
 export function youTubeHeroEmbedUrl(videoId: string, options: YouTubeHeroEmbedOptions = {}): string {
   const loop = options.loop !== false;
+  const autoPlay = options.autoPlay !== false;
   const params = new URLSearchParams({
-    autoplay: "1",
+    autoplay: autoPlay ? "1" : "0",
     mute: "1",
     controls: "0",
     playsinline: "1",

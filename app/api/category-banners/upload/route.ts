@@ -1,5 +1,3 @@
-import { put } from "@vercel/blob";
-import { promises as fs } from "fs";
 import path from "path";
 import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
@@ -8,6 +6,7 @@ import { getSessionSecret, SESSION_COOKIE, verifySessionPayload } from "../../..
 import { catalogCategories } from "../../../../lib/catalog-categories";
 import type { CategoryBannerOverride } from "../../../../lib/category-banner-types";
 import { readCategoryBannerStore, writeCategoryBannerStore } from "../../../../lib/category-banner-store";
+import { persistPublicMediaFile } from "../../../../lib/public-media-upload";
 import { registerSiteMediaItem } from "../../../../lib/site-media-gallery-store";
 
 export const runtime = "nodejs";
@@ -15,18 +14,8 @@ export const maxDuration = 60;
 
 const uploadDir = path.join(process.cwd(), "public", "staging-media", "admin-category-banners");
 
-const extensionForMime = (mime: string): string => {
-  if (mime === "image/jpeg") return ".jpg";
-  if (mime === "image/png") return ".png";
-  if (mime === "image/webp") return ".webp";
-  if (mime === "image/gif") return ".gif";
-  return ".bin";
-};
-
 const validSlug = (slug: string): boolean =>
   catalogCategories.some((category) => category.slug === slug);
-
-const blobConfigured = (): boolean => Boolean(process.env.BLOB_READ_WRITE_TOKEN?.trim());
 
 function normalisePatch(patch: CategoryBannerOverride): CategoryBannerOverride {
   const next = { ...patch };
@@ -46,29 +35,11 @@ async function requireAdmin(): Promise<boolean> {
   return session?.role === "admin";
 }
 
-async function persistImage(
-  file: File,
-  fileName: string
-): Promise<{ url: string; filename: string }> {
-  if (blobConfigured() || process.env.VERCEL) {
-    const uploaded = await put(`admin-category-banners/${fileName}`, file, {
-      access: "public",
-      addRandomSuffix: true,
-      contentType: file.type,
-      cacheControlMaxAge: 31536000,
-    });
-    const filename = uploaded.pathname.split("/").pop() ?? fileName;
-    return { url: uploaded.url, filename };
-  }
-
-  await fs.mkdir(uploadDir, { recursive: true });
-  const fullPath = path.join(uploadDir, fileName);
-  const buffer = Buffer.from(await file.arrayBuffer());
-  await fs.writeFile(fullPath, buffer);
-  return {
-    url: `/staging-media/admin-category-banners/${fileName}`,
-    filename: fileName,
-  };
+async function persistImage(file: File): Promise<{ url: string; filename: string }> {
+  return persistPublicMediaFile(file, "admin-category-banners", {
+    dir: uploadDir,
+    urlPrefix: "/staging-media/admin-category-banners",
+  });
 }
 
 export async function POST(request: Request) {
@@ -102,10 +73,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Only image uploads are supported." }, { status: 400 });
     }
 
-    const ext = extensionForMime(file.type);
-    const safeSlug = slug.replace(/[^a-z0-9-]/gi, "");
-    const fileName = `${safeSlug}-${Date.now()}${ext}`;
-    const { url: publicPath } = await persistImage(file, fileName);
+    const { url: publicPath, filename } = await persistImage(file);
 
     const store = await readCategoryBannerStore();
     const prev = store.banners[slug] ?? {};
@@ -120,7 +88,7 @@ export async function POST(request: Request) {
     try {
       await registerSiteMediaItem({
         url: publicPath,
-        filename: fileName,
+        filename,
         label: `${slug} ${target === "card" ? "collection card" : "banner"}`,
         tags: ["category", slug, target],
       });
@@ -141,9 +109,9 @@ export async function POST(request: Request) {
   } catch (error) {
     const message = error instanceof Error ? error.message : "Unable to upload category banner.";
     console.error("[category-banners] upload failed", error);
-    if (/BLOB_READ_WRITE_TOKEN|No token found|store has been suspended/i.test(message)) {
+    if (/Firebase Storage is not configured|quota exceeded|BLOB_READ_WRITE_TOKEN/i.test(message)) {
       return NextResponse.json(
-        { error: "Image storage is not configured. Link Vercel Blob for this project." },
+        { error: "Image storage is not configured. Check Firebase Storage env vars." },
         { status: 503 }
       );
     }

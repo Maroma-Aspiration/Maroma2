@@ -1,0 +1,2601 @@
+{
+  "generatedAt": "2026-09-11T03:38:29.299Z",
+  "sourceImageDirectory": "/Users/apple/Documents/Maroma Shopping/Key ingredients",
+  "sourceImageCount": 75,
+  "copiedImages": 61,
+  "sourceImageCandidatesUsed": 720,
+  "liveProductCount": 190,
+  "productsUpdated": 189,
+  "ingredientSlotsChecked": 876,
+  "ingredientSlotsMatched": 720,
+  "unmatchedIngredients": {
+    "Zinc Ricinoleate": 1,
+    "Manjistha": 5,
+    "Poppy": 1,
+    "Bengal Gram": 2,
+    "Castor": 6,
+    "Cypriol": 5,
+    "Ginger Grass": 4,
+    "Juniper Berry": 3,
+    "Myrrh": 5,
+    "Pine": 2,
+    "Indian Borage": 1,
+    "Guaiac Wood": 6,
+    "Bhumyamlaki": 2,
+    "Brahmi": 6,
+    "Amla": 6,
+    "Cardamom": 3,
+    "Clove": 6,
+    "Rosewood": 1,
+    "Niacinamide": 4,
+    "Peptides": 1,
+    "Pro-ceramides": 2,
+    "Bukachiol": 2,
+    "Glycerine": 2,
+    "Cassia": 2,
+    "Clary Sage": 2,
+    "Chamomile": 1,
+    "Neroli": 2,
+    "Spikenard": 1,
+    "Indian Tulsi": 1,
+    "Vitamin E": 3,
+    "Multani Mitti": 2,
+    "Walnut": 3,
+    "Sunflower": 5,
+    "Labdanum": 1,
+    "Oakmoss": 2,
+    "Oats": 2,
+    "Bearberry": 1,
+    "Panthenol": 1,
+    "Tocopherol": 1,
+    "Elemi": 3,
+    "Nutmeg": 2,
+    "Shiu": 1,
+    "Natural Vinegar": 1,
+    "Balsam Copaiba": 1,
+    "Galbanum Resin": 2,
+    "Rockrose": 2,
+    "Amyris": 2,
+    "Spirulina": 1,
+    "Cananga": 1,
+    "Ginger": 2,
+    "Oregano": 1,
+    "Saffron": 3,
+    "Ashwagandha": 2,
+    "Flaxseed": 2,
+    "Cubeb": 1,
+    "Styrax": 2,
+    "Blackpepper": 1,
+    "Cinnamon": 3,
+    "Eucalyptus": 1,
+    "Wheatgerm": 2,
+    "Retinol (Vitamin A)": 1,
+    "Lupine Peptides": 1,
+    "Bringaraj": 1,
+    "Benzoin": 3,
+    "Arnica": 1,
+    "Allantoin": 1,
+    "Masikai": 1,
+    "Zincoxide": 1,
+    "Cucumber": 3,
+    "Lime": 1
+  },
+  "products": {
+    "775": {
+      "title": "Cedar Lavender Aromatic Bath Soap - Elevate",
+      "sku": "ML16-B01",
+      "matchedCount": 3,
+      "totalCount": 4,
+      "matchedIngredients": [
+        "Coconut",
+        "Himalayan Cedarwood",
+        "Lavandin"
+      ]
+    },
+    "780": {
+      "title": "Tonka Vetiver Aromatic Bath Soap for Man",
+      "sku": "ML16-B03",
+      "matchedCount": 4,
+      "totalCount": 4,
+      "matchedIngredients": [
+        "Coconut",
+        "Petitgrain",
+        "Tonka Bean",
+        "Vetiver"
+      ]
+    },
+    "790": {
+      "title": "Olibanum Citrus Aromatic Bath Soap",
+      "sku": "ML16-B02",
+      "matchedCount": 3,
+      "totalCount": 4,
+      "matchedIngredients": [
+        "Coconut",
+        "Lemon",
+        "Olibanum"
+      ]
+    },
+    "795": {
+      "title": "Cedar Lavender Men’s Oil Perfume",
+      "sku": "ML14-A01",
+      "matchedCount": 2,
+      "totalCount": 2,
+      "matchedIngredients": [
+        "Cedarwood",
+        "Lavender"
+      ]
+    },
+    "812": {
+      "title": "Cedar Lavender Men's Deodorant - Elevate",
+      "sku": "ML16-D71",
+      "matchedCount": 3,
+      "totalCount": 3,
+      "matchedIngredients": [
+        "Aloe Vera",
+        "Himalayan Cedarwood Oil",
+        "Lavandin Oil"
+      ]
+    },
+    "816": {
+      "title": "Olibanum Citrus Men's Deodorant - Emanate",
+      "sku": "ML16-D72",
+      "matchedCount": 3,
+      "totalCount": 3,
+      "matchedIngredients": [
+        "Aloe Vera",
+        "Himalayan Cedarwood",
+        "Lavandin"
+      ]
+    },
+    "825": {
+      "title": "Cedar Lavender Men’s Beard Oil",
+      "sku": "ML16-D42",
+      "matchedCount": 3,
+      "totalCount": 4,
+      "matchedIngredients": [
+        "Coconut",
+        "Himalayan Cedarwood",
+        "Lavandin"
+      ]
+    },
+    "829": {
+      "title": "Olibanum Citrus Men’s Beard Oil",
+      "sku": "ML16-D44",
+      "matchedCount": 3,
+      "totalCount": 3,
+      "matchedIngredients": [
+        "Lemon",
+        "Olibanum",
+        "Patchouli"
+      ]
+    },
+    "839": {
+      "title": "Tea Tree and Lavender After Shave Gel",
+      "sku": "TL16-O77",
+      "matchedCount": 3,
+      "totalCount": 4,
+      "matchedIngredients": [
+        "Aloe Vera",
+        "Lavender",
+        "Tea Tree"
+      ]
+    },
+    "849": {
+      "title": "Elevate Cedar Lavender Eau de Toilette",
+      "sku": "ML14-A31",
+      "matchedCount": 3,
+      "totalCount": 3,
+      "matchedIngredients": [
+        "Himalayan Cedarwood",
+        "Lavender",
+        "Orange"
+      ]
+    },
+    "859": {
+      "title": "Intrigue Orange Patchouli Eau de Toilette",
+      "sku": "ML14-A34",
+      "matchedCount": 5,
+      "totalCount": 8,
+      "matchedIngredients": [
+        "Geranium",
+        "Lemon",
+        "Orange",
+        "Patchouli",
+        "Rosemary"
+      ]
+    },
+    "964": {
+      "title": "Baby Shampoo",
+      "sku": "BJ16-A01",
+      "matchedCount": 4,
+      "totalCount": 4,
+      "matchedIngredients": [
+        "Calendula",
+        "Jasmine",
+        "Petitgrain",
+        "Rosemary"
+      ]
+    },
+    "974": {
+      "title": "Baby Body Lotion",
+      "sku": "BJ16-A24",
+      "matchedCount": 4,
+      "totalCount": 4,
+      "matchedIngredients": [
+        "Avocado",
+        "Calendula",
+        "Olive",
+        "Shea Butter"
+      ]
+    },
+    "1039": {
+      "title": "Emanate Olibanum Citrus Eau de Toilette",
+      "sku": "ML14-A32",
+      "matchedCount": 3,
+      "totalCount": 3,
+      "matchedIngredients": [
+        "Bergamot",
+        "GRAPEFRUIT",
+        "Olibanum"
+      ]
+    },
+    "1044": {
+      "title": "Captivate Tonka Vetiver Eau de Toilette",
+      "sku": "ML14-A33",
+      "matchedCount": 3,
+      "totalCount": 3,
+      "matchedIngredients": [
+        "Cedarwood",
+        "Lavandin",
+        "Vetiver"
+      ]
+    },
+    "2133": {
+      "title": "Bamboo Charcoal Bath Soap",
+      "sku": "BC16-A03",
+      "matchedCount": 4,
+      "totalCount": 4,
+      "matchedIngredients": [
+        "Activated Bamboo Charcoal",
+        "Cedarwood",
+        "Lemongrass",
+        "Rosemary"
+      ]
+    },
+    "2246": {
+      "title": "Coconut Bath Soap",
+      "sku": "CT16-A01",
+      "matchedCount": 5,
+      "totalCount": 5,
+      "matchedIngredients": [
+        "Coconut",
+        "Kokum",
+        "Mango Butter",
+        "Peppermint",
+        "Ylang Ylang"
+      ]
+    },
+    "2260": {
+      "title": "Coconut Body Butter",
+      "sku": "CT16-A82",
+      "matchedCount": 3,
+      "totalCount": 3,
+      "matchedIngredients": [
+        "Cocoa Butter",
+        "Coconut",
+        "Shea Butter"
+      ]
+    },
+    "2289": {
+      "title": "Coconut with Aloe Vera Hair and Body Bar",
+      "sku": "CT16-A65",
+      "matchedCount": 7,
+      "totalCount": 7,
+      "matchedIngredients": [
+        "Aloe Vera",
+        "Avocado",
+        "Coconut",
+        "Olive",
+        "Peppermint",
+        "Shea Butter",
+        "Ylang Ylang"
+      ]
+    },
+    "2294": {
+      "title": "Coconut with Shea Butter Hair and Body Bar",
+      "sku": "CT16-A66",
+      "matchedCount": 5,
+      "totalCount": 6,
+      "matchedIngredients": [
+        "Aloe Vera",
+        "Avocado",
+        "Coconut",
+        "Olive",
+        "Shea Butter"
+      ]
+    },
+    "2394": {
+      "title": "Face Mask",
+      "sku": "TL16-O53",
+      "matchedCount": 3,
+      "totalCount": 4,
+      "matchedIngredients": [
+        "Black Clay",
+        "Kaolin",
+        "Olive"
+      ]
+    },
+    "2402": {
+      "title": "Mango Body Butter",
+      "sku": "TL16-O52",
+      "matchedCount": 3,
+      "totalCount": 3,
+      "matchedIngredients": [
+        "Lemongrass Butter",
+        "Mango Butter",
+        "Shea Butter"
+      ]
+    },
+    "2412": {
+      "title": "Hand Cream",
+      "sku": "TL16-O55",
+      "matchedCount": 3,
+      "totalCount": 3,
+      "matchedIngredients": [
+        "Aloe Vera",
+        "Sesame",
+        "Shea Butter"
+      ]
+    },
+    "2420": {
+      "title": "Foot Cream",
+      "sku": "TL16-O54",
+      "matchedCount": 2,
+      "totalCount": 3,
+      "matchedIngredients": [
+        "Kokum Butter",
+        "Mango Butter"
+      ]
+    },
+    "2427": {
+      "title": "Citrus & Mint Deodorant",
+      "sku": "TL16-O66",
+      "matchedCount": 3,
+      "totalCount": 3,
+      "matchedIngredients": [
+        "Aloe Vera",
+        "Lemon OIl",
+        "Peppermint Oil"
+      ]
+    },
+    "2438": {
+      "title": "Aloe & Calendula Deodorant Spray",
+      "sku": "TL16-O74",
+      "matchedCount": 2,
+      "totalCount": 3,
+      "matchedIngredients": [
+        "Aloe Vera",
+        "Calendula"
+      ]
+    },
+    "2444": {
+      "title": "Lavender & Vinegar Deodorant Spray",
+      "sku": "TL16-O73",
+      "matchedCount": 3,
+      "totalCount": 4,
+      "matchedIngredients": [
+        "Bergamot",
+        "Geranium",
+        "Lavender"
+      ]
+    },
+    "2456": {
+      "title": "Grapefruit Lip Balm",
+      "sku": "TL16-O78",
+      "matchedCount": 4,
+      "totalCount": 4,
+      "matchedIngredients": [
+        "Almond",
+        "Beeswax",
+        "Jojoba",
+        "Shea Butter"
+      ]
+    },
+    "2461": {
+      "title": "Lemon Lip Balm",
+      "sku": "TL16-O79",
+      "matchedCount": 4,
+      "totalCount": 4,
+      "matchedIngredients": [
+        "Almond",
+        "Beeswax",
+        "Jojoba",
+        "Shea Butter"
+      ]
+    },
+    "2465": {
+      "title": "Orange Lip Balm",
+      "sku": "TL16-O80",
+      "matchedCount": 3,
+      "totalCount": 3,
+      "matchedIngredients": [
+        "Beewax",
+        "Jojoba",
+        "Shea Butter"
+      ]
+    },
+    "2508": {
+      "title": "Hair & Scalp Serum",
+      "sku": "TL16-O94",
+      "matchedCount": 4,
+      "totalCount": 4,
+      "matchedIngredients": [
+        "Almond",
+        "Avocado",
+        "Coconut",
+        "Jojoba"
+      ]
+    },
+    "2521": {
+      "title": "Lemongrass Mild Scrub Soap",
+      "sku": "SS16-A82",
+      "matchedCount": 4,
+      "totalCount": 5,
+      "matchedIngredients": [
+        "Coconut",
+        "Lemongrass",
+        "Mango Butter",
+        "Palmarosa"
+      ]
+    },
+    "2530": {
+      "title": "Lavender Mild Scrub Soap",
+      "sku": "SS16-A80",
+      "matchedCount": 6,
+      "totalCount": 6,
+      "matchedIngredients": [
+        "Bergamot",
+        "Coconut",
+        "Geranium",
+        "Lavender",
+        "Mango Butter",
+        "Rosemary"
+      ]
+    },
+    "2536": {
+      "title": "Sandalwood Mild Scrub Soap",
+      "sku": "SS16-A87",
+      "matchedCount": 4,
+      "totalCount": 5,
+      "matchedIngredients": [
+        "Cedarwood",
+        "Coconut",
+        "Mango Butter",
+        "Sandalwood"
+      ]
+    },
+    "2542": {
+      "title": "Rose Mild Scrub Soap",
+      "sku": "SS16-A86",
+      "matchedCount": 4,
+      "totalCount": 4,
+      "matchedIngredients": [
+        "Coconut",
+        "Geranium",
+        "Mango Butter",
+        "Rose"
+      ]
+    },
+    "2543": {
+      "title": "Aloe Vera Mild Scrub Soap",
+      "sku": "SS16-A90",
+      "matchedCount": 6,
+      "totalCount": 8,
+      "matchedIngredients": [
+        "Aloe Vera",
+        "Coconut",
+        "Lavender",
+        "Mango Butter",
+        "Shatavari",
+        "Tea Tree"
+      ]
+    },
+    "2549": {
+      "title": "Neem Scrub Soap",
+      "sku": "SS16-A30",
+      "matchedCount": 4,
+      "totalCount": 7,
+      "matchedIngredients": [
+        "GRAPEFRUIT",
+        "Mango Butter",
+        "Neem",
+        "Palmarosa"
+      ]
+    },
+    "2555": {
+      "title": "Apricot Scrub Soap",
+      "sku": "SS16-A27",
+      "matchedCount": 5,
+      "totalCount": 6,
+      "matchedIngredients": [
+        "Apricot",
+        "Coconut",
+        "Geranium",
+        "Himalayan Cedarwood",
+        "Kokum"
+      ]
+    },
+    "2566": {
+      "title": "Moringa Scrub Soap",
+      "sku": "SS16-A28",
+      "matchedCount": 5,
+      "totalCount": 5,
+      "matchedIngredients": [
+        "Coconut",
+        "Kokum",
+        "Lavender",
+        "Moringa",
+        "Rosemary"
+      ]
+    },
+    "2567": {
+      "title": "Bamboo Charcoal Scrub Soap",
+      "sku": "SS16-A26",
+      "matchedCount": 4,
+      "totalCount": 4,
+      "matchedIngredients": [
+        "Activated Bamboo Charcoal",
+        "Coconut",
+        "Frankincense",
+        "Kokum"
+      ]
+    },
+    "2572": {
+      "title": "Turmeric Scrub Soap",
+      "sku": "SS16-A29",
+      "matchedCount": 3,
+      "totalCount": 4,
+      "matchedIngredients": [
+        "Coconut",
+        "Kokum",
+        "Turmeric"
+      ]
+    },
+    "2730": {
+      "title": "Colibri Lemongrass Body Spray",
+      "sku": "CL16-A03",
+      "matchedCount": 4,
+      "totalCount": 4,
+      "matchedIngredients": [
+        "Himalayan Cedarwood",
+        "Lemongrass",
+        "Neem",
+        "Vetiver"
+      ]
+    },
+    "2734": {
+      "title": "Colibri Lavender Body Spray",
+      "sku": "CL16-A04",
+      "matchedCount": 4,
+      "totalCount": 4,
+      "matchedIngredients": [
+        "Geranium",
+        "Lavender",
+        "Neem",
+        "Vetiver"
+      ]
+    },
+    "2738": {
+      "title": "Colibri Cedarwood Body Spray",
+      "sku": "CL16-A11",
+      "matchedCount": 4,
+      "totalCount": 4,
+      "matchedIngredients": [
+        "Geranium",
+        "Himalayan Cedarwood",
+        "Neem",
+        "Vetiver"
+      ]
+    },
+    "4008": {
+      "title": "Turmeric Serum",
+      "sku": "AY16-B59",
+      "matchedCount": 3,
+      "totalCount": 4,
+      "matchedIngredients": [
+        "Indian Barberry",
+        "Licorice",
+        "Turmeric"
+      ]
+    },
+    "4017": {
+      "title": "Saffron Serum",
+      "sku": "AY16-B56",
+      "matchedCount": 4,
+      "totalCount": 4,
+      "matchedIngredients": [
+        "Avocado",
+        "Grapeseed",
+        "Olive",
+        "Rosehip"
+      ]
+    },
+    "4040": {
+      "title": "Moringa Serum",
+      "sku": "AY16-B58",
+      "matchedCount": 4,
+      "totalCount": 4,
+      "matchedIngredients": [
+        "Almond",
+        "Aloe Vera",
+        "Coconut",
+        "Moringa"
+      ]
+    },
+    "4051": {
+      "title": "Under Eye Serum with Water Lily Extract",
+      "sku": "AY16-B52",
+      "matchedCount": 3,
+      "totalCount": 4,
+      "matchedIngredients": [
+        "Hyaluronic acid",
+        "Quiona",
+        "Water Lily"
+      ]
+    },
+    "4056": {
+      "title": "Under Eye Gel with Aloe Vera",
+      "sku": "AY16-B51",
+      "matchedCount": 2,
+      "totalCount": 4,
+      "matchedIngredients": [
+        "Aloe Vera",
+        "Palmarosa"
+      ]
+    },
+    "4125": {
+      "title": "Clear Mind Aromatherapy Spray",
+      "sku": "AY14-F01",
+      "matchedCount": 4,
+      "totalCount": 4,
+      "matchedIngredients": [
+        "Lemon",
+        "Peppermint",
+        "Petitgrain",
+        "Rosemary"
+      ]
+    },
+    "4129": {
+      "title": "Recharge Aromatherapy Spray",
+      "sku": "AY14-F02",
+      "matchedCount": 4,
+      "totalCount": 4,
+      "matchedIngredients": [
+        "Geranium",
+        "Himalayan Cedarwood",
+        "Lemon",
+        "Peppermint"
+      ]
+    },
+    "4133": {
+      "title": "Stress Away Aromatherapy Spray",
+      "sku": "AY14-F03",
+      "matchedCount": 4,
+      "totalCount": 4,
+      "matchedIngredients": [
+        "Geranium",
+        "Lavender",
+        "Rose",
+        "Sandalwood"
+      ]
+    },
+    "4137": {
+      "title": "Uplifting Aromatherapy Spray",
+      "sku": "AY14-F04",
+      "matchedCount": 4,
+      "totalCount": 4,
+      "matchedIngredients": [
+        "Jasmine",
+        "Lemon",
+        "Orange",
+        "Ylang Ylang"
+      ]
+    },
+    "4143": {
+      "title": "Clear Mind Aromatherapy Bath Salt",
+      "sku": "MS16-E09",
+      "matchedCount": 9,
+      "totalCount": 12,
+      "matchedIngredients": [
+        "Baking Soda",
+        "Basil",
+        "Epsom Salt",
+        "Glauber’s Salt",
+        "Lavender",
+        "Lemon",
+        "Peppermint",
+        "Petitgrain",
+        "Rosemary"
+      ]
+    },
+    "4147": {
+      "title": "Stress Away Aromatherapy Bath Salt",
+      "sku": "MS16-E10",
+      "matchedCount": 10,
+      "totalCount": 13,
+      "matchedIngredients": [
+        "Epsom Salt",
+        "Geranium",
+        "Glauber’s Salt",
+        "Himalayan Cedarwood",
+        "Lavender",
+        "Palmarosa",
+        "Patchouli",
+        "Rose",
+        "Sandalwood",
+        "Sodium Bicarbonate"
+      ]
+    },
+    "4150": {
+      "title": "Recharge Aromatherapy Bath Salt",
+      "sku": "MS16-E12",
+      "matchedCount": 10,
+      "totalCount": 14,
+      "matchedIngredients": [
+        "Baking Soda",
+        "Basil",
+        "Epsom Salt",
+        "Geranium",
+        "Glauber’s Salt",
+        "Himalayan Cedarwood",
+        "Lavender",
+        "Lemon",
+        "Orange",
+        "Peppermint"
+      ]
+    },
+    "4153": {
+      "title": "Uplifting Aromatherapy Bath Salt",
+      "sku": "MS16-E11",
+      "matchedCount": 11,
+      "totalCount": 12,
+      "matchedIngredients": [
+        "Baking Soda",
+        "Basil",
+        "Epsom Salt",
+        "Glauber’s Salt",
+        "Jasmine",
+        "Lemon",
+        "Orange",
+        "Peppermint",
+        "Petitgrain",
+        "Rosemary",
+        "Ylang Ylang"
+      ]
+    },
+    "5490": {
+      "title": "Soothing Massage Oil",
+      "sku": "TL16-A53",
+      "matchedCount": 6,
+      "totalCount": 8,
+      "matchedIngredients": [
+        "Coconut",
+        "Cypress",
+        "Grapeseed",
+        "Lavender",
+        "Lemon",
+        "Spearmint"
+      ]
+    },
+    "5508": {
+      "title": "Nurture Massage Oil",
+      "sku": "TL16-A55",
+      "matchedCount": 8,
+      "totalCount": 15,
+      "matchedIngredients": [
+        "Apricot",
+        "Frankincense",
+        "GRAPEFRUIT",
+        "Grapeseed",
+        "Lavender",
+        "Patchouli",
+        "Sesame",
+        "Turmeric"
+      ]
+    },
+    "5528": {
+      "title": "Relaxing Massage Oil",
+      "sku": "TL16-A58",
+      "matchedCount": 6,
+      "totalCount": 14,
+      "matchedIngredients": [
+        "Ajowan",
+        "Apricot",
+        "Grapeseed",
+        "Lemongrass",
+        "Rosemary",
+        "Sesame"
+      ]
+    },
+    "5533": {
+      "title": "Serene Massage Oil",
+      "sku": "TL16-A59",
+      "matchedCount": 11,
+      "totalCount": 11,
+      "matchedIngredients": [
+        "Apricot",
+        "Geranium",
+        "Grapeseed",
+        "Lemon",
+        "Palmarosa",
+        "Patchouli",
+        "Peppermint",
+        "Rose",
+        "Sesame",
+        "Tea Tree",
+        "Ylang Ylang"
+      ]
+    },
+    "8679": {
+      "title": "Rose Body Lotion",
+      "sku": "",
+      "matchedCount": 6,
+      "totalCount": 6,
+      "matchedIngredients": [
+        "Cocoa",
+        "Geranium",
+        "Pomegranate",
+        "Rose",
+        "Sesame",
+        "Ylang Ylang"
+      ]
+    },
+    "8681": {
+      "title": "Lavender Body Lotion",
+      "sku": "",
+      "matchedCount": 6,
+      "totalCount": 6,
+      "matchedIngredients": [
+        "Bergamot",
+        "Geranium",
+        "Lavender",
+        "Rosemary",
+        "Sesame",
+        "Shea Butter"
+      ]
+    },
+    "8901": {
+      "title": "Tonka Vetiver Men's Deodorant - Captivate",
+      "sku": "ML16-D73",
+      "matchedCount": 4,
+      "totalCount": 4,
+      "matchedIngredients": [
+        "Aloe Vera",
+        "Coconut",
+        "Himalayan Cedarwood",
+        "Lavandin"
+      ]
+    },
+    "8908": {
+      "title": "Orange Patchouli Men's Deodorant - Intrigue",
+      "sku": "ML16-D74",
+      "matchedCount": 4,
+      "totalCount": 4,
+      "matchedIngredients": [
+        "Aloe Vera",
+        "Coconut",
+        "Himalayan Cedarwood",
+        "Lavandin"
+      ]
+    },
+    "9042": {
+      "title": "Aloe Vera and Calendula Deodorant",
+      "sku": "TL16-O27",
+      "matchedCount": 3,
+      "totalCount": 3,
+      "matchedIngredients": [
+        "Aloe Vera",
+        "Calendula",
+        "Coconut"
+      ]
+    },
+    "9054": {
+      "title": "Rose and Pomegranate Deodorant",
+      "sku": "TL16-O28",
+      "matchedCount": 3,
+      "totalCount": 3,
+      "matchedIngredients": [
+        "Aloe Vera",
+        "Coconut",
+        "Pomegranate"
+      ]
+    },
+    "9280": {
+      "title": "Under Eye Serum with Coffee Extract",
+      "sku": "AY16-B61",
+      "matchedCount": 3,
+      "totalCount": 4,
+      "matchedIngredients": [
+        "Aloe Vera",
+        "Olive",
+        "Organic Coffee"
+      ]
+    },
+    "9573": {
+      "title": "Face Scrub",
+      "sku": "TL16-O13",
+      "matchedCount": 3,
+      "totalCount": 4,
+      "matchedIngredients": [
+        "Almond",
+        "Aloe Vera",
+        "Sesame"
+      ]
+    },
+    "10353": {
+      "title": "Orange Patchouli Men’s Beard Oil",
+      "sku": "ML16-D46",
+      "matchedCount": 3,
+      "totalCount": 4,
+      "matchedIngredients": [
+        "Coconut",
+        "Orange",
+        "Patchouli"
+      ]
+    },
+    "10360": {
+      "title": "Tonka Vetiver Men’s Beard Oil",
+      "sku": "ML16-D45",
+      "matchedCount": 4,
+      "totalCount": 4,
+      "matchedIngredients": [
+        "Coconut",
+        "Jojoba",
+        "Tonka Bean",
+        "Vetiver"
+      ]
+    },
+    "11648": {
+      "title": "Bamboo Charcoal Shampoo with Hibiscus Flower Extract",
+      "sku": "",
+      "matchedCount": 4,
+      "totalCount": 4,
+      "matchedIngredients": [
+        "Activated Bamboo Charcoal",
+        "Hibiscus",
+        "Himalayan Cedarwood",
+        "Olive"
+      ]
+    },
+    "11652": {
+      "title": "Bamboo Charcoal Shower Gel",
+      "sku": "",
+      "matchedCount": 5,
+      "totalCount": 5,
+      "matchedIngredients": [
+        "Activated Bamboo Charcoal",
+        "Cedarwood",
+        "Hibiscus",
+        "Olibanum",
+        "Patchouli"
+      ]
+    },
+    "11656": {
+      "title": "Bamboo Charcoal Conditioner with Hibiscus Flower Extract",
+      "sku": "",
+      "matchedCount": 10,
+      "totalCount": 16,
+      "matchedIngredients": [
+        "Activated Bamboo Charcoal",
+        "Basil",
+        "Hibiscus",
+        "Himalayan Cedarwood",
+        "Lemon",
+        "Olibanum",
+        "Olive",
+        "Patchouli",
+        "Rosemary",
+        "Sesame"
+      ]
+    },
+    "11660": {
+      "title": "Coconut Conditioner with Aloe Vera Extract",
+      "sku": "",
+      "matchedCount": 4,
+      "totalCount": 4,
+      "matchedIngredients": [
+        "Aloe Vera",
+        "Coconut",
+        "Jojoba",
+        "Olive"
+      ]
+    },
+    "11664": {
+      "title": "Coconut Shampoo with Aloe Vera Extract",
+      "sku": "",
+      "matchedCount": 4,
+      "totalCount": 4,
+      "matchedIngredients": [
+        "Aloe Vera",
+        "Coconut",
+        "Peppermint",
+        "Ylang Ylang"
+      ]
+    },
+    "11668": {
+      "title": "Coconut Shower Gel",
+      "sku": "",
+      "matchedCount": 4,
+      "totalCount": 5,
+      "matchedIngredients": [
+        "Aloe Vera",
+        "Coconut",
+        "Peppermint",
+        "Ylang Ylang"
+      ]
+    },
+    "11672": {
+      "title": "Lavender Conditioner with Rosemary Extract",
+      "sku": "",
+      "matchedCount": 8,
+      "totalCount": 9,
+      "matchedIngredients": [
+        "Bergamot",
+        "Fenugreek",
+        "Geranium",
+        "Lavender",
+        "Olive",
+        "Rosemary",
+        "Sesame",
+        "Shea Butter"
+      ]
+    },
+    "11676": {
+      "title": "Lavender Shampoo with Rosemary Extract",
+      "sku": "",
+      "matchedCount": 5,
+      "totalCount": 5,
+      "matchedIngredients": [
+        "Bergamot",
+        "Fenugreek",
+        "Geranium",
+        "Lavender",
+        "Rosemary"
+      ]
+    },
+    "11680": {
+      "title": "Lavender Shower Gel",
+      "sku": "",
+      "matchedCount": 4,
+      "totalCount": 4,
+      "matchedIngredients": [
+        "Bergamot",
+        "Geranium",
+        "Lavender",
+        "Rosemary"
+      ]
+    },
+    "11684": {
+      "title": "Rose Conditioner with Pomegranate Extract",
+      "sku": "",
+      "matchedCount": 3,
+      "totalCount": 4,
+      "matchedIngredients": [
+        "Cocoa",
+        "Rose",
+        "Sesame"
+      ]
+    },
+    "11688": {
+      "title": "Rose Shampoo with Pomegranate Extract",
+      "sku": "",
+      "matchedCount": 3,
+      "totalCount": 4,
+      "matchedIngredients": [
+        "Coconut",
+        "Pomegranate",
+        "Rose"
+      ]
+    },
+    "11692": {
+      "title": "Rose Shower Gel",
+      "sku": "",
+      "matchedCount": 4,
+      "totalCount": 4,
+      "matchedIngredients": [
+        "Cocoa",
+        "Geranium",
+        "Pomegranate",
+        "Rose"
+      ]
+    },
+    "11742": {
+      "title": "Stress Away Massage Oil",
+      "sku": "TL16-A61",
+      "matchedCount": 9,
+      "totalCount": 13,
+      "matchedIngredients": [
+        "Apricot",
+        "Geranium",
+        "Grapeseed",
+        "Himalayan Cedarwood",
+        "Palmarosa",
+        "Patchouli",
+        "Rose",
+        "Sandalwood",
+        "Sesame"
+      ]
+    },
+    "11744": {
+      "title": "Recharge Massage Oil",
+      "sku": "TL16-A63",
+      "matchedCount": 3,
+      "totalCount": 3,
+      "matchedIngredients": [
+        "Lavender",
+        "Peppermint",
+        "Sesame"
+      ]
+    },
+    "12173": {
+      "title": "Delight Aromatherapy Roll-On Perfume",
+      "sku": "MS14-B02",
+      "matchedCount": 2,
+      "totalCount": 4,
+      "matchedIngredients": [
+        "Bitter Orange",
+        "Grapeseed"
+      ]
+    },
+    "12202": {
+      "title": "Serene Aromatherapy Roll-On Perfume",
+      "sku": "MS14-B06",
+      "matchedCount": 4,
+      "totalCount": 4,
+      "matchedIngredients": [
+        "Bergamot",
+        "Lavandin",
+        "Sandalwood",
+        "Vetiver"
+      ]
+    },
+    "12730": {
+      "title": "Cedar Lavender Shaving Foam",
+      "sku": "ML16-D43",
+      "matchedCount": 2,
+      "totalCount": 2,
+      "matchedIngredients": [
+        "Himalayan Cedarwood",
+        "Lavender"
+      ]
+    },
+    "15013": {
+      "title": "Mystical Sandal Ambient Perfume - 10ml",
+      "sku": "EA14-B20",
+      "matchedCount": 2,
+      "totalCount": 3,
+      "matchedIngredients": [
+        "Cedarwood",
+        "Lemon"
+      ]
+    },
+    "19142": {
+      "title": "Colibri Roll-On & Spray Set",
+      "sku": "Cl16-A13",
+      "matchedCount": 4,
+      "totalCount": 4,
+      "matchedIngredients": [
+        "Aloe Vera",
+        "Cedarwood",
+        "Lavender",
+        "Lemongrass"
+      ]
+    },
+    "20878": {
+      "title": "Rose Hair Oil with Amla and Hibiscus Flower Extract",
+      "sku": "TL16-B38",
+      "matchedCount": 4,
+      "totalCount": 8,
+      "matchedIngredients": [
+        "Coconut",
+        "Geranium",
+        "Hibiscus",
+        "Rose"
+      ]
+    },
+    "20879": {
+      "title": "Cedarwood Hair Oil with Aloe Butter and Brahmi Extract",
+      "sku": "TL16-B40",
+      "matchedCount": 4,
+      "totalCount": 7,
+      "matchedIngredients": [
+        "Aloe Vera",
+        "Coconut",
+        "Himalayan Cedarwood",
+        "Shatavari"
+      ]
+    },
+    "20880": {
+      "title": "Lavender Hair Oil with Rosemary and Amla Oil",
+      "sku": "TL16-B37",
+      "matchedCount": 5,
+      "totalCount": 6,
+      "matchedIngredients": [
+        "Coconut",
+        "Himalayan Cedarwood",
+        "Lavender",
+        "Rosemary",
+        "Sesame"
+      ]
+    },
+    "20881": {
+      "title": "Lavender Body Oil",
+      "sku": "TL16-S38",
+      "matchedCount": 4,
+      "totalCount": 4,
+      "matchedIngredients": [
+        "Apricot",
+        "Bergamot",
+        "Geranium",
+        "Lavender"
+      ]
+    },
+    "20882": {
+      "title": "Rose Body Oil",
+      "sku": "TL16-S39",
+      "matchedCount": 4,
+      "totalCount": 4,
+      "matchedIngredients": [
+        "Apricot",
+        "Geranium",
+        "Rose",
+        "Ylang Ylang"
+      ]
+    },
+    "20883": {
+      "title": "Sandalwood Body Oil",
+      "sku": "TL16-S36",
+      "matchedCount": 4,
+      "totalCount": 4,
+      "matchedIngredients": [
+        "Almond",
+        "Basil",
+        "Sandalwood",
+        "Turmeric"
+      ]
+    },
+    "20884": {
+      "title": "Cedarwood Body Oil",
+      "sku": "TL16-S40",
+      "matchedCount": 4,
+      "totalCount": 4,
+      "matchedIngredients": [
+        "Aloe Vera",
+        "Apricot",
+        "Grapeseed",
+        "Himalayan Cedarwood"
+      ]
+    },
+    "21421": {
+      "title": "Tea Tree Shower Gel",
+      "sku": "",
+      "matchedCount": 4,
+      "totalCount": 4,
+      "matchedIngredients": [
+        "Calendula",
+        "Lavender",
+        "Rosemary",
+        "Tea Tree"
+      ]
+    },
+    "21425": {
+      "title": "Peach Blossom Shower Gel",
+      "sku": "",
+      "matchedCount": 4,
+      "totalCount": 4,
+      "matchedIngredients": [
+        "Aloe Vera",
+        "Coconut",
+        "Lemon",
+        "Tonka Bean"
+      ]
+    },
+    "21639": {
+      "title": "Cedar Lavender 3 in 1 Shower Gel",
+      "sku": "ML16-D47",
+      "matchedCount": 5,
+      "totalCount": 6,
+      "matchedIngredients": [
+        "Calendula",
+        "Cedarwood",
+        "Geranium",
+        "Lavender",
+        "Rosemary"
+      ]
+    },
+    "21830": {
+      "title": "Summer Berries Deodorant",
+      "sku": "TL16-O29",
+      "matchedCount": 3,
+      "totalCount": 3,
+      "matchedIngredients": [
+        "Aloe Vera",
+        "Coconut",
+        "Sodium Bicarbonate"
+      ]
+    },
+    "21831": {
+      "title": "Strawberry Blush Deodorant",
+      "sku": "TL16-O30",
+      "matchedCount": 3,
+      "totalCount": 3,
+      "matchedIngredients": [
+        "Aloe Vera",
+        "Coconut",
+        "Sodium Bicarbonate"
+      ]
+    },
+    "21832": {
+      "title": "Peach Blossom Deodorant",
+      "sku": "TL16-O32",
+      "matchedCount": 3,
+      "totalCount": 3,
+      "matchedIngredients": [
+        "Aloe Vera",
+        "Coconut",
+        "Sodium Bicarbonate"
+      ]
+    },
+    "21833": {
+      "title": "Cherry Blossom Deodorant",
+      "sku": "TL16-O31",
+      "matchedCount": 4,
+      "totalCount": 4,
+      "matchedIngredients": [
+        "Aloe Vera",
+        "Bergamot",
+        "Coconut",
+        "Geranium"
+      ]
+    },
+    "25008": {
+      "title": "Turmeric Night Cream",
+      "sku": "AY16-B27",
+      "matchedCount": 3,
+      "totalCount": 4,
+      "matchedIngredients": [
+        "Pomegranate",
+        "Sesame",
+        "Turmeric"
+      ]
+    },
+    "25009": {
+      "title": "Turmeric Day Cream",
+      "sku": "AY16-B26",
+      "matchedCount": 2,
+      "totalCount": 4,
+      "matchedIngredients": [
+        "Coconut",
+        "Turmeric"
+      ]
+    },
+    "25010": {
+      "title": "Coconut Day Cream",
+      "sku": "CT16-A31",
+      "matchedCount": 3,
+      "totalCount": 4,
+      "matchedIngredients": [
+        "Coconut",
+        "Kokum",
+        "Olive"
+      ]
+    },
+    "25011": {
+      "title": "Coconut Night Cream",
+      "sku": "CT16-A32",
+      "matchedCount": 4,
+      "totalCount": 4,
+      "matchedIngredients": [
+        "Almond",
+        "Aloe Vera",
+        "Avocado",
+        "Coconut"
+      ]
+    },
+    "25012": {
+      "title": "Sun Screen Day Cream with SPF 30",
+      "sku": "TL16-O05",
+      "matchedCount": 3,
+      "totalCount": 4,
+      "matchedIngredients": [
+        "Lavender",
+        "Mandarine",
+        "Olive"
+      ]
+    },
+    "25013": {
+      "title": "Retinol Night Cream",
+      "sku": "TL16-O06",
+      "matchedCount": 1,
+      "totalCount": 3,
+      "matchedIngredients": [
+        "Almond"
+      ]
+    },
+    "25719": {
+      "title": "Ultra Wide Spectrum Face Sunscreen SPF 50 PA+++",
+      "sku": "AY16B54",
+      "matchedCount": 2,
+      "totalCount": 3,
+      "matchedIngredients": [
+        "Aloe Vera",
+        "Turmeric"
+      ]
+    },
+    "26246": {
+      "title": "Tea Tree Conditioner with Lavender Extract",
+      "sku": "",
+      "matchedCount": 8,
+      "totalCount": 9,
+      "matchedIngredients": [
+        "Aloe Vera",
+        "Calendula",
+        "Hibiscus",
+        "Lavender",
+        "Olive",
+        "Rosemary",
+        "Sesame",
+        "Tea Tree"
+      ]
+    },
+    "991380": {
+      "title": "Sun Stick SPF 45  PA+++",
+      "sku": "TL16-O33",
+      "matchedCount": 3,
+      "totalCount": 4,
+      "matchedIngredients": [
+        "Cocoa Butter",
+        "Coconut",
+        "Mango Butter"
+      ]
+    },
+    "991696": {
+      "title": "Olibanum Citrus 2-in-1 Hair and Body Wash for Men",
+      "sku": "ML16-C12",
+      "matchedCount": 5,
+      "totalCount": 5,
+      "matchedIngredients": [
+        "Coconut",
+        "Mint",
+        "Olibanum",
+        "Orange",
+        "Rosemary"
+      ]
+    },
+    "991700": {
+      "title": "Cedar Lavender 2-in-1 Hair and Body Wash for Men",
+      "sku": "ML16-C11",
+      "matchedCount": 5,
+      "totalCount": 5,
+      "matchedIngredients": [
+        "Coconut",
+        "Fenugreek",
+        "Henna Leaf",
+        "Himalayan Cedarwood",
+        "Lavandin"
+      ]
+    },
+    "991835": {
+      "title": "Colibri Lemongrass Solid Stick",
+      "sku": "CL16-A25",
+      "matchedCount": 5,
+      "totalCount": 5,
+      "matchedIngredients": [
+        "Coconut",
+        "Himalayan Cedarwood",
+        "Lemongrass",
+        "Neem",
+        "Vetiver"
+      ]
+    },
+    "1000354": {
+      "title": "Coconut Soap Bar with Coconut Scrub & Mango Butter",
+      "sku": "CT16-A03",
+      "matchedCount": 5,
+      "totalCount": 5,
+      "matchedIngredients": [
+        "Coconut",
+        "Kokum",
+        "Lavender",
+        "Moringa",
+        "Rosemary"
+      ]
+    },
+    "1000382": {
+      "title": "Lemongrass Soap Bar with Mango Butter",
+      "sku": "TL16-P04",
+      "matchedCount": 5,
+      "totalCount": 5,
+      "matchedIngredients": [
+        "Coconut",
+        "Kokum",
+        "Lavender",
+        "Moringa",
+        "Rosemary"
+      ]
+    },
+    "1000388": {
+      "title": "Mint Soap Bar with Mango Butter",
+      "sku": "TL16-P05",
+      "matchedCount": 5,
+      "totalCount": 5,
+      "matchedIngredients": [
+        "Coconut",
+        "Kokum",
+        "Lavender",
+        "Moringa",
+        "Rosemary"
+      ]
+    },
+    "1000389": {
+      "title": "Rose Soap Bar with Mango Butter",
+      "sku": "TL16-P07",
+      "matchedCount": 5,
+      "totalCount": 5,
+      "matchedIngredients": [
+        "Coconut",
+        "Kokum",
+        "Lavender",
+        "Moringa",
+        "Rosemary"
+      ]
+    },
+    "1000392": {
+      "title": "Sesame Soap Bar with Sesame Scrub & Mango Butter",
+      "sku": "TL16-P12",
+      "matchedCount": 5,
+      "totalCount": 5,
+      "matchedIngredients": [
+        "Coconut",
+        "Kokum",
+        "Lavender",
+        "Moringa",
+        "Rosemary"
+      ]
+    },
+    "1001092": {
+      "title": "Golden Amber Roll On/Perfume Oil",
+      "sku": "",
+      "matchedCount": 1,
+      "totalCount": 3,
+      "matchedIngredients": [
+        "Orange"
+      ]
+    },
+    "1001225": {
+      "title": "Peach Blossom Shampoo with Aloe Vera Extract",
+      "sku": "",
+      "matchedCount": 4,
+      "totalCount": 4,
+      "matchedIngredients": [
+        "Aloe Vera",
+        "Coconut",
+        "Lemon",
+        "Tonka Bean"
+      ]
+    },
+    "1001226": {
+      "title": "Peach Blossom Conditioner",
+      "sku": "",
+      "matchedCount": 4,
+      "totalCount": 4,
+      "matchedIngredients": [
+        "Aloe Vera",
+        "Coconut",
+        "Lemon",
+        "Tonka Bean"
+      ]
+    },
+    "1001227": {
+      "title": "Peach Blossom Body Lotion",
+      "sku": "",
+      "matchedCount": 4,
+      "totalCount": 4,
+      "matchedIngredients": [
+        "Aloe Vera",
+        "Coconut",
+        "Lemon",
+        "Tonka Bean"
+      ]
+    },
+    "1001739": {
+      "title": "Neem Shikakai Shampoo",
+      "sku": "TL16-F53",
+      "matchedCount": 4,
+      "totalCount": 4,
+      "matchedIngredients": [
+        "Aloe Vera",
+        "Coconut",
+        "Lemon",
+        "Tonka Bean"
+      ]
+    },
+    "1001762": {
+      "title": "Neem Shikakai Conditioner",
+      "sku": "TL16-K77",
+      "matchedCount": 4,
+      "totalCount": 4,
+      "matchedIngredients": [
+        "Aloe Vera",
+        "Coconut",
+        "Lemon",
+        "Tonka Bean"
+      ]
+    },
+    "1001764": {
+      "title": "Neem Shikakai Shower Gel",
+      "sku": "TL16-L78",
+      "matchedCount": 4,
+      "totalCount": 4,
+      "matchedIngredients": [
+        "Aloe Vera",
+        "Coconut",
+        "Lemon",
+        "Tonka Bean"
+      ]
+    },
+    "1001766": {
+      "title": "Aloe Vera Hibiscus Shower Gel",
+      "sku": "TL16-L76",
+      "matchedCount": 4,
+      "totalCount": 4,
+      "matchedIngredients": [
+        "Aloe Vera",
+        "Coconut",
+        "Lemon",
+        "Tonka Bean"
+      ]
+    },
+    "1001767": {
+      "title": "Aloe Vera Hibiscus Conditioner",
+      "sku": "TL16-K75",
+      "matchedCount": 4,
+      "totalCount": 4,
+      "matchedIngredients": [
+        "Aloe Vera",
+        "Coconut",
+        "Lemon",
+        "Tonka Bean"
+      ]
+    },
+    "1001768": {
+      "title": "Aloe Vera Hibiscus Shampoo",
+      "sku": "TL16-F51",
+      "matchedCount": 4,
+      "totalCount": 4,
+      "matchedIngredients": [
+        "Aloe Vera",
+        "Coconut",
+        "Lemon",
+        "Tonka Bean"
+      ]
+    },
+    "1001772": {
+      "title": "Moringa Lime Shampoo",
+      "sku": "TL16-F52",
+      "matchedCount": 4,
+      "totalCount": 4,
+      "matchedIngredients": [
+        "Aloe Vera",
+        "Coconut",
+        "Lemon",
+        "Tonka Bean"
+      ]
+    },
+    "1001773": {
+      "title": "Moringa Lime Conditioner",
+      "sku": "TL16-K76",
+      "matchedCount": 4,
+      "totalCount": 4,
+      "matchedIngredients": [
+        "Aloe Vera",
+        "Coconut",
+        "Lemon",
+        "Tonka Bean"
+      ]
+    },
+    "1001774": {
+      "title": "Moringa Lime Shower Gel",
+      "sku": "TL16-L77",
+      "matchedCount": 4,
+      "totalCount": 4,
+      "matchedIngredients": [
+        "Aloe Vera",
+        "Coconut",
+        "Lemon",
+        "Tonka Bean"
+      ]
+    },
+    "1001937": {
+      "title": "Desert Blooms Roll On/Perfume Oil",
+      "sku": "",
+      "matchedCount": 3,
+      "totalCount": 3,
+      "matchedIngredients": [
+        "Mandarin",
+        "Patchouli",
+        "Rosemary"
+      ]
+    },
+    "1003683": {
+      "title": "Radiant Turmeric Day Complex Face Cream",
+      "sku": "TL16-H02",
+      "matchedCount": 4,
+      "totalCount": 9,
+      "matchedIngredients": [
+        "Coconut",
+        "Licorice",
+        "Shatavari",
+        "Turmeric"
+      ]
+    },
+    "1003686": {
+      "title": "Radiant Turmeric Night Complex Face Cream",
+      "sku": "TL16-H01",
+      "matchedCount": 4,
+      "totalCount": 8,
+      "matchedIngredients": [
+        "Almond",
+        "Jojoba",
+        "Pomegranate",
+        "Turmeric"
+      ]
+    },
+    "1003691": {
+      "title": "Coco Essence Night Complex Face Cream",
+      "sku": "TL16-H03",
+      "matchedCount": 2,
+      "totalCount": 3,
+      "matchedIngredients": [
+        "Apricot",
+        "Hyaluronic acid"
+      ]
+    },
+    "1003698": {
+      "title": "Retinol Renewal Night Complex Face Cream",
+      "sku": "TL16-H05",
+      "matchedCount": 1,
+      "totalCount": 4,
+      "matchedIngredients": [
+        "Water Lily"
+      ]
+    },
+    "1003700": {
+      "title": "Saffron Elixir Serum",
+      "sku": "TL16-H21",
+      "matchedCount": 3,
+      "totalCount": 5,
+      "matchedIngredients": [
+        "Aloe Vera",
+        "Hyaluronic acid",
+        "Water Lily"
+      ]
+    },
+    "1003711": {
+      "title": "Hydra Glow Elixir Serum",
+      "sku": "TL16-H22",
+      "matchedCount": 5,
+      "totalCount": 8,
+      "matchedIngredients": [
+        "Aloe Vera",
+        "Hyaluronic acid",
+        "Licorice",
+        "Rose",
+        "Turmeric"
+      ]
+    },
+    "1004142": {
+      "title": "Sandalwood Shampoo - 100ml",
+      "sku": "TL16-T41",
+      "matchedCount": 5,
+      "totalCount": 8,
+      "matchedIngredients": [
+        "Coconut",
+        "Himalayan Cedarwood",
+        "Kokum",
+        "Sandalwood",
+        "Turmeric"
+      ]
+    },
+    "1004145": {
+      "title": "Himalayan Cedarwood Conditioner - 100ml",
+      "sku": "TL16-T25",
+      "matchedCount": 4,
+      "totalCount": 8,
+      "matchedIngredients": [
+        "Calendula",
+        "Himalayan Cedarwood",
+        "Olive",
+        "Sesame"
+      ]
+    },
+    "1004146": {
+      "title": "Himalayan Cedarwood Shampoo - 100ml",
+      "sku": "TL16-T45",
+      "matchedCount": 2,
+      "totalCount": 5,
+      "matchedIngredients": [
+        "Calendula",
+        "Himalayan Cedarwood"
+      ]
+    },
+    "1004150": {
+      "title": "Sandalwood Conditioner - 100ml",
+      "sku": "TL16-T21",
+      "matchedCount": 5,
+      "totalCount": 9,
+      "matchedIngredients": [
+        "Himalayan Cedarwood",
+        "Olive",
+        "Sandalwood",
+        "Sesame",
+        "Turmeric"
+      ]
+    },
+    "1004153": {
+      "title": "Himalayan Cedarwood Shower Gel - 100ml",
+      "sku": "TL16-T55",
+      "matchedCount": 4,
+      "totalCount": 4,
+      "matchedIngredients": [
+        "Bergamot",
+        "Geranium",
+        "Lavender",
+        "Rosemary"
+      ]
+    },
+    "1004155": {
+      "title": "Sandalwood Shower Gel - 100ml",
+      "sku": "TL16-T51",
+      "matchedCount": 4,
+      "totalCount": 4,
+      "matchedIngredients": [
+        "Bergamot",
+        "Geranium",
+        "Lavender",
+        "Rosemary"
+      ]
+    },
+    "1004587": {
+      "title": "Face Mask with Multani Mitti and Kaolin Clay",
+      "sku": "TL16-G03",
+      "matchedCount": 2,
+      "totalCount": 3,
+      "matchedIngredients": [
+        "Kaolin",
+        "Rosemary"
+      ]
+    },
+    "1004626": {
+      "title": "Nurture Aromatherapy Roll-On Perfume",
+      "sku": "MS14-B05",
+      "matchedCount": 3,
+      "totalCount": 4,
+      "matchedIngredients": [
+        "Bergamot",
+        "Geranium",
+        "Grapeseed"
+      ]
+    },
+    "1004628": {
+      "title": "Inspire Aromatherapy Roll-On Perfume",
+      "sku": "MS14-B04",
+      "matchedCount": 4,
+      "totalCount": 4,
+      "matchedIngredients": [
+        "GRAPEFRUIT",
+        "Grapeseed",
+        "Palmarosa",
+        "Ylang Ylang"
+      ]
+    },
+    "1004630": {
+      "title": "Bliss Aromatherapy Roll-On Perfume",
+      "sku": "MS14-B01",
+      "matchedCount": 3,
+      "totalCount": 4,
+      "matchedIngredients": [
+        "Grapeseed",
+        "Orange",
+        "Patchouli"
+      ]
+    },
+    "1004632": {
+      "title": "Recharge Aromatherapy Roll-On Perfume",
+      "sku": "MS14-B07",
+      "matchedCount": 4,
+      "totalCount": 4,
+      "matchedIngredients": [
+        "Basil",
+        "Geranium",
+        "Lavender",
+        "Orange"
+      ]
+    },
+    "1004634": {
+      "title": "Dream Aromatherapy Roll-On Perfume",
+      "sku": "MS14-B03",
+      "matchedCount": 2,
+      "totalCount": 5,
+      "matchedIngredients": [
+        "Grapeseed",
+        "Lavender"
+      ]
+    },
+    "1004636": {
+      "title": "Stress Away Aromatherapy Roll-On Perfume",
+      "sku": "MS14-B08",
+      "matchedCount": 4,
+      "totalCount": 4,
+      "matchedIngredients": [
+        "Grapeseed",
+        "Palmarosa",
+        "Rose",
+        "Sandalwood"
+      ]
+    },
+    "1004640": {
+      "title": "Orange Patchouli Men’s Perfume",
+      "sku": "ML14-A04",
+      "matchedCount": 2,
+      "totalCount": 2,
+      "matchedIngredients": [
+        "Orange",
+        "Patchouli"
+      ]
+    },
+    "1004642": {
+      "title": "Tonka Vetiver Men's Perfume",
+      "sku": "ML14-A03",
+      "matchedCount": 2,
+      "totalCount": 2,
+      "matchedIngredients": [
+        "Tonka Bean",
+        "Vetiver"
+      ]
+    },
+    "1004644": {
+      "title": "Olibanum Citrus Men's Perfume",
+      "sku": "ML14-A02",
+      "matchedCount": 1,
+      "totalCount": 1,
+      "matchedIngredients": [
+        "Olibanum"
+      ]
+    },
+    "1004646": {
+      "title": "Strawberry Blush Roll On/Perfume Oil",
+      "sku": "",
+      "matchedCount": 3,
+      "totalCount": 3,
+      "matchedIngredients": [
+        "Lavandin",
+        "Palmarosa",
+        "Sweet Orange"
+      ]
+    },
+    "1004650": {
+      "title": "Cranberry Mist Roll On/Perfume Oil",
+      "sku": "",
+      "matchedCount": 2,
+      "totalCount": 3,
+      "matchedIngredients": [
+        "Orange",
+        "Vanilla"
+      ]
+    },
+    "1004655": {
+      "title": "Summer Berries Roll On/Perfume Oil",
+      "sku": "",
+      "matchedCount": 2,
+      "totalCount": 3,
+      "matchedIngredients": [
+        "Orange",
+        "Vanilla"
+      ]
+    },
+    "1004659": {
+      "title": "Exotic Patchouli Roll On/Perfume Oil",
+      "sku": "",
+      "matchedCount": 2,
+      "totalCount": 3,
+      "matchedIngredients": [
+        "Himalayan Cedarwood",
+        "Patchouli"
+      ]
+    },
+    "1004663": {
+      "title": "Winter Musk Roll On/Perfume Oil",
+      "sku": "",
+      "matchedCount": 3,
+      "totalCount": 3,
+      "matchedIngredients": [
+        "Jasmine",
+        "Patchouli",
+        "Vetiver"
+      ]
+    },
+    "1004667": {
+      "title": "Spring Rose Roll On/Perfume Oil",
+      "sku": "",
+      "matchedCount": 3,
+      "totalCount": 3,
+      "matchedIngredients": [
+        "Geranium",
+        "Petitgrain",
+        "Rose"
+      ]
+    },
+    "1004671": {
+      "title": "Night Blossom Roll On/Perfume Oil",
+      "sku": "",
+      "matchedCount": 2,
+      "totalCount": 3,
+      "matchedIngredients": [
+        "Olibanum",
+        "Rose"
+      ]
+    },
+    "1004675": {
+      "title": "Wild Pomegranate Roll On/Perfume Oil",
+      "sku": "",
+      "matchedCount": 1,
+      "totalCount": 3,
+      "matchedIngredients": [
+        "Tonka Bean"
+      ]
+    },
+    "1004679": {
+      "title": "Vanilla Passion Roll On/Perfume Oil",
+      "sku": "",
+      "matchedCount": 1,
+      "totalCount": 3,
+      "matchedIngredients": [
+        "Vanilla"
+      ]
+    },
+    "1004683": {
+      "title": "Opium Flower Roll On/Perfume Oil",
+      "sku": "",
+      "matchedCount": 3,
+      "totalCount": 3,
+      "matchedIngredients": [
+        "Himalayan Cedarwood",
+        "Mandarin",
+        "Patchouli"
+      ]
+    },
+    "1004687": {
+      "title": "Mystical Sandal Roll On/Perfume Oil",
+      "sku": "",
+      "matchedCount": 2,
+      "totalCount": 3,
+      "matchedIngredients": [
+        "Cedarwood",
+        "Lemon"
+      ]
+    },
+    "1004691": {
+      "title": "Cherry Blossom Roll On/Perfume Oil",
+      "sku": "",
+      "matchedCount": 3,
+      "totalCount": 3,
+      "matchedIngredients": [
+        "Bergamot",
+        "Geranium",
+        "Tonka Bean"
+      ]
+    },
+    "1004695": {
+      "title": "Night Jasmine Roll On/Perfume Oil",
+      "sku": "",
+      "matchedCount": 1,
+      "totalCount": 3,
+      "matchedIngredients": [
+        "Jasmine"
+      ]
+    },
+    "1004703": {
+      "title": "Opium Flower Solid Perfume",
+      "sku": "EA14-D33",
+      "matchedCount": 2,
+      "totalCount": 3,
+      "matchedIngredients": [
+        "Lemon",
+        "Peppermint"
+      ]
+    },
+    "1004706": {
+      "title": "Wild Pomegranate Solid Perfume",
+      "sku": "EA14-D42",
+      "matchedCount": 2,
+      "totalCount": 3,
+      "matchedIngredients": [
+        "Orange",
+        "Vanilla"
+      ]
+    },
+    "1004708": {
+      "title": "Cherry Blossom Solid Perfume",
+      "sku": "EA14-D39",
+      "matchedCount": 3,
+      "totalCount": 3,
+      "matchedIngredients": [
+        "Bergamot",
+        "Geranium",
+        "Tonka Bean"
+      ]
+    },
+    "1004710": {
+      "title": "Mystic Sandal Solid Perfume",
+      "sku": "EA14-D29",
+      "matchedCount": 3,
+      "totalCount": 6,
+      "matchedIngredients": [
+        "Frankincense",
+        "Lavandin",
+        "Sandalwood"
+      ]
+    },
+    "1004713": {
+      "title": "Night Jasmine Solid Perfume",
+      "sku": "EA14-D26",
+      "matchedCount": 3,
+      "totalCount": 3,
+      "matchedIngredients": [
+        "Jasmine",
+        "Rose",
+        "Ylang Ylang"
+      ]
+    },
+    "1004790": {
+      "title": "Face Mask with Bamboo Charcoal and Kaolin Clay",
+      "sku": "TL16-G01",
+      "matchedCount": 3,
+      "totalCount": 3,
+      "matchedIngredients": [
+        "Activated Bamboo Charcoal",
+        "Kaolin",
+        "Tea Tree"
+      ]
+    },
+    "1004793": {
+      "title": "Face Mask with Turmeric and Kaolin Clay",
+      "sku": "TL16-G02",
+      "matchedCount": 3,
+      "totalCount": 3,
+      "matchedIngredients": [
+        "Activated Bamboo Charcoal",
+        "Kaolin",
+        "Tea Tree"
+      ]
+    },
+    "1004796": {
+      "title": "Face Scrub with Multani Mitti and Vetiver",
+      "sku": "TL16-G13",
+      "matchedCount": 3,
+      "totalCount": 4,
+      "matchedIngredients": [
+        "Aloe Vera",
+        "Vetiver Oil",
+        "Vetiver Root Powder"
+      ]
+    },
+    "1004798": {
+      "title": "Face Scrub with Bamboo Charcoal and Walnut Shell",
+      "sku": "TL16-G11",
+      "matchedCount": 3,
+      "totalCount": 4,
+      "matchedIngredients": [
+        "Activated Bamboo Charcoal",
+        "Aloe Vera",
+        "Olibanum"
+      ]
+    },
+    "1004800": {
+      "title": "Face Scrub with Turmeric and Walnut Shell",
+      "sku": "TL16-G12",
+      "matchedCount": 3,
+      "totalCount": 4,
+      "matchedIngredients": [
+        "Aloe Vera",
+        "Lavandin",
+        "Turmeric"
+      ]
+    },
+    "1004808": {
+      "title": "Face Gel with Lavender & Aloe Vera Extract",
+      "sku": "TL16-G33",
+      "matchedCount": 3,
+      "totalCount": 3,
+      "matchedIngredients": [
+        "Aloe Vera",
+        "Lavender",
+        "Rose Water"
+      ]
+    },
+    "1004810": {
+      "title": "Face Gel with Olibanum & Aloe Vera Extract",
+      "sku": "TL16-G31",
+      "matchedCount": 3,
+      "totalCount": 3,
+      "matchedIngredients": [
+        "Aloe Vera",
+        "Olibanum",
+        "Rose Water"
+      ]
+    },
+    "1004812": {
+      "title": "Face Gel with Rose Absolute & Aloe Vera Extract",
+      "sku": "TL16-G32",
+      "matchedCount": 3,
+      "totalCount": 3,
+      "matchedIngredients": [
+        "Aloe Vera",
+        "Rose Absolute",
+        "Rose Water"
+      ]
+    },
+    "1004830": {
+      "title": "CLEANSING MILK - With Aloe Vera, Amla & Lavender Extracts",
+      "sku": "TL16-G21",
+      "matchedCount": 3,
+      "totalCount": 4,
+      "matchedIngredients": [
+        "Aloe Vera",
+        "Coconut Oil",
+        "Lavender"
+      ]
+    },
+    "1004832": {
+      "title": "CLEANSING MILK - With Aloe Vera, Amla & Tea Tree  Extracts",
+      "sku": "TL16-G22",
+      "matchedCount": 4,
+      "totalCount": 4,
+      "matchedIngredients": [
+        "Aloe Vera",
+        "Coconut Oil",
+        "Rose Water",
+        "Tea Tree"
+      ]
+    },
+    "1004834": {
+      "title": "CLEANSING MILK - With Aloe Vera, Amla & Rose Extracts",
+      "sku": "TL16-G23",
+      "matchedCount": 3,
+      "totalCount": 4,
+      "matchedIngredients": [
+        "Aloe Vera",
+        "Coconut Oil",
+        "Rose Water"
+      ]
+    },
+    "1006633": {
+      "title": "Night Blossom Solid Perfume",
+      "sku": "EA14-D32",
+      "matchedCount": 3,
+      "totalCount": 3,
+      "matchedIngredients": [
+        "Jasmine",
+        "Rose",
+        "Ylang Ylang"
+      ]
+    },
+    "1006635": {
+      "title": "Exotic Patchouli Solid Perfume",
+      "sku": "EA14-D27",
+      "matchedCount": 3,
+      "totalCount": 3,
+      "matchedIngredients": [
+        "Jasmine",
+        "Rose",
+        "Ylang Ylang"
+      ]
+    },
+    "1006638": {
+      "title": "Vanilla Passion Solid Perfume",
+      "sku": "EA14-D30",
+      "matchedCount": 3,
+      "totalCount": 3,
+      "matchedIngredients": [
+        "Jasmine",
+        "Rose",
+        "Ylang Ylang"
+      ]
+    }
+  },
+  "matchRate": 82.19,
+  "unmatchedIngredientCount": 70,
+  "topUnmatchedIngredients": [
+    {
+      "name": "Amla",
+      "count": 6
+    },
+    {
+      "name": "Brahmi",
+      "count": 6
+    },
+    {
+      "name": "Castor",
+      "count": 6
+    },
+    {
+      "name": "Clove",
+      "count": 6
+    },
+    {
+      "name": "Guaiac Wood",
+      "count": 6
+    },
+    {
+      "name": "Cypriol",
+      "count": 5
+    },
+    {
+      "name": "Manjistha",
+      "count": 5
+    },
+    {
+      "name": "Myrrh",
+      "count": 5
+    },
+    {
+      "name": "Sunflower",
+      "count": 5
+    },
+    {
+      "name": "Ginger Grass",
+      "count": 4
+    },
+    {
+      "name": "Niacinamide",
+      "count": 4
+    },
+    {
+      "name": "Benzoin",
+      "count": 3
+    },
+    {
+      "name": "Cardamom",
+      "count": 3
+    },
+    {
+      "name": "Cinnamon",
+      "count": 3
+    },
+    {
+      "name": "Cucumber",
+      "count": 3
+    },
+    {
+      "name": "Elemi",
+      "count": 3
+    },
+    {
+      "name": "Juniper Berry",
+      "count": 3
+    },
+    {
+      "name": "Saffron",
+      "count": 3
+    },
+    {
+      "name": "Vitamin E",
+      "count": 3
+    },
+    {
+      "name": "Walnut",
+      "count": 3
+    },
+    {
+      "name": "Amyris",
+      "count": 2
+    },
+    {
+      "name": "Ashwagandha",
+      "count": 2
+    },
+    {
+      "name": "Bengal Gram",
+      "count": 2
+    },
+    {
+      "name": "Bhumyamlaki",
+      "count": 2
+    },
+    {
+      "name": "Bukachiol",
+      "count": 2
+    },
+    {
+      "name": "Cassia",
+      "count": 2
+    },
+    {
+      "name": "Clary Sage",
+      "count": 2
+    },
+    {
+      "name": "Flaxseed",
+      "count": 2
+    },
+    {
+      "name": "Galbanum Resin",
+      "count": 2
+    },
+    {
+      "name": "Ginger",
+      "count": 2
+    },
+    {
+      "name": "Glycerine",
+      "count": 2
+    },
+    {
+      "name": "Multani Mitti",
+      "count": 2
+    },
+    {
+      "name": "Neroli",
+      "count": 2
+    },
+    {
+      "name": "Nutmeg",
+      "count": 2
+    },
+    {
+      "name": "Oakmoss",
+      "count": 2
+    },
+    {
+      "name": "Oats",
+      "count": 2
+    },
+    {
+      "name": "Pine",
+      "count": 2
+    },
+    {
+      "name": "Pro-ceramides",
+      "count": 2
+    },
+    {
+      "name": "Rockrose",
+      "count": 2
+    },
+    {
+      "name": "Styrax",
+      "count": 2
+    },
+    {
+      "name": "Wheatgerm",
+      "count": 2
+    },
+    {
+      "name": "Allantoin",
+      "count": 1
+    },
+    {
+      "name": "Arnica",
+      "count": 1
+    },
+    {
+      "name": "Balsam Copaiba",
+      "count": 1
+    },
+    {
+      "name": "Bearberry",
+      "count": 1
+    },
+    {
+      "name": "Blackpepper",
+      "count": 1
+    },
+    {
+      "name": "Bringaraj",
+      "count": 1
+    },
+    {
+      "name": "Cananga",
+      "count": 1
+    },
+    {
+      "name": "Chamomile",
+      "count": 1
+    },
+    {
+      "name": "Cubeb",
+      "count": 1
+    },
+    {
+      "name": "Eucalyptus",
+      "count": 1
+    },
+    {
+      "name": "Indian Borage",
+      "count": 1
+    },
+    {
+      "name": "Indian Tulsi",
+      "count": 1
+    },
+    {
+      "name": "Labdanum",
+      "count": 1
+    },
+    {
+      "name": "Lime",
+      "count": 1
+    },
+    {
+      "name": "Lupine Peptides",
+      "count": 1
+    },
+    {
+      "name": "Masikai",
+      "count": 1
+    },
+    {
+      "name": "Natural Vinegar",
+      "count": 1
+    },
+    {
+      "name": "Oregano",
+      "count": 1
+    },
+    {
+      "name": "Panthenol",
+      "count": 1
+    },
+    {
+      "name": "Peptides",
+      "count": 1
+    },
+    {
+      "name": "Poppy",
+      "count": 1
+    },
+    {
+      "name": "Retinol (Vitamin A)",
+      "count": 1
+    },
+    {
+      "name": "Rosewood",
+      "count": 1
+    },
+    {
+      "name": "Shiu",
+      "count": 1
+    },
+    {
+      "name": "Spikenard",
+      "count": 1
+    },
+    {
+      "name": "Spirulina",
+      "count": 1
+    },
+    {
+      "name": "Tocopherol",
+      "count": 1
+    },
+    {
+      "name": "Zinc Ricinoleate",
+      "count": 1
+    },
+    {
+      "name": "Zincoxide",
+      "count": 1
+    }
+  ]
+}

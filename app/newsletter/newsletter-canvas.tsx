@@ -77,6 +77,7 @@ import {
   pinIdsForElement,
   clearSpacingLocks,
   pushElementsAfter,
+  restoreSpacingLockedY,
   relayoutNewsletterCanvas,
   type RelayoutOptions,
 } from "../../lib/canvas-layout";
@@ -889,16 +890,22 @@ function Toolbar({
     </label>
   );
 
-  const slider = (label: string, val: number, key: string, min: number, max: number, step = 1) => (
-    <label key={key} className="nl-tb-row nl-tb-slider-row">
-      <span className="nl-tb-label">{label} <em>{typeof val === "number" ? (step < 1 ? val.toFixed(2) : Math.round(val)) : val}</em></span>
-      <input
-        type="range" min={min} max={max} step={step} value={val}
-        className="nl-tb-range"
-        onChange={(e) => onUpdate({ [key]: parseFloat(e.target.value) } as Partial<CanvasEl>)}
-      />
-    </label>
-  );
+  const yMax = Math.max(3000, Math.ceil(canvasHeight), Math.ceil(el.y) + 800);
+
+  const slider = (label: string, val: number, key: string, min: number, max: number, step = 1) => {
+    const safeVal = Number.isFinite(val) ? val : min;
+    const clamped = Math.min(max, Math.max(min, safeVal));
+    return (
+      <label key={key} className="nl-tb-row nl-tb-slider-row">
+        <span className="nl-tb-label">{label} <em>{typeof val === "number" ? (step < 1 ? val.toFixed(2) : Math.round(val)) : val}</em></span>
+        <input
+          type="range" min={min} max={max} step={step} value={clamped}
+          className="nl-tb-range"
+          onChange={(e) => onUpdate({ [key]: parseFloat(e.target.value) } as Partial<CanvasEl>)}
+        />
+      </label>
+    );
+  };
 
   const col = (label: string, val: string, key: string) => {
     const applyColor = (newColor: string) => {
@@ -1054,7 +1061,7 @@ function Toolbar({
               onClick={() => onUpdate({ y: el.y + 8 })}>↓ Down</button>
           </div>
           {slider("X", el.x, "x", -200, 716)}
-          {slider("Y", el.y, "y", 0, 3000)}
+          {slider("Y", el.y, "y", 0, yMax)}
           {slider("Width", el.w, "w", 40, 760)}
           {centrePositionButtons()}
           {onCentreAll && (
@@ -1076,7 +1083,7 @@ function Toolbar({
               onClick={() => onUpdate({ y: el.y + 8 })}>↓ Down</button>
           </div>
           {slider("X", el.x, "x", -200, 716)}
-          {slider("Y", el.y, "y", 0, 3000)}
+          {slider("Y", el.y, "y", 0, yMax)}
           {slider("Width", el.w, "w", 40, 760)}
           {centrePositionButtons()}
           {onCentreAll && (
@@ -1172,7 +1179,7 @@ function Toolbar({
         <div className="nl-tb-section">
           <div className="nl-tb-section-label">Frame: drag to move, handles to resize</div>
           {slider("X", el.x, "x", -200, 716)}
-          {slider("Y", el.y, "y", 0, 3000)}
+          {slider("Y", el.y, "y", 0, yMax)}
           {slider("Width", el.w, "w", 40, 760)}
           {slider("Height", el.h, "h", 20, 1200)}
           {centrePositionButtons()}
@@ -1271,7 +1278,7 @@ function Toolbar({
           <div className="nl-tb-section">
             <div className="nl-tb-section-label">Position &amp; size</div>
             {slider("X", el.x, "x", -200, 716)}
-            {slider("Y", el.y, "y", 0, 3000)}
+            {slider("Y", el.y, "y", 0, yMax)}
             {slider("Width", el.w, "w", 100, 760)}
             {centrePositionButtons()}
             {onCentreAll && (
@@ -1316,7 +1323,7 @@ function Toolbar({
         <>
           <div className="nl-tb-section">
             <div className="nl-tb-section-label">Position</div>
-            {slider("Y", el.y, "y", 0, 3000)}
+            {slider("Y", el.y, "y", 0, yMax)}
           </div>
           <div className="nl-tb-section">
             <div className="nl-tb-section-label">Layout</div>
@@ -1392,7 +1399,7 @@ export const NewsletterCanvas = forwardRef<NewsletterCanvasHandle, CanvasProps>(
 
   const applyStorySpacing = useCallback(
     (els: CanvasEl[], measuredHeights?: Record<string, number>) => {
-      return layoutNewsletterCanvas(
+      const laidOut = layoutNewsletterCanvas(
         {
           elements: els,
           measuredHeights: measuredHeights ?? canvas.measuredHeights,
@@ -1400,6 +1407,7 @@ export const NewsletterCanvas = forwardRef<NewsletterCanvasHandle, CanvasProps>(
         },
         gaps,
       ).elements;
+      return restoreSpacingLockedY(els, laidOut);
     },
     [gaps, canvas.measuredHeights],
   );
@@ -1547,7 +1555,8 @@ export const NewsletterCanvas = forwardRef<NewsletterCanvasHandle, CanvasProps>(
         compact: true,
         ...relayoutOpts,
       });
-      upd({ elements: stacked, measuredHeights: collectCanonicalMeasuredHeights(stacked, mergedHeights) });
+      const finalEls = relayoutOpts?.compact ? stacked : restoreSpacingLockedY(next, stacked);
+      upd({ elements: finalEls, measuredHeights: collectCanonicalMeasuredHeights(finalEls, mergedHeights) });
       requestAnimationFrame(() => {
         isReflowingRef.current = false;
       });
@@ -2067,6 +2076,8 @@ export const NewsletterCanvas = forwardRef<NewsletterCanvasHandle, CanvasProps>(
   }, [canEdit, undo, redo]);
 
   const selectedEl = elements.find((e) => e.id === selectedId) ?? null;
+  const selectedToolbarEl =
+    (selectedId ? displayElements.find((e) => e.id === selectedId) : null) ?? selectedEl;
   const selectedMontageCount =
     selectedEl && isImage(selectedEl) && selectedEl.montageGroup
       ? elements.filter(
@@ -2620,9 +2631,9 @@ export const NewsletterCanvas = forwardRef<NewsletterCanvasHandle, CanvasProps>(
     <div className="nl-canvas-outer">
       {canvasSurface}
 
-      {canEdit && selectedEl && (
+      {canEdit && selectedEl && selectedToolbarEl && (
         <Toolbar
-          el={selectedEl}
+          el={selectedToolbarEl}
           rect={elRect}
           canvasHeight={h}
           onUpdate={(patch) => updEl(selectedEl.id, patch)}

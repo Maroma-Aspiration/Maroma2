@@ -100,12 +100,14 @@ export async function createOrderFromCart(
     notifications: input.notifications,
   });
 
-  await clearCartServer(cart.id);
-
-  const { sendProductionInstructionEmail } = await import("./commerce-production-email");
-  const productionEmail = await sendProductionInstructionEmail(order, request);
-  if (!productionEmail.ok) {
-    console.warn("Production instruction email failed:", productionEmail.message);
+  const { isCcavenueConfigured } = await import("./ccavenue");
+  if (!isCcavenueConfigured()) {
+    await clearCartServer(cart.id);
+    const { sendProductionInstructionEmail } = await import("./commerce-production-email");
+    const productionEmail = await sendProductionInstructionEmail(order, request);
+    if (!productionEmail.ok) {
+      console.warn("Production instruction email failed:", productionEmail.message);
+    }
   }
 
   return order;
@@ -129,9 +131,12 @@ export async function markOrderPaid(
   }
 
   await decrementStockForOrder(order.lines);
+  if (order.cartId) {
+    await clearCartServer(order.cartId);
+  }
   const updated = await updateOrderStatus(orderId, "paid", {
     payment: {
-      provider: "razorpay",
+      provider: payment?.provider ?? order.payment?.provider ?? "razorpay",
       ...order.payment,
       ...payment,
       paidAt: payment?.paidAt ?? new Date().toISOString(),
@@ -139,6 +144,12 @@ export async function markOrderPaid(
   });
   if (!updated) {
     throw new CartError("Failed to update order.", 500);
+  }
+
+  const { sendProductionInstructionEmail } = await import("./commerce-production-email");
+  const productionEmail = await sendProductionInstructionEmail(updated, request);
+  if (!productionEmail.ok) {
+    console.warn("Production instruction email failed:", productionEmail.message);
   }
 
   const emailResult = await sendOrderConfirmationEmail(updated, request);

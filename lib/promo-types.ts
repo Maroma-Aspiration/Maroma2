@@ -10,6 +10,8 @@ export type PromoOverlayCrop = "none" | "square" | "portrait" | "landscape";
 
 export type PromoOverlayImage = {
   id: string;
+  /** Admin label in the editor. Not shown on the live promo. */
+  name?: string;
   imageUrl: string;
   x: number;
   y: number;
@@ -21,6 +23,10 @@ export type PromoOverlayImage = {
   crop: PromoOverlayCrop;
   cropX: number;
   cropY: number;
+  /** Stacking depth: negative sits behind the banner copy, positive in front of it. */
+  depth?: number;
+  /** Editor only: bumping this remounts the layer so its animation replays. Never stored. */
+  replayToken?: number;
 };
 
 export type PromoCtaBuyLink = {
@@ -58,6 +64,39 @@ export type PromoFrame = {
   ctaScale?: number;
 };
 
+/** Per-layer mobile placement, matched to an overlay image by id. */
+export type PromoMobileOverlayLayout = {
+  id: string;
+  x: number;
+  y: number;
+  scale: number;
+};
+
+/**
+ * Optional mobile-only layout. While enabled, the phone view uses these numbers verbatim
+ * instead of rescaling the desktop offsets, so the two views are edited independently.
+ */
+export type PromoMobileLayout = {
+  enabled: boolean;
+  stripHeightPx: number;
+  textBannerOffsetX: number;
+  textBannerOffsetY: number;
+  textBannerScale: number;
+  textBannerWidthPct: number;
+  textBannerHeightPct: number;
+  headlineOffsetX: number;
+  headlineOffsetY: number;
+  headlineScale: number;
+  taglineOffsetX: number;
+  taglineOffsetY: number;
+  taglineScale: number;
+  ctaOffsetX: number;
+  ctaOffsetY: number;
+  thumbnailOffsetX: number;
+  thumbnailOffsetY: number;
+  overlay: PromoMobileOverlayLayout[];
+};
+
 export type PromoBanner = {
   id: string;
   /** Admin-only label for saved banners (shown in Site admin lists). */
@@ -77,6 +116,14 @@ export type PromoBanner = {
   textBannerOffsetX?: number;
   textBannerOffsetY?: number;
   textBannerScale?: number;
+  /** Strip width as a percentage of its natural width. */
+  textBannerWidthPct?: number;
+  /** Strip height as a percentage of its natural height. */
+  textBannerHeightPct?: number;
+  /** Custom strip fill (hex). Empty falls back to the chosen appearance preset. */
+  textBannerColor?: string;
+  /** Strip fill opacity, 0 to 100. Only used with a custom colour. */
+  textBannerOpacity?: number;
 
   textBannerStyle?: PromoTextBannerStyle;
   /** Independent headline and tagline layout controls. */
@@ -163,6 +210,10 @@ export type PromoBanner = {
   active: boolean;
   /** When false, homepage hides the promo strip and shows primary hero media. */
   promoModeEnabled?: boolean;
+  /** Hand-tuned phone layout, edited on /admin/mobile-promo. */
+  mobile?: PromoMobileLayout;
+  /** Render only: set once a mobile layout has been merged in. Never stored. */
+  mobileTuned?: boolean;
   createdAt: string;
   updatedAt: string;
 };

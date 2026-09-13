@@ -3,12 +3,12 @@ import { cookies } from "next/headers";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ProductPdpTitle } from "../../components/ProductPdpTitle";
+import { ProductPdpPinnedStage } from "./ProductPdpPinnedStage";
 import { ProductPdpBuyRow } from "../../components/ProductPdpBuyRow";
 import { ProductPdpGallery } from "../../components/ProductPdpGallery";
-import { ProductPdpScrollLock } from "./ProductPdpScrollLock";
 import { ProductReviews } from "../../components/ProductReviews";
 import { ProductAdminToolbar } from "../../components/ProductAdminToolbar";
-import { ProductIngredientGallery } from "../../components/ProductIngredientGallery";
+import { ProductKeyIngredients, type KeyIngredientCard } from "../../components/ProductKeyIngredients";
 import { JsonLd } from "../../components/JsonLd";
 import { CurrencyPrice } from "../../components/CurrencyPrice";
 import { CurrencySelector } from "../../components/CurrencySelector";
@@ -35,6 +35,14 @@ import {
 } from "../../../lib/site-seo";
 import type { ProductRecord } from "../../../lib/product-types";
 import { productPriceState } from "../../../lib/product-pricing";
+import { readSafetySet } from "../../../lib/safety-guidelines-store";
+import { pickSafetyHighlight, resolveSafetyTranslation, safetySetIdForProductContext } from "../../../lib/safety-guidelines-types";
+import {
+  galleryItemsForProduct,
+  readIngredientGalleryStore,
+} from "../../../lib/product-ingredient-gallery-store";
+import { normalizeKeyIngredientName, resolveKeyIngredientImage } from "../../../lib/key-ingredient-media";
+import { ingredientSlugFromName } from "../../../lib/ingredient-pages";
 
 export const runtime = "nodejs";
 
@@ -86,7 +94,7 @@ function SuggestedCard({ product }: { product: ProductRecord }) {
   return (
     <Link href={`/product/${product.id}`} className="product-pdp-suggestion-card">
       <div className="product-pdp-suggestion-media">
-        {imageSrc ? <img src={imageSrc} alt={`${displayName} — Maroma`} /> : <span>No image</span>}
+        {imageSrc ? <img src={imageSrc} alt={`${displayName}, Maroma`} /> : <span>No image</span>}
       </div>
       <div className="product-pdp-suggestion-copy">
         <p className="product-pdp-suggestion-name">{displayName}</p>
@@ -99,7 +107,7 @@ function SuggestedCard({ product }: { product: ProductRecord }) {
 }
 
 export default async function ProductPage({ params, searchParams }: Props) {
-  const [{ product, isDraftPreview }, { products: liveProducts }, isAdmin, stockQty, gift3dReady] = await Promise.all([
+  const [{ product, isDraftPreview }, { products: liveProducts }, isAdmin, stockQty, gift3dReady, ingredientGallery] = await Promise.all([
     readProductForRequest(params.id),
     readLiveStorefrontCatalog(),
     canPreviewDraftProduct(),
@@ -107,6 +115,7 @@ export default async function ProductPage({ params, searchParams }: Props) {
     readGift3dAssetsStore()
       .then((store) => Boolean(toPublicGift3dAssets(store)[params.id]?.glbUrl) || isGift3dPreviewProduct(params.id))
       .catch(() => isGift3dPreviewProduct(params.id)),
+    readIngredientGalleryStore(),
   ]);
   if (!product) {
     notFound();
@@ -117,6 +126,24 @@ export default async function ProductPage({ params, searchParams }: Props) {
   const sections = derivePdpSections(product);
   const { displayName, subtitleText } = deriveProductPdpCopy(product.name, product.shortDescription);
   const keyIngredients = product.attributes["Key Ingredients"] ?? [];
+  const storedIngredientItems = galleryItemsForProduct(ingredientGallery, product.id);
+  const keyIngredientCards: KeyIngredientCard[] = [];
+  const seenIngredientSlugs = new Set<string>();
+  for (const raw of keyIngredients) {
+    const name = decodeBasicHtmlEntities(raw).trim();
+    if (!name || /^ingredient to be added$/i.test(name)) continue;
+    const href = `/ingredient/${ingredientSlugFromName(name)}`;
+    if (seenIngredientSlugs.has(href)) continue;
+    seenIngredientSlugs.add(href);
+    const stored = storedIngredientItems.find(
+      (item) => normalizeKeyIngredientName(item.name) === normalizeKeyIngredientName(name)
+    );
+    keyIngredientCards.push({
+      name,
+      imageUrl: stored?.imageUrl || resolveKeyIngredientImage(name),
+      href,
+    });
+  }
   const searchQuery = searchParams?.search?.trim().slice(0, 160) ?? "";
   const seoAudit = auditProductSeoFacts(product);
   const categorySlug = resolvePrimaryCategorySlug(product);
@@ -133,9 +160,17 @@ export default async function ProductPage({ params, searchParams }: Props) {
     (fact) => fact.label !== "Product" && fact.label !== "Ingredients (INCI)"
   );
 
+  // Incense and candles carry regulatory guidance, shared with the QR guides and the safety page.
+  const safetySetId = safetySetIdForProductContext(
+    [product.name, ...product.categories, ...product.tags].join(" ").toLowerCase()
+  );
+  const safetySet = safetySetId ? await readSafetySet(safetySetId) : null;
+  const safetyHighlight = safetySet
+    ? pickSafetyHighlight(resolveSafetyTranslation(safetySet, "en").translation ?? { title: "", sections: [] })
+    : null;
+
   return (
     <main className="product-pdp-page">
-      <ProductPdpScrollLock />
       <JsonLd
         data={[
           productJsonLd(product, { availability }),
@@ -145,44 +180,47 @@ export default async function ProductPage({ params, searchParams }: Props) {
       {/* Missing catalog fields for SEO (do not invent): see data-seo-missing */}
       <div hidden data-seo-missing={seoAudit.missing.join("|") || "none"} />
       {isAdmin ? <ProductAdminToolbar productId={product.id} productName={displayName} /> : null}
-      <nav className="product-pdp-breadcrumbs" aria-label="Breadcrumb">
-        <ol>
-          <li>
-            <Link href="/">Home</Link>
-          </li>
-          {category ? (
-            <li>
-              <Link href={`/${category.slug}`}>{category.label}</Link>
-            </li>
-          ) : null}
-          <li aria-current="page">{displayName}</li>
-        </ol>
-      </nav>
-      {searchQuery ? (
-        <Link
-          href={`/?skipIntro=1&q=${encodeURIComponent(searchQuery)}#shop`}
-          className="product-pdp-back-to-search"
-        >
-          <span aria-hidden="true">←</span> Back to search results
-        </Link>
-      ) : null}
-      {isDraftPreview ? (
-        <div className="product-pdp-draft-notice" role="status">
-          Admin preview · This product is not yet published on the storefront.
-        </div>
-      ) : null}
+      <ProductPdpPinnedStage />
       <div
         className="product-pdp-layout"
         data-review="Product details"
         data-review-id="pdp-layout"
         data-review-files="app/product/[id]/page.tsx,app/components/ProductPdpBuyRow.tsx,app/components/ProductPdpGallery.tsx"
       >
-        <ProductPdpTitle>{displayName}</ProductPdpTitle>
         <div className="product-pdp-left-column">
           <ProductPdpGallery images={gallery} videos={product.videos} productId={product.id} productName={displayName} ready3d={isGiftingProduct(product) && gift3dReady} />
         </div>
 
         <div className="product-pdp-details-column">
+          <div className="product-pdp-details-chrome">
+            <nav className="product-pdp-breadcrumbs" aria-label="Breadcrumb">
+              <ol>
+                <li>
+                  <Link href="/">Home</Link>
+                </li>
+                {category ? (
+                  <li>
+                    <Link href={`/${category.slug}`}>{category.label}</Link>
+                  </li>
+                ) : null}
+                <li aria-current="page">{displayName}</li>
+              </ol>
+            </nav>
+            {searchQuery ? (
+              <Link
+                href={`/?skipIntro=1&q=${encodeURIComponent(searchQuery)}#shop`}
+                className="product-pdp-back-to-search"
+              >
+                <span aria-hidden="true">←</span> Back to search results
+              </Link>
+            ) : null}
+            {isDraftPreview ? (
+              <div className="product-pdp-draft-notice" role="status">
+                Admin preview · This product is not yet published on the storefront.
+              </div>
+            ) : null}
+          </div>
+          <ProductPdpTitle>{displayName}</ProductPdpTitle>
           <div className="product-pdp-info">
             {subtitleText ? <p className="product-pdp-subtitle">{subtitleText}</p> : null}
             <div className="product-pdp-price-row">
@@ -206,12 +244,29 @@ export default async function ProductPage({ params, searchParams }: Props) {
             </details>
               <details className="product-pdp-accordion">
                 <summary>Benefits</summary>
-                <div className="product-pdp-accordion-body">{sections.benefits}</div>
+                <div className="product-pdp-accordion-body">
+                  <ul className="product-pdp-benefits">
+                    {sections.benefits.map((item) => (
+                      <li key={item}>{item}</li>
+                    ))}
+                  </ul>
+                </div>
               </details>
               {sections.howToUse ? (
                 <details className="product-pdp-accordion">
                   <summary>How to use</summary>
                   <div className="product-pdp-accordion-body">{sections.howToUse}</div>
+                </details>
+              ) : null}
+              {safetySet && safetyHighlight ? (
+                <details className="product-pdp-accordion">
+                  <summary>Safety guidelines</summary>
+                  <div className="product-pdp-accordion-body">
+                    <p>{safetyHighlight.body}</p>
+                    <Link href={`/safety-guidelines#${safetySet.id}`}>
+                      Read the full safety guidelines
+                    </Link>
+                  </div>
                 </details>
               ) : null}
             </div>
@@ -258,16 +313,8 @@ export default async function ProductPage({ params, searchParams }: Props) {
         <h2 id="pdp-key-ingredients-heading" className="product-pdp-key-ingredients-title">
           Key ingredients
         </h2>
-      {keyIngredients.length ? (
-        <ul className="product-pdp-key-ingredients">
-          {keyIngredients.map((item, index) => <li key={`${item}-${index}`}>{decodeBasicHtmlEntities(item)}</li>)}
-        </ul>
-      ) : (
-        <p className="product-pdp-accordion-body">Key ingredients are listed on the product label.</p>
-      )}
+        <ProductKeyIngredients items={keyIngredientCards} />
       </section>
-
-      <ProductIngredientGallery productId={product.id} ingredients={keyIngredients} isAdmin={isAdmin} />
 
       <footer className="product-pdp-trust" aria-label="Certifications">
         <div className="product-pdp-trust-badge">Fair trade ethos</div>

@@ -17,6 +17,8 @@ type HeroVideoMediaProps = {
   variant?: "frame" | "background";
   /** When false, video plays once (for homepage intro). Default true. */
   loop?: boolean;
+  /** When false, show the poster and do not start playback. Default true. */
+  autoPlay?: boolean;
   /** Fired when a non-looping YouTube/native video ends. */
   onEnded?: () => void;
   /** Fired once playback has actually started. */
@@ -30,6 +32,7 @@ function HeroNativeVideo({
   poster,
   objectFit,
   loop,
+  autoPlay,
   onEnded,
   onPlaying,
 }: {
@@ -37,6 +40,7 @@ function HeroNativeVideo({
   poster?: string;
   objectFit?: CSSProperties["objectFit"];
   loop: boolean;
+  autoPlay: boolean;
   onEnded?: () => void;
   onPlaying?: () => void;
 }) {
@@ -48,6 +52,11 @@ function HeroNativeVideo({
     if (!video) return;
     video.muted = true;
     video.playsInline = true;
+    if (!autoPlay) {
+      video.pause();
+      setNeedsTap(false);
+      return;
+    }
 
     const beginPlayback = () => {
       try {
@@ -72,14 +81,14 @@ function HeroNativeVideo({
       window.clearTimeout(timer);
       video.removeEventListener("canplay", beginPlayback);
     };
-  }, [src]);
+  }, [autoPlay, src]);
 
   return (
     <div className="hero-native-video-wrap">
       <video
         ref={videoRef}
         className="hero-video"
-        autoPlay
+        autoPlay={autoPlay}
         muted
         loop={loop}
         playsInline
@@ -129,6 +138,7 @@ export function HeroVideoMedia({
   objectFit = "cover",
   variant = "frame",
   loop = true,
+  autoPlay = true,
   onEnded,
   onPlaying,
   portrait = false,
@@ -190,7 +200,8 @@ export function HeroVideoMedia({
           id={`maroma-hero-yt-${iframeDomId}`}
           className="hero-youtube-embed"
           src={youTubeHeroEmbedUrl(youTubeId, {
-            loop,
+            loop: loop && autoPlay,
+            autoPlay,
             enableJsApi: !loop || Boolean(onPlaying),
             origin,
           })}
@@ -210,6 +221,7 @@ export function HeroVideoMedia({
         poster={poster}
         objectFit={objectFit}
         loop={loop}
+        autoPlay={autoPlay}
         onEnded={onEnded}
         onPlaying={onPlaying}
       />

@@ -444,7 +444,8 @@ body.maroma-mobile-layout-active .page.maroma.is-mobile-document-flow {
 }
 
 .page.maroma.is-mobile-document-flow {
-  --mobile-header-clearance: calc(124px + var(--admin-bar-height, 0px) + var(--nav-bottom-gap));
+  /* Trimmed from 124px so the promo and the sections below it sit closer to the nav. */
+  --mobile-header-clearance: calc(88px + var(--admin-bar-height, 0px) + var(--nav-bottom-gap));
   min-height: 100vh;
   height: auto;
 }

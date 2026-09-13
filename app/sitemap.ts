@@ -6,6 +6,7 @@ import { readLiveStorefrontCatalog } from "../lib/product-catalog-admin";
 import { hasDisplayImage } from "../lib/product-image";
 import { getJournalStories } from "../lib/journal-stories";
 import { readStoriesState } from "../lib/story-storage";
+import { listIngredientPages } from "../lib/ingredient-pages";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -31,7 +32,15 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     { url: `${SITE_URL}/terms`, changeFrequency: "yearly", priority: 0.3 },
     { url: `${SITE_URL}/shipping`, changeFrequency: "yearly", priority: 0.3 },
     { url: `${SITE_URL}/returns`, changeFrequency: "yearly", priority: 0.3 },
+    { url: `${SITE_URL}/safety-guidelines`, changeFrequency: "yearly", priority: 0.5 },
+    { url: `${SITE_URL}/ingredient`, changeFrequency: "monthly", priority: 0.6 },
   ];
+
+  const ingredientPages: MetadataRoute.Sitemap = listIngredientPages().map((item) => ({
+    url: `${SITE_URL}/ingredient/${item.slug}`,
+    changeFrequency: "monthly" as const,
+    priority: 0.55,
+  }));
 
   const categoryPages: MetadataRoute.Sitemap = catalogCategories.map((category) => ({
     url: `${SITE_URL}/${category.slug}`,
@@ -65,5 +74,5 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       priority: 0.7,
     }));
 
-  return [...staticPages, ...categoryPages, ...productPages, ...archivePages, ...blogPages];
+  return [...staticPages, ...categoryPages, ...productPages, ...ingredientPages, ...archivePages, ...blogPages];
 }

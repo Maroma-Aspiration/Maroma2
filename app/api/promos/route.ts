@@ -3,6 +3,7 @@ import { cookies } from "next/headers";
 import { getSessionSecret, SESSION_COOKIE, verifySessionPayload } from "../../../lib/auth-session";
 import type { PromoBanner, PromoFrame, PromoPresentation, PromoSequenceTransition } from "../../../lib/promo-types";
 import { asFiniteNumber, resolvePromoBannerTitle } from "../../../lib/promo-strip-utils";
+import { normalizePromoMobileLayout } from "../../../lib/promo-mobile-layout";
 import {
   deletePromoBanner,
   listLivePromoBanners,
@@ -93,6 +94,10 @@ export async function POST(request: Request) {
     textBannerOffsetX: asFiniteNumber(body.textBannerOffsetX),
     textBannerOffsetY: asFiniteNumber(body.textBannerOffsetY),
     textBannerScale: asFiniteNumber(body.textBannerScale),
+    textBannerWidthPct: asFiniteNumber(body.textBannerWidthPct),
+    textBannerHeightPct: asFiniteNumber(body.textBannerHeightPct),
+    textBannerColor: typeof body.textBannerColor === "string" ? body.textBannerColor.trim() : undefined,
+    textBannerOpacity: asFiniteNumber(body.textBannerOpacity),
     textBannerStyle:
       body.textBannerStyle === "glass" || body.textBannerStyle === "ivory" || body.textBannerStyle === "teal"
         ? body.textBannerStyle
@@ -171,6 +176,7 @@ export async function POST(request: Request) {
     active,
     promoModeEnabled:
       typeof body.promoModeEnabled === "boolean" ? body.promoModeEnabled : undefined,
+    mobile: normalizePromoMobileLayout(body.mobile),
   });
   return NextResponse.json({ ok: true, banner });
 }

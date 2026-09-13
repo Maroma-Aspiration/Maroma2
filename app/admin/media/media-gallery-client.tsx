@@ -36,6 +36,11 @@ export default function MediaGalleryClient() {
     setStatus("");
     try {
       for (const file of Array.from(files)) {
+        if (file.size > 4 * 1024 * 1024) {
+          const { uploadFileToFirebase } = await import("../../../lib/client-firebase-upload");
+          await uploadFileToFirebase(file, "site-gallery");
+          continue;
+        }
         const form = new FormData();
         form.set("file", file);
         if (labelDraft.trim()) {

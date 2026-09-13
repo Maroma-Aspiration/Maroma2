@@ -1020,13 +1020,13 @@ export async function readStoriesState(): Promise<StoriesState> {
 }
 
 function newsletterCanvasRepaired(before: StoriesState, after: StoriesState): boolean {
-  const beforeCanvas = before.newsletterCanvas;
   const afterCanvas = after.newsletterCanvas;
   if (!afterCanvas?.enabled) return false;
-  if (JSON.stringify(beforeCanvas) !== JSON.stringify(afterCanvas)) return true;
+  const beforeIds = new Set((before.newsletterCanvas?.elements ?? []).map((e) => e.id));
+  const addedElement = (afterCanvas.elements ?? []).some((e) => !beforeIds.has(e.id));
   const beforeStories = (before.stories ?? []).filter((s) => !s.kind || s.kind === "story").length;
   const afterStories = (after.stories ?? []).filter((s) => !s.kind || s.kind === "story").length;
-  return afterStories > beforeStories;
+  return addedElement || afterStories > beforeStories;
 }
 
 export async function writeStoriesState(state: StoriesState): Promise<StoriesState> {

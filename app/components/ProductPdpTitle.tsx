@@ -49,5 +49,9 @@ export function ProductPdpTitle({ children }: { children: string }) {
       document.fonts.removeEventListener("loadingdone", fit);
     };
   }, [children]);
-  return <h1 ref={ref} className="product-pdp-title">{children}</h1>;
+  return (
+    <div className="product-pdp-title-slot">
+      <h1 ref={ref} className="product-pdp-title">{children}</h1>
+    </div>
+  );
 }

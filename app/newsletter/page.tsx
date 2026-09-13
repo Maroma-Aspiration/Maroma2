@@ -153,12 +153,10 @@ export default async function NewsletterPage({
   const editParam = Array.isArray(rawEdit) ? rawEdit[0] : rawEdit;
   const requestedEdit = editParam === "1" || editParam === "true";
 
-  if (requestedEdit && !canEdit) {
-    redirect("/login?next=/newsletter%3Fedit%3D1");
-  }
-
-  const editMode = requestedEdit && canEdit;
-  if (!editMode) {
+  if (!canEdit) {
+    if (requestedEdit) {
+      redirect("/login?next=/newsletter%3Fedit%3D1");
+    }
     redirect("/blog");
   }
 
@@ -167,7 +165,7 @@ export default async function NewsletterPage({
   return (
     <NewsletterPageClient
       initialState={state}
-      editMode={editMode}
+      editMode
       isAdmin={session?.role === "admin"}
       canEditNewsletter={canEdit}
     />

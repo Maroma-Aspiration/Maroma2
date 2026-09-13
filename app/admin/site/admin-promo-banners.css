@@ -969,7 +969,11 @@
 .maroma-catalog-picker-root {
   position: fixed;
   inset: 0;
-  z-index: 1200;
+  /* Above the promo editor panel, tile-edit overlays and the admin header. */
+  z-index: 15000;
+  display: grid;
+  place-items: center;
+  padding: 16px;
 }
 
 .maroma-catalog-picker-backdrop {
@@ -981,12 +985,9 @@
 }
 
 .maroma-catalog-picker {
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%);
-  width: min(920px, calc(100vw - 32px));
-  max-height: min(82vh, 760px);
+  position: relative;
+  width: min(1180px, 100%);
+  height: min(90vh, 940px);
   display: grid;
   grid-template-rows: auto auto minmax(0, 1fr);
   gap: 14px;
@@ -1031,12 +1032,20 @@
 .maroma-catalog-picker-search {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
-  gap: 10px;
+  align-items: center;
+  gap: 12px;
+}
+
+.maroma-catalog-picker-count {
+  font-size: 0.8rem;
+  white-space: nowrap;
+  color: rgba(255, 255, 255, 0.55);
 }
 
 .maroma-catalog-picker-search input {
   width: 100%;
-  padding: 10px 12px;
+  padding: 13px 15px;
+  font-size: 1rem;
   border-radius: 10px;
   border: 1px solid rgba(255, 255, 255, 0.12);
   background: rgba(8, 18, 16, 0.75);
@@ -1046,7 +1055,7 @@
 
 .maroma-catalog-picker-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
   gap: 8px;
   overflow: auto;
   padding-right: 4px;

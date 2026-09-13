@@ -4,6 +4,8 @@ import { hasDisplayImage } from "./product-image";
 import type { ProductRecord } from "./product-types";
 import { kv } from "@vercel/kv";
 import { normalizeProductInciFields } from "./product-inci-extract";
+import packagedProductOverrides from "../data/product-overrides.json";
+import packagedVideoBlobMap from "../data/product-video-blob-map.json";
 
 export type { ProductRecord } from "./product-types";
 
@@ -22,6 +24,47 @@ const productDataPath = path.join(process.cwd(), "data", "maroma-products.json")
 const overrideDataPath = path.join(process.cwd(), "data", "product-overrides.json");
 const overrideKvKey = "maroma:product-image-overrides";
 const hasKvConfig = Boolean(process.env.KV_REST_API_URL && process.env.KV_REST_API_TOKEN);
+
+function overrideHasVideos(row?: ProductOverride): boolean {
+  return Boolean(row?.videos?.some((url) => String(url || "").trim()));
+}
+
+function resolveVideoUrl(url: string): string {
+  const trimmed = String(url || "").trim();
+  if (!trimmed) return trimmed;
+  const mapped = (packagedVideoBlobMap as Record<string, string>)[trimmed];
+  return mapped || trimmed;
+}
+
+function resolveVideoUrls(urls?: string[]): string[] | undefined {
+  if (!urls?.length) return urls;
+  return urls.map(resolveVideoUrl);
+}
+
+function packagedOverrideStore(): ProductOverrideStore {
+  const raw = packagedProductOverrides as ProductOverrideStore;
+  return { overrides: raw?.overrides ?? {} };
+}
+
+/** Keep admin KV image edits, and fill empty video slots from the packaged how-to mappings. */
+function mergeDiskVideoOverrides(
+  primary: ProductOverrideStore,
+  disk: ProductOverrideStore
+): ProductOverrideStore {
+  const overrides = { ...primary.overrides };
+  for (const [id, diskRow] of Object.entries(disk.overrides ?? {})) {
+    if (!overrideHasVideos(diskRow)) continue;
+    const existing = overrides[id];
+    if (!existing) {
+      overrides[id] = diskRow;
+      continue;
+    }
+    if (!overrideHasVideos(existing)) {
+      overrides[id] = { ...existing, videos: diskRow.videos };
+    }
+  }
+  return { overrides };
+}
 
 const readJson = async <T>(filePath: string, fallback: T): Promise<T> => {
   try {
@@ -60,13 +103,14 @@ export const readProducts = async (): Promise<ProductRecord[]> => {
 };
 
 export const readOverrides = async (): Promise<ProductOverrideStore> => {
+  const disk = packagedOverrideStore();
   if (hasKvConfig) {
     try {
       const stored = await kv.get<ProductOverrideStore>(overrideKvKey);
-      if (stored?.overrides) return stored;
+      if (stored?.overrides) return mergeDiskVideoOverrides(stored, disk);
     } catch {}
   }
-  return readJson<ProductOverrideStore>(overrideDataPath, { overrides: {} });
+  return disk;
 };
 
 export const writeOverrides = async (store: ProductOverrideStore): Promise<void> => {
@@ -93,7 +137,7 @@ export const withOverrides = (
       ...product,
       imageUrl: override.imageUrl ?? product.imageUrl,
       images: override.images && override.images.length > 0 ? override.images : product.images,
-      videos: override.videos ?? product.videos
+      videos: resolveVideoUrls(overrideHasVideos(override) ? override.videos : product.videos)
     };
   });
 };

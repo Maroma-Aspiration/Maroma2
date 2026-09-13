@@ -165,6 +165,74 @@ export async function uploadCanvasFile(file: File, prefix = "canvas"): Promise<s
   return uploadCanvasBuffer(path, buffer, contentType);
 }
 
+export async function createFirebaseDirectUpload(
+  path: string,
+  contentType: string
+): Promise<{ uploadUrl: string; path: string; downloadToken: string; publicUrl: string }> {
+  const config = getCanvasFirebaseConfig();
+  if (!config) throw new Error("Firebase Storage is not configured.");
+  const normalized = path.replace(/^\/+/, "");
+  const file = getBucket(config).file(normalized);
+  const downloadToken = randomUUID();
+  const [uploadUrl] = await file.getSignedUrl({
+    version: "v4",
+    action: "write",
+    expires: Date.now() + 15 * 60 * 1000,
+    contentType,
+  });
+  return {
+    uploadUrl,
+    path: normalized,
+    downloadToken,
+    publicUrl: `${publicUrlForCanvasPath(normalized, config)}&token=${downloadToken}`,
+  };
+}
+
+export async function finalizeFirebaseDirectUpload(
+  path: string,
+  contentType: string,
+  downloadToken: string
+): Promise<string> {
+  const config = getCanvasFirebaseConfig();
+  if (!config) throw new Error("Firebase Storage is not configured.");
+  const normalized = path.replace(/^\/+/, "");
+  const file = getBucket(config).file(normalized);
+  await file.setMetadata({
+    contentType,
+    cacheControl: "public, max-age=31536000, immutable",
+    metadata: {
+      firebaseStorageDownloadTokens: downloadToken,
+    },
+  });
+  try {
+    await file.makePublic();
+  } catch {
+    /* ignore */
+  }
+  return `${publicUrlForCanvasPath(normalized, config)}&token=${downloadToken}`;
+}
+
+let corsEnsured = false;
+
+export async function ensureFirebaseUploadCors(): Promise<void> {
+  if (corsEnsured) return;
+  const config = getCanvasFirebaseConfig();
+  if (!config) return;
+  try {
+    await getBucket(config).setCorsConfiguration([
+      {
+        origin: ["*"],
+        method: ["GET", "PUT", "HEAD", "OPTIONS"],
+        responseHeader: ["Content-Type"],
+        maxAgeSeconds: 3600,
+      },
+    ]);
+    corsEnsured = true;
+  } catch {
+    /* bucket may already have CORS or lack permission */
+  }
+}
+
 export async function probeCanvasFirebaseReadable(): Promise<boolean> {
   const config = getCanvasFirebaseConfig();
   if (!config) return false;

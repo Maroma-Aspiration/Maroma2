@@ -53,9 +53,26 @@ const removeLegacyIngredientBlock = (text: string): string =>
 export type PdpAccordionSections = {
   description: string;
   ingredients: string;
-  benefits: string;
+  benefits: string[];
   howToUse: string;
 };
+
+/** Catalogue benefits often arrive as one paragraph. Split into shopper-facing bullets. */
+export function splitBenefitBullets(text: string): string[] {
+  const cleaned = text
+    .replace(/\u2022/g, "\n")
+    .replace(/^[•·\-*]+\s*/gm, "")
+    .replace(/\s+/g, " ")
+    .trim();
+  if (!cleaned) return [];
+  const fromLines = text
+    .split(/\n+/)
+    .map((line) => line.replace(/^[•·\-*]+\s*/, "").trim())
+    .filter(Boolean);
+  if (fromLines.length > 1) return fromLines;
+  const sentences = cleaned.split(/(?<=[.!?])\s+(?=[A-Z0-9])/).map((item) => item.trim()).filter(Boolean);
+  return sentences.length ? sentences : [cleaned];
+}
 
 export function derivePdpSections(product: ProductRecord): PdpAccordionSections {
   const { indiaOnlyNote } = stripIndiaOnlyFromProductName(product.name);
@@ -124,5 +141,5 @@ export function derivePdpSections(product: ProductRecord): PdpAccordionSections 
     ingredients = "Full INCI ingredient list is not yet available online. Please refer to the product label or contact Maroma before purchase.";
   }
 
-  return { description, ingredients, benefits, howToUse };
+  return { description, ingredients, benefits: splitBenefitBullets(benefits), howToUse };
 }

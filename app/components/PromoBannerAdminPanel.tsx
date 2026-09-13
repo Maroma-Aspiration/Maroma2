@@ -26,6 +26,7 @@ import {
 } from "../../lib/promo-sequence-utils";
 import {
   buildPreviewBannerStack,
+  derivePromoNameFromCopy,
   formatScheduleLabel,
   isPromoLiveClient,
   promoVisibilityStatus,
@@ -87,16 +88,6 @@ const STRIP_BG_IMAGE_MAX_BYTES = 12 * 1024 * 1024;
 const STRIP_BG_VIDEO_MAX_BYTES = 50 * 1024 * 1024;
 const STRIP_BG_CLIENT_UPLOAD_MIN_BYTES = 4 * 1024 * 1024;
 
-function stripBgUploadPathname(file: File): string {
-  const ext = file.name.includes(".") ? `.${file.name.split(".").pop()?.toLowerCase() ?? "bin"}` : ".bin";
-  const safeBase = (file.name.replace(/\.[^.]+$/, "") || "strip-bg")
-    .replace(/[^a-z0-9-]+/gi, "-")
-    .replace(/^-+|-+$/g, "")
-    .slice(0, 48)
-    .toLowerCase();
-  return `admin-promo-strip-bg/${safeBase || "strip-bg"}-${Date.now()}${ext}`;
-}
-
 async function uploadStripBackgroundFile(
   file: File,
   mediaKind: "image" | "video"
@@ -109,14 +100,8 @@ async function uploadStripBackgroundFile(
 
   const useClientUpload = mediaKind === "video" || file.size > STRIP_BG_CLIENT_UPLOAD_MIN_BYTES;
   if (useClientUpload) {
-    const { upload } = await import("@vercel/blob/client");
-    const result = await upload(stripBgUploadPathname(file), file, {
-      access: "public",
-      handleUploadUrl: "/api/promo-strip-background/upload",
-      multipart: file.size > 5 * 1024 * 1024,
-      contentType: file.type || undefined,
-    });
-    return result.url;
+    const { uploadFileToFirebase } = await import("../../lib/client-firebase-upload");
+    return uploadFileToFirebase(file, "admin-promo-strip-bg");
   }
 
   const form = new FormData();
@@ -460,7 +445,8 @@ export function PromoBannerAdminPanel({
   const resolveAdminName = () => {
     const name = draft.adminName.trim();
     if (name) return name.slice(0, 80);
-    return "Untitled banner";
+    // Borrow the headline instead of saving a placeholder name.
+    return derivePromoNameFromCopy(draft);
   };
 
   const buildPayload = (mode: SaveMode) => {

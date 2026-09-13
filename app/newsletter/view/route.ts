@@ -1,13 +1,24 @@
 import { unstable_noStore as noStore } from "next/cache";
+import { cookies } from "next/headers";
+import { NextResponse } from "next/server";
+import { canEditNewsletter } from "../../../lib/auth-roles";
+import { getSessionSecret, SESSION_COOKIE, verifySessionPayload } from "../../../lib/auth-session";
 import { readStoriesState } from "../../../lib/story-storage";
 import { ensureCanvasPublicImageUrls } from "../../../lib/canvas-email-images";
 import { canvasToEmailHtml, canvasEmailOptionsFromState } from "../../../lib/canvas-to-email";
 
 export const dynamic = "force-dynamic";
 
-/** Public "view in browser" — same HTML as the sent email. */
-export async function GET() {
+/** Public "view in browser" — same HTML as the sent email. Admins see the editor. */
+export async function GET(request: Request) {
   noStore();
+  const secret = getSessionSecret();
+  const token = cookies().get(SESSION_COOKIE)?.value;
+  const session = secret && token ? await verifySessionPayload(token, secret) : null;
+  if (canEditNewsletter(session?.role)) {
+    return NextResponse.redirect(new URL("/newsletter", request.url));
+  }
+
   const state = await readStoriesState();
   const canvas = state.newsletterCanvas;
   if (!canvas?.enabled || !canvas.elements?.length) {

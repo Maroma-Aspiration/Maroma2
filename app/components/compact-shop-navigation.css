@@ -15,11 +15,17 @@
 .compact-store-search .nav-search-bar { width:100%; }
 .compact-store-basket { flex:0 0 auto; }
 @media(max-width:800px) {
-  .compact-store-nav { display:grid; grid-template-columns:1fr minmax(90px,140px) auto; gap:8px 14px; padding:12px 16px; }
-  .compact-store-nav .brand { grid-column:1; grid-row:1; }
-  .compact-store-nav .brand-logo { width:125px!important; max-width:125px!important; height:auto!important; }
+  /* Equal side columns keep the search pill centred on the header, not just between its neighbours. */
+  .compact-store-nav { display:grid; grid-template-columns:1fr minmax(90px,140px) 1fr; gap:8px 14px; padding:12px 16px; }
+  .compact-store-nav .brand { grid-column:1; grid-row:1; justify-self:start; padding-left:0; }
+  .compact-store-nav .brand-logo { width:75px!important; max-width:75px!important; height:auto!important; }
   .compact-store-search { grid-column:2; grid-row:1; }
-  .compact-store-basket { grid-column:3; grid-row:1; }
+  .compact-store-nav .brand,.compact-store-search { transform:translateY(3mm); }
+  .compact-store-basket { grid-column:3; grid-row:1; justify-self:end; }
+  .compact-store-basket .nav-basket-btn { --nav-basket-offset-y:3mm; }
+  .compact-store-basket .nav-basket-btn { min-width:21.6px; min-height:21.6px; }
+  .compact-store-basket .nav-basket-btn .nav-basket-icon { width:21.6px; height:21.6px; }
+  .compact-store-basket .nav-basket-count { left:12px; min-width:14px; height:14px; padding:0 3px; font-size:9px; line-height:14px; }
   .compact-shop-links { grid-column:1/-1; grid-row:2; justify-content:space-between; gap:12px; }
   .compact-shop-links > a,.compact-shop-links button { font-size:10px; letter-spacing:.03em; }
 }

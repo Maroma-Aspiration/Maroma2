@@ -34,6 +34,21 @@ export function clearSpacingLocks(elements: CanvasEl[]): CanvasEl[] {
     return next;
   });
 }
+
+/** Keep user Y from drag / toolbar after a compact pass. */
+export function restoreSpacingLockedY(original: CanvasEl[], laidOut: CanvasEl[]): CanvasEl[] {
+  const origById = new Map(original.map((e) => [e.id, e]));
+  let changed = false;
+  const next = laidOut.map((e) => {
+    const orig = origById.get(e.id);
+    if (!orig || !isSpacingLocked(orig)) return e;
+    const lockedY = orig.y;
+    if (e.y === lockedY && isSpacingLocked(e)) return e;
+    changed = true;
+    return { ...e, y: lockedY, spacingLocked: true } as CanvasEl;
+  });
+  return changed ? next : laidOut;
+}
 const isText = (e: CanvasEl): e is CanvasTextEl => e.kind === "text";
 
 function estimateTextHeight(el: CanvasTextEl): number {
@@ -430,6 +445,13 @@ export function stackCanvasElements(
       continue;
     }
 
+    // Manual Y (slider / drag): keep stored top even when it sits above the compact cursor.
+    if (isSpacingLocked(unit.representative)) {
+      const unitBottom = preserveUnitY(unit, elements, heightOf, yById);
+      cursor = Math.max(cursor, mastheadFloor, unitBottom + gap);
+      continue;
+    }
+
     if (unitPreserved(unit, preserveIds)) {
       let unitBottom: number;
       if (unit.top < cursor - 0.5) {
@@ -466,6 +488,7 @@ const MASTHEAD_CENTER_IDS = new Set([
   "migrated-top",
   "migrated-logo",
   "migrated-hero",
+  "migrated-portrait",
 ]);
 
 /** Horizontally center a masthead asset on the 716px canvas (760px full-bleed → x = -22). */
@@ -860,6 +883,7 @@ function pushElementsFromLayoutOrder(
   return elements.map((e) => {
     if (canvasLayoutOrder(e) < fromOrder) return e;
     if (MASTHEAD_OVERLAY_IDS.has(e.id)) return e;
+    if (isSpacingLocked(e)) return e;
     const next = { ...e, y: e.y + delta } as CanvasEl;
     if ((e as { locked?: boolean }).locked) {
       (next as { locked?: boolean }).locked = false;
@@ -884,6 +908,7 @@ export function compactStorySectionsBelowGrid(
     .filter((e) => !MASTHEAD_OVERLAY_IDS.has(e.id) && canvasLayoutOrder(e) > gridOrder)
     .sort((a, b) => canvasLayoutOrder(a) - canvasLayoutOrder(b))[0];
   if (!anchor || anchor.y <= target + 8) return elements;
+  if (isSpacingLocked(anchor)) return elements;
 
   return pushElementsFromLayoutOrder(
     elements,
@@ -952,14 +977,15 @@ export function enforceStorySectionSpacing(
       const sbH = storyBodyInkHeight(sb);
       const sbBottom = sbY + sbH;
       if (cta && isCta(cta)) {
-        yById.set(cta.id, sbBottom + gaps.aboveButton);
-        y = sbBottom + gaps.aboveButton + heightOf(cta) + gaps.belowButton;
+        const ctaY = isSpacingLocked(cta) ? cta.y : sbBottom + gaps.aboveButton;
+        if (!isSpacingLocked(cta)) yById.set(cta.id, ctaY);
+        y = ctaY + heightOf(cta) + gaps.belowButton;
       } else {
         y = sbBottom + gaps.belowButton;
       }
     } else if (cta && isCta(cta)) {
-      const ctaY = y + gaps.aboveButton;
-      yById.set(cta.id, ctaY);
+      const ctaY = isSpacingLocked(cta) ? cta.y : y + gaps.aboveButton;
+      if (!isSpacingLocked(cta)) yById.set(cta.id, ctaY);
       y = ctaY + heightOf(cta) + gaps.belowButton;
     } else {
       y += gaps.belowButton;
@@ -1052,13 +1078,13 @@ export function relayoutNewsletterCanvas(
   options: RelayoutOptions = {},
 ): CanvasEl[] {
   const compact = options.compact ?? false;
-  let els = stripLockedFlags(clearMastheadMontage(ensureMastheadZOrder(elements)));
+  let els = stripLockedFlags(clearMastheadMontage(ensureMastheadLayout(elements)));
 
   if (options.resetIssueHeading) {
     els = resetIssueHeadingBand(els);
   }
 
-  if (!compact) return els;
+  if (!compact) return restoreSpacingLockedY(elements, els);
 
   els = unlockIssueHeadingForStack(unlockMisplacedIssueHeading(els));
   const gapFn = (cur: CanvasEl, nxt: CanvasEl | undefined) =>
@@ -1066,7 +1092,7 @@ export function relayoutNewsletterCanvas(
   els = stackCanvasElements(els, heightOf, gapFn, options.preserveIds ?? new Set());
   els = enforceIssueTitleGreetingGap(els);
   els = layoutCanvasStorySpacing(els, gaps, heightOf);
-  return els;
+  return restoreSpacingLockedY(elements, els);
 }
 
 /** Shared story-spacing pass — editor display and email export must use the same order. */
@@ -1123,7 +1149,7 @@ export function syncCanvasStoryLayout(
 ): { elements: CanvasEl[]; measuredHeights: Record<string, number> } {
   const heightOf = canvasLayoutHeightOf(measuredHeights);
   const stacked = relayoutNewsletterCanvas(
-    clearSpacingLocks(elements),
+    elements,
     gaps,
     heightOf,
     { compact: true },
@@ -1147,7 +1173,7 @@ export function prepareCanvasForEmailExport(
   elements: CanvasEl[],
   gaps: StorySpacingGaps = DEFAULT_STORY_SPACING_GAPS,
 ): CanvasEl[] {
-  let els = stripLockedFlags(clearMastheadMontage(ensureMastheadZOrder(elements)));
+  let els = stripLockedFlags(clearMastheadMontage(ensureMastheadLayout(elements)));
   els = normalizeEmailBannerWidth(els);
   return paintOrderElements(els);
 }

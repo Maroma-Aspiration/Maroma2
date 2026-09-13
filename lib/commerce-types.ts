@@ -43,6 +43,7 @@ export type CartView = CartTotals & {
   id: string;
   items: CartItemView[];
   couponCode?: string;
+  promoAvailable?: boolean;
 };
 
 export type CommerceProduct = {
@@ -106,9 +107,10 @@ export type OrderRecord = {
   total: number;
   notifications: { email: boolean; whatsapp: boolean };
   payment?: {
-    provider: "razorpay";
+    provider: "razorpay" | "ccavenue";
     orderId?: string;
     paymentId?: string;
+    trackingId?: string;
     paidAt?: string;
   };
   createdAt: string;

@@ -11,11 +11,17 @@ export const dynamic = "force-dynamic";
 export default async function Home({
   searchParams,
 }: {
-  searchParams?: { skipIntro?: string; q?: string; promoPreview?: string };
+  searchParams?: {
+    skipIntro?: string;
+    q?: string;
+    promoPreview?: string;
+    mobilePromoPreview?: string;
+  };
 }) {
   const ua = (await headers()).get("user-agent") ?? "";
   const initialViewportIsMobile = isMaromaMobileUserAgent(ua);
   const promoPreview = searchParams?.promoPreview === "1";
+  const mobilePromoPreview = searchParams?.mobilePromoPreview === "1";
   const [initialHeroVisual, initialSiteContent, initialPromoBanners, initialCategoryBanners] = await Promise.all([
     readPersistedHeroVisualState(),
     readSiteContentFromDisk(),
@@ -28,9 +34,15 @@ export default async function Home({
       initialSiteContent={initialSiteContent}
       initialPromoBanners={initialPromoBanners}
       initialCategoryBanners={initialCategoryBanners}
-      initialViewportIsMobile={promoPreview ? false : initialViewportIsMobile}
-      initialSkipIntro={promoPreview || searchParams?.skipIntro === "1" || Boolean(searchParams?.q?.trim())}
+      initialViewportIsMobile={promoPreview ? false : mobilePromoPreview ? true : initialViewportIsMobile}
+      initialSkipIntro={
+        promoPreview ||
+        mobilePromoPreview ||
+        searchParams?.skipIntro === "1" ||
+        Boolean(searchParams?.q?.trim())
+      }
       initialPromoPreview={promoPreview}
+      initialMobilePromoPreview={mobilePromoPreview}
       initialProductSearch={searchParams?.q ?? ""}
     />
   );

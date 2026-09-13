@@ -1,0 +1,428 @@
+import type { SafetySet } from "./safety-guidelines-types";
+
+/**
+ * Seed copy carried over from maroma.com/safety-guidelines. Wording is regulatory, so it is kept
+ * as published apart from clear typographic slips (noted in the review list handed to Maroma).
+ */
+export const DEFAULT_SAFETY_SETS: SafetySet[] = [
+  {
+    id: "incense",
+    label: "Incense sticks and cones",
+    summary: "Lighting, burning and disposal guidance for Maroma incense, in eight languages.",
+    translations: {
+      en: {
+        title: "Incense safety",
+        sections: [
+          {
+            heading: "How to use",
+            body: "Light the incense stick for a few seconds and blow out the flame. Place the incense in a holder on a non-flammable surface. Do not touch hot ashes and discard the ashes after it is completely cooled down.",
+            items: [],
+          },
+          {
+            heading: "Caution",
+            body: "Use only in well-ventilated places. Avoid contact with inflammable materials. Keep out of reach of children and pets. Do not inhale the smoke or leave the incense stick unattended while burning. Always use with an incense holder.",
+            items: [],
+          },
+          {
+            heading: "Important instructions",
+            body: "",
+            items: [
+              "Ensure plenty of space above and around the stick incense or cone, away from shelves, walls, and any heat sources.",
+              "Place one incense stick or cone on a heat resistant incense holder. Ensure that it will not be damaged by falling ash.",
+              "Keep away from flammable materials and polished or painted surfaces which may be damaged by fragrance oils.",
+              "Light the tip of the stick incense or cone. Once lit, extinguish the flame immediately to allow the incense to smolder.",
+              "Burn one stick or cone at a time.",
+              "Use only in well ventilated places.",
+              "Keep out of reach of children and pets.",
+              "Do not directly inhale the smoke.",
+              "Do not ingest.",
+              "Do not leave a burning incense stick or cone unattended.",
+              "Allow burnt stick incense or cone to cool sufficiently before disposing of it.",
+              "Those with fragrance sensitivities should use this product with caution.",
+            ],
+          },
+        ],
+      },
+      fr: {
+        title: "Sécurité de l'encens",
+        sections: [
+          {
+            heading: "Mode d'emploi",
+            body: "Allumez le bâton d'encens quelques secondes et soufflez sur la flamme. Placez l'encens dans un récipient sur une surface non inflammable. Ne touchez pas les cendres chaudes et jetez-les une fois complètement refroidies.",
+            items: [],
+          },
+          {
+            heading: "Attention",
+            body: "Utiliser uniquement dans un endroit bien ventilé. Éviter tout contact avec des matières inflammables. Tenir hors de portée des enfants et des animaux. Ne pas inhaler la fumée et ne pas laisser le bâton d'encens sans surveillance pendant sa combustion. Toujours utiliser avec un porte-encens.",
+            items: [],
+          },
+          {
+            heading: "Directives importantes",
+            body: "",
+            items: [
+              "Vérifiez qu'il y a assez de place au-dessus et autour du bâtonnet ou du cône, placé à distance des étagères et de toute source de chaleur.",
+              "Placer un bâton d'encens sur un porte-encens résistant à la chaleur. Attention à ce que la cendre ne puisse rien endommager en tombant.",
+              "Tenir à l'écart de tout matériel inflammable ou de surface polie ou peinte qui pourraient être abîmées par les huiles parfumées.",
+              "Allumez l'extrémité du bâtonnet ou du cône. Une fois allumé, éteignez immédiatement la flamme, afin de permettre au bâtonnet ou au cône de se consumer.",
+              "Faire brûler un seul bâtonnet ou cône à la fois.",
+              "À utiliser uniquement dans une pièce bien ventilée.",
+              "Garder hors d'atteinte des enfants et des animaux domestiques.",
+              "Ne pas inhaler directement la fumée.",
+              "Ne pas ingérer.",
+              "Ne pas laisser le bâton d'encens ou le cône sans surveillance.",
+              "Laissez refroidir suffisamment le bâtonnet ou le cône brûlé avant de le jeter.",
+              "Les personnes souffrant de sensibilité aux parfums doivent utiliser ce produit avec prudence.",
+              "Veuillez conserver ces informations pour consultation ultérieure.",
+            ],
+          },
+        ],
+      },
+      it: {
+        title: "Sicurezza dell'incenso",
+        sections: [
+          {
+            heading: "Modalità d'uso",
+            body: "Accendi il bastoncino di incenso per qualche secondo e spegni la fiamma soffiando. Posiziona l'incenso in un porta incenso su una superficie non infiammabile. Non toccare la cenere calda e gettala via una volta che si è completamente raffreddata.",
+            items: [],
+          },
+          {
+            heading: "Attenzione",
+            body: "Utilizzare solo in luoghi ben ventilati. Evitare il contatto con materiali infiammabili. Tenere fuori dalla portata di bambini e animali domestici. Non inalare il fumo né lasciare il bastoncino di incenso incustodito durante la combustione. Utilizzare sempre con un porta incenso.",
+            items: [],
+          },
+          {
+            heading: "Importanti avvertenze",
+            body: "",
+            items: [
+              "Assicurarsi che vi sia spazio abbondante sopra ed intorno al bastoncino o al cono d'incenso, lontano da scaffali, muri e da qualsiasi fonte di calore.",
+              "Posizionare il bastoncino o il cono d'incenso su un portaincenso resistente al calore. Assicurarsi che la cenere cadendo non danneggi il piano su cui è appoggiato.",
+              "Tenere lontano da materiali infiammabili e da superfici lucidate o verniciate che potrebbero venir danneggiate dagli olii profumati.",
+              "Accendere la punta del bastoncino o del cono d'incenso. Una volta accesa, spegnere immediatamente la fiamma facendo sì che il bastoncino o il cono d'incenso bruci senza fiamma.",
+              "Accendere un bastoncino alla volta.",
+              "Consumare sempre gli incensi in luogo ampio e ben ventilato.",
+              "Tenere fuori dalla portata dei bambini e animali domestici.",
+              "Non inalare direttamente il fumo emesso dal bastoncino o dal cono d'incenso durante la combustione.",
+              "Non ingerire.",
+              "Non lasciare incustodito il bastoncino o il cono d'incenso durante la sua combustione.",
+              "Lasciare raffreddare e spegnere completamente i bastoncini e i coni d'incenso prima di gettarli via.",
+              "Coloro che soffrono di sensibilità ai profumi dovrebbero usare questo prodotto con cautela.",
+              "Tempo di combustione: 50-60 minuti per bastoncino.",
+            ],
+          },
+        ],
+      },
+      de: {
+        title: "Sicherheitshinweise für Räucherstäbchen",
+        sections: [
+          {
+            heading: "Anwendung",
+            body: "Zünden Sie das Räucherstäbchen einige Sekunden lang an und pusten Sie die Flamme aus. Stellen Sie das Räucherstäbchen in einen Halter auf eine nicht brennbare Oberfläche. Berühren Sie die heiße Asche nicht und entsorgen Sie sie, sobald sie vollständig abgekühlt ist.",
+            items: [],
+          },
+          {
+            heading: "Achtung",
+            body: "Nur an gut belüfteten Orten verwenden. Kontakt mit brennbaren Materialien vermeiden. Außerhalb der Reichweite von Kindern und Haustieren aufbewahren. Rauch nicht einatmen und das Räucherstäbchen während des Brennens nicht unbeaufsichtigt lassen. Immer mit Räucherstäbchenhalter verwenden.",
+            items: [],
+          },
+          {
+            heading: "Wichtige Anleitungen",
+            body: "",
+            items: [
+              "Stellen Sie sicher, dass genügend Platz über und um das Räucherstäbchen und den Räucherkegel vorhanden ist, entfernt von Regalen, Wänden und Wärmequellen.",
+              "Platzieren Sie ein Räucherstäbchen oder einen Räucherkegel in einen hitzebeständigen Halter. Stellen Sie sicher, dass fallende Asche keinen Schaden verursacht.",
+              "Halten Sie das Räucherstäbchen oder den Räucherkegel entfernt von entzündbaren Materialien und polierten oder bemalten Oberflächen, die durch die Duftöle beschädigt werden könnten.",
+              "Zünden Sie die Spitze des Räucherstäbchens oder Räucherkegels an. Einmal angezündet, löschen Sie die Flamme sofort aus, um die Räucherstäbchen oder Räucherkegel glimmen zu lassen.",
+              "Lassen Sie nur ein Räucherstäbchen auf einmal abbrennen.",
+              "Benutzen Sie das Produkt nur an gut belüfteten Orten.",
+              "Halten Sie das Produkt von Haustieren und Kindern fern.",
+              "Inhalieren Sie den Rauch nicht direkt, der beim Abbrennen der Räucherstäbchen oder Räucherkegel ausströmt.",
+              "Nehmen Sie das Produkt nicht mit der Nahrung auf.",
+              "Lassen Sie niemals abbrennende Räucherstäbchen oder Räucherkegel unbeaufsichtigt.",
+              "Lassen Sie abgebrannte Räucherstäbchen oder Räucherkegel genügend abkühlen, bevor Sie sie beseitigen.",
+              "Diejenigen, die empfindlich auf Duftstoffe reagieren, sollten dieses Produkt mit Vorsicht verwenden.",
+            ],
+          },
+        ],
+      },
+      es: {
+        title: "Seguridad del incienso",
+        sections: [
+          {
+            heading: "Modo de empleo",
+            body: "Encienda la varilla de incienso durante unos segundos y apague la llama soplando. Coloque el incienso en un recipiente sobre una superficie no inflamable. No toque las cenizas calientes y deséchelas una vez que se hayan enfriado por completo.",
+            items: [],
+          },
+          {
+            heading: "Precaución",
+            body: "Usar solo en lugares bien ventilados. Evitar el contacto con materiales inflamables. Mantener fuera del alcance de niños y mascotas. No inhalar el humo ni dejar la varilla de incienso sin supervisión mientras esté encendida. Usar siempre con un portainciensos.",
+            items: [],
+          },
+          {
+            heading: "Instrucciones importantes",
+            body: "",
+            items: [
+              "Asegúrese de dejar amplio espacio por encima y en torno a la varita o cono de incienso, colóquelo alejado de armarios, paredes y de cualquier fuente de calor.",
+              "Ponga una varita o cono de incienso en un inciensario resistente al calor. Asegúrese de que no le dañe la caída de ceniza.",
+              "Manténgalo alejado de materiales inflamables y superficies enceradas o pintadas que puedan ser dañadas por los aceites aromáticos.",
+              "Prenda la punta de la varita o cono de incienso. Una vez prendida, apague la llama inmediatamente para permitir que arda el incienso.",
+              "Quemar sólo una varita o cono de incienso cada vez.",
+              "Usar únicamente en lugares bien ventilados.",
+              "Mantener lejos del alcance de niños y animales domésticos.",
+              "No inhalar directamente el humo emitido por la varita o cono de incienso encendido.",
+              "No ingerir.",
+              "No dejar desatendida la varita o cono de incienso mientras arde.",
+              "Dejar que la varita o cono de incienso quemado se enfríe suficientemente antes de retirarlo.",
+              "Las personas hipersensibles a las fragancias deberían utilizar este producto con precaución.",
+            ],
+          },
+        ],
+      },
+      ta: {
+        title: "ஊதுபத்தி பாதுகாப்பு",
+        sections: [
+          {
+            heading: "பயன்படுத்தும் முறை",
+            body: "ஊதுபத்திக் குச்சியை சில விநாடிகள் பற்றவைத்து, தீயை ஊதி அணைக்கவும். அதை எரியாத மேற்பரப்பில் வைக்கப்பட்ட தாங்கியில் வையுங்கள். சூடான சாம்பலைத் தொடாதீர்கள். முழுவதும் ஆறிய பிறகே சாம்பலை அகற்றுங்கள்.",
+            items: [],
+          },
+          {
+            heading: "எச்சரிக்கை",
+            body: "காற்றோட்டம் நன்றாக உள்ள இடங்களில் மட்டுமே பயன்படுத்துங்கள். எளிதில் தீப்பற்றும் பொருட்களைத் தவிர்க்கவும். குழந்தைகள் மற்றும் செல்லப்பிராணிகளின் எட்டாத இடத்தில் வையுங்கள். புகையை சுவாசிக்காதீர்கள். எரியும்போது ஊதுபத்தியை கவனிக்காமல் விடாதீர்கள். எப்போதும் ஊதுபத்தித் தாங்கியுடன் பயன்படுத்துங்கள்.",
+            items: [],
+          },
+          {
+            heading: "முக்கிய அறிவுறுத்தல்கள்",
+            body: "",
+            items: [
+              "குச்சி அல்லது கூம்பின் மேலும் சுற்றும் போதுமான இடம் இருக்கட்டும். அலமாரிகள், சுவர்கள் மற்றும் வெப்ப மூலங்களிலிருந்து விலக்கி வையுங்கள்.",
+              "ஒரு குச்சி அல்லது கூம்பை வெப்பத்தைத் தாங்கும் ஊதுபத்தித் தாங்கியில் வையுங்கள். விழும் சாம்பலால் சேதம் ஏற்படாதபடி பார்த்துக்கொள்ளுங்கள்.",
+              "எளிதில் தீப்பற்றும் பொருட்களிலிருந்தும், நறுமண எண்ணெய்களால் சேதமாகக்கூடிய மெருகேற்றப்பட்ட அல்லது வர்ணம் பூசப்பட்ட மேற்பரப்புகளிலிருந்தும் விலக்கி வையுங்கள்.",
+              "குச்சி அல்லது கூம்பின் நுனியைப் பற்றவைக்கவும். பற்றியவுடன் தீயை உடனே அணைத்து, ஊதுபத்தி புகைக்க விடுங்கள்.",
+              "ஒரே நேரத்தில் ஒரு குச்சி அல்லது கூம்பை மட்டுமே எரிக்கவும்.",
+              "காற்றோட்டம் நன்றாக உள்ள இடங்களில் மட்டுமே பயன்படுத்துங்கள்.",
+              "குழந்தைகள் மற்றும் செல்லப்பிராணிகளின் எட்டாத இடத்தில் வையுங்கள்.",
+              "புகையை நேரடியாக சுவாசிக்காதீர்கள்.",
+              "உண்ண வேண்டாம்.",
+              "எரியும் ஊதுபத்திக் குச்சி அல்லது கூம்பை கவனிக்காமல் விடாதீர்கள்.",
+              "எரிந்த குச்சி அல்லது கூம்பை போதுமான அளவு ஆறிய பிறகே அகற்றுங்கள்.",
+              "நறுமணத்திற்கு உணர்ச்சியுள்ளவர்கள் இதைக் கவனத்துடன் பயன்படுத்த வேண்டும்.",
+            ],
+          },
+        ],
+      },
+      hi: {
+        title: "धूपबत्ती सुरक्षा",
+        sections: [
+          {
+            heading: "उपयोग की विधि",
+            body: "धूपबत्ती को कुछ सेकंड जलाएँ और लौ बुझा दें। इसे गैर-ज्वलनशील सतह पर रखे होल्डर में रखें। गर्म राख न छुएँ और पूरी तरह ठंडी होने के बाद ही राख फेंकें।",
+            items: [],
+          },
+          {
+            heading: "सावधानी",
+            body: "केवल अच्छी हवा वाले स्थानों पर उपयोग करें। ज्वलनशील सामग्री से दूर रखें। बच्चों और पालतू जानवरों की पहुँच से बाहर रखें। धुआँ न सूँघें और जलती धूपबत्ती को अकेला न छोड़ें। हमेशा धूपबत्ती होल्डर के साथ उपयोग करें।",
+            items: [],
+          },
+          {
+            heading: "महत्वपूर्ण निर्देश",
+            body: "",
+            items: [
+              "छड़ी या शंकु के ऊपर और चारों ओर पर्याप्त जगह रखें, अलमारियों, दीवारों और किसी भी गर्मी के स्रोत से दूर।",
+              "एक छड़ी या शंकु को गर्मी सहने वाले होल्डर पर रखें। गिरती राख से नुकसान न हो, यह सुनिश्चित करें।",
+              "ज्वलनशील सामग्री और पॉलिश या पेंट की गई सतहों से दूर रखें, जिन्हें सुगंध तेल नुकसान पहुँचा सकते हैं।",
+              "छड़ी या शंकु की नोक जलाएँ। जलते ही लौ तुरंत बुझा दें ताकि धूपबत्ती सुलगती रहे।",
+              "एक समय में केवल एक छड़ी या शंकु जलाएँ।",
+              "केवल अच्छी हवा वाले स्थानों पर उपयोग करें।",
+              "बच्चों और पालतू जानवरों की पहुँच से बाहर रखें।",
+              "धुआँ सीधे न सूँघें।",
+              "निगलें नहीं।",
+              "जलती धूपबत्ती या शंकु को अकेला न छोड़ें।",
+              "जली हुई छड़ी या शंकु को फेंकने से पहले पर्याप्त ठंडा होने दें।",
+              "सुगंध के प्रति संवेदनशील लोगों को यह उत्पाद सावधानी से उपयोग करना चाहिए।",
+            ],
+          },
+        ],
+      },
+      bn: {
+        title: "ধূপের নিরাপত্তা",
+        sections: [
+          {
+            heading: "ব্যবহারবিধি",
+            body: "ধূপকাঠি কয়েক সেকেন্ড জ্বালিয়ে শিখা নিভিয়ে দিন। এটিকে অদাহ্য তলের উপর রাখা হোল্ডারে রাখুন। গরম ছাই স্পর্শ করবেন না এবং সম্পূর্ণ ঠান্ডা হওয়ার পরেই ছাই ফেলুন।",
+            items: [],
+          },
+          {
+            heading: "সতর্কতা",
+            body: "শুধুমাত্র ভালো বায়ুচলাচলযুক্ত স্থানে ব্যবহার করুন। দাহ্য পদার্থ থেকে দূরে রাখুন। শিশু ও পোষা প্রাণীর নাগালের বাইরে রাখুন। ধোঁয়া শ্বাসে নেবেন না এবং জ্বলন্ত ধূপকাঠি অযত্নে ফেলে রাখবেন না। সর্বদা ধূপ হোল্ডারের সাথে ব্যবহার করুন।",
+            items: [],
+          },
+          {
+            heading: "গুরুত্বপূর্ণ নির্দেশাবলী",
+            body: "",
+            items: [
+              "কাঠি বা কোনের উপর ও চারপাশে পর্যাপ্ত জায়গা রাখুন, তাক, দেয়াল এবং যেকোনো তাপের উৎস থেকে দূরে।",
+              "একটি কাঠি বা কোন তাপসহনশীল হোল্ডারে রাখুন। পড়া ছাইতে যেন ক্ষতি না হয়, তা নিশ্চিত করুন।",
+              "দাহ্য পদার্থ এবং পালিশ বা রং করা পৃষ্ঠ থেকে দূরে রাখুন, যেগুলো সুগন্ধি তেলে ক্ষতিগ্রস্ত হতে পারে।",
+              "কাঠি বা কোনের ডগা জ্বালান। জ্বলে উঠলে সঙ্গে সঙ্গে শিখা নিভিয়ে দিন, যাতে ধূপ ধীরে জ্বলতে পারে।",
+              "একবারে শুধু একটি কাঠি বা কোন জ্বালান।",
+              "শুধুমাত্র ভালো বায়ুচলাচলযুক্ত স্থানে ব্যবহার করুন।",
+              "শিশু ও পোষা প্রাণীর নাগালের বাইরে রাখুন।",
+              "ধোঁয়া সরাসরি শ্বাসে নেবেন না।",
+              "খাবেন না।",
+              "জ্বলন্ত ধূপকাঠি বা কোন অযত্নে ফেলে রাখবেন না।",
+              "পোড়া কাঠি বা কোন ফেলার আগে যথেষ্ট ঠান্ডা হতে দিন।",
+              "সুগন্ধির প্রতি সংবেদনশীলদের এই পণ্য সাবধানে ব্যবহার করা উচিত।",
+            ],
+          },
+        ],
+      },
+    },
+  },
+  {
+    id: "candles",
+    label: "Candles",
+    summary: "Care and burning instructions for Maroma's hand-poured pillar and container candles.",
+    translations: {
+      en: {
+        title: "Candle care and safety",
+        sections: [
+          {
+            heading: "Candle care",
+            body: "",
+            items: [
+              "The making of candles is an art as well as a science. A precise integration of the parts that add up to the sum of a luminous beauty.",
+              "Maroma's candles are 100% hand crafted. People, not machines, make Maroma's candles special.",
+              "Like people, candles also respond well to attention. Always keep a pillar candle of any size or diameter burning for a longer time when first burning it, to ensure good, even burning thereafter. Check the wick and help it to remain straight and centred by using a knife to gently coax it to the centre.",
+              "Container candles take much less time for the top part of the wax to melt. Our container candles are all made of vegetal wax which is softer than paraffin wax, have a lovely smoke free burning and the wicks are self trimming. As the top wax melts quickly, help the wick to remain centred in the same way as for pillar candles.",
+            ],
+          },
+          {
+            heading: "Warning",
+            body: "",
+            items: [
+              "Always leave at least 10cm between burning candles.",
+              "Burn the candle out of reach of children and pets.",
+              "Never leave a burning candle unattended.",
+              "Do not burn candles near anything that can catch fire.",
+              "Place on a suitable holder to contain wax spills and only place on heat resistant surfaces. Keep free from secondary wicks such as matches and other debris, and away from other heat sources and out of draughts, to avoid flaring. Other heat sources such as a fireplace or heater can also cause the candle to topple, and draughts can blow flammable items onto the candle.",
+              "Trim the wick to 10mm before use.",
+              "Remove all packaging and labels before use.",
+              "Burn in a vertical position.",
+              "Never place on top of televisions or stereos.",
+              "Do not move while alight. Allow cooling time before moving.",
+              "Do not burn for more than 4 hours at a time.",
+              "Extinguish the candle immediately if it smokes, flickers repeatedly, or the flame becomes too high.",
+              "Extinguish using a snuffer or the back of a metal spoon, taking care not to damage the wick. Never use liquid to extinguish.",
+              "Never allow the candle to burn down to the base. Leave 20mm of wax remaining.",
+            ],
+          },
+        ],
+      },
+      ta: {
+        title: "மெழுகுவர்த்தி பராமரிப்பு மற்றும் பாதுகாப்பு",
+        sections: [
+          {
+            heading: "மெழுகுவர்த்தி பராமரிப்பு",
+            body: "",
+            items: [
+              "மெழுகுவர்த்தி செய்வது ஒரு கலை மட்டுமல்ல, அறிவியலும் கூட. ஒளிரும் அழகை உருவாக்கும் பகுதிகளின் துல்லியமான இணைவு.",
+              "மரோமாவின் மெழுகுவர்த்திகள் 100% கைவினை. இயந்திரங்கள் அல்ல, மக்களே இவற்றைச் சிறப்பாக்குகிறார்கள்.",
+              "மக்களைப் போலவே, மெழுகுவர்த்திகளும் கவனத்திற்கு நன்றாகப் பதிலளிக்கின்றன. எந்த அளவு தூண் மெழுகுவர்த்தியையும் முதல் முறை நீண்ட நேரம் எரியவிடுங்கள், அதன்பின் சீராக எரியும். திரியைப் பார்த்து, கத்தியால் மெதுவாக நடுவில் நிற்க உதவுங்கள்.",
+              "கலன் மெழுகுவர்த்திகளில் மேற்புற மெழுகு வேகமாக உருகும். எங்கள் கலன் மெழுகுவர்த்திகள் பாராஃபினை விட மென்மையான தாவர மெழுகால் ஆனவை, புகையில்லாமல் எரிகின்றன, திரிகள் தானே சீரமைக்கப்படுகின்றன. மேற்புற மெழுகு வேகமாக உருகும்போது, தூண் மெழுகுவர்த்தியைப் போலவே திரியை நடுவில் வையுங்கள்.",
+            ],
+          },
+          {
+            heading: "எச்சரிக்கை",
+            body: "",
+            items: [
+              "எரியும் மெழுகுவர்த்திகளுக்கு இடையே குறைந்தது 10 செ.மீ. இடைவெளி விடுங்கள்.",
+              "குழந்தைகள் மற்றும் செல்லப்பிராணிகளின் எட்டாத இடத்தில் எரியுங்கள்.",
+              "எரியும் மெழுகுவர்த்தியை ஒருபோதும் கவனிக்காமல் விடாதீர்கள்.",
+              "தீப்பற்றக்கூடிய எதற்கும் அருகில் மெழுகுவர்த்தி எரியாதீர்கள்.",
+              "உருகும் மெழுகைப் பிடிக்க ஏற்ற தாங்கியில், வெப்பத்தைத் தாங்கும் மேற்பரப்பில் மட்டுமே வையுங்கள். தீக்குச்சி மற்றும் பிற குப்பை போன்ற இரண்டாம் திரிகள் இல்லாமல் வையுங்கள். பிற வெப்ப மூலங்கள் மற்றும் காற்றோட்டத்திலிருந்து விலக்கி, தீ பரவாமல் பார்த்துக்கொள்ளுங்கள். நெருப்பிடம் அல்லது ஹீட்டர் மெழுகுவர்த்தியைக் கவிழ்க்கலாம், காற்று தீப்பற்றும் பொருட்களை அதன் மேல் வீசலாம்.",
+              "பயன்படுத்துவதற்கு முன் திரியை 10 மி.மீ.க்கு வெட்டுங்கள்.",
+              "பயன்படுத்துவதற்கு முன் அனைத்து பொதியையும் லேபிள்களையும் அகற்றுங்கள்.",
+              "செங்குத்தாக எரியுங்கள்.",
+              "தொலைக்காட்சி அல்லது ஸ்டீரியோவின் மேல் ஒருபோதும் வைக்காதீர்கள்.",
+              "எரியும்போது நகர்த்தாதீர்கள். நகர்த்துவதற்கு முன் ஆற விடுங்கள்.",
+              "ஒரே நேரத்தில் 4 மணி நேரத்திற்கு மேல் எரியாதீர்கள்.",
+              "புகைந்தால், மீண்டும் மீண்டும் மின்னினால், அல்லது தீ அதிக உயரம் எடுத்தால் உடனே அணைக்கவும்.",
+              "ஸ்னஃபர் அல்லது உலோகக் கரண்டியின் பின்புறத்தால் அணைக்கவும், திரிக்கு சேதம் வராமல் பார்த்துக்கொள்ளுங்கள். அணைக்க திரவம் பயன்படுத்த வேண்டாம்.",
+              "மெழுகுவர்த்தியை அடிவரை எரிய விடாதீர்கள். 20 மி.மீ. மெழுகு மீதம் இருக்கட்டும்.",
+            ],
+          },
+        ],
+      },
+      hi: {
+        title: "मोमबत्ती की देखभाल और सुरक्षा",
+        sections: [
+          {
+            heading: "मोमबत्ती की देखभाल",
+            body: "",
+            items: [
+              "मोमबत्ती बनाना कला भी है और विज्ञान भी। उन भागों का सटीक मेल जो मिलकर एक चमकदार सुंदरता बनाते हैं।",
+              "मरोमा की मोमबत्तियाँ 100% हाथ से बनी हैं। मशीनें नहीं, लोग इन्हें खास बनाते हैं।",
+              "लोगों की तरह मोमबत्तियाँ भी ध्यान देने पर अच्छा जवाब देती हैं। किसी भी आकार की स्तंभ मोमबत्ती को पहली बार अधिक देर तक जलने दें, ताकि आगे समान रूप से जले। बाती जाँचें और चाकू से धीरे से उसे बीच में रखें।",
+              "डिब्बे वाली मोमबत्तियों में ऊपर की मोम जल्दी पिघलती है। हमारी डिब्बे वाली मोमबत्तियाँ पैराफिन से नरम वनस्पति मोम की हैं, धुआँ रहित जलती हैं और बाती अपने आप संतुलित रहती है। ऊपर की मोम जल्दी पिघले तो स्तंभ मोमबत्ती की तरह बाती को बीच में रखें।",
+            ],
+          },
+          {
+            heading: "चेतावनी",
+            body: "",
+            items: [
+              "जलती मोमबत्तियों के बीच कम से कम 10 सेमी दूरी रखें।",
+              "मोमबत्ती बच्चों और पालतू जानवरों की पहुँच से दूर जलाएँ।",
+              "जलती मोमबत्ती को कभी अकेला न छोड़ें।",
+              "आग पकड़ सकने वाली किसी भी चीज़ के पास मोमबत्ती न जलाएँ।",
+              "पिघली मोम रोकने वाले उपयुक्त होल्डर पर और केवल गर्मी सहने वाली सतह पर रखें। माचिस और अन्य कचरे जैसी दूसरी बाती से मुक्त रखें, अन्य गर्मी के स्रोतों और हवा से दूर रखें ताकि लौ न उछले। चिमनी या हीटर मोमबत्ती गिरा सकते हैं, और हवा आग पकड़ने वाली चीज़ें उस पर गिरा सकती है।",
+              "उपयोग से पहले बाती 10 मिमी काटें।",
+              "उपयोग से पहले सारी पैकिंग और लेबल हटाएँ।",
+              "सीधी अवस्था में जलाएँ।",
+              "टेलीविज़न या स्टीरियो के ऊपर कभी न रखें।",
+              "जलते समय न हिलाएँ। हिलाने से पहले ठंडा होने दें।",
+              "एक बार में 4 घंटे से अधिक न जलाएँ।",
+              "अगर धुआँ निकले, बार-बार टिमटिमाए, या लौ बहुत ऊँची हो जाए तो तुरंत बुझाएँ।",
+              "स्नफ़र या धातु के चम्मच के पिछले हिस्से से बुझाएँ, बाती खराब न हो। बुझाने के लिए तरल का उपयोग न करें।",
+              "मोमबत्ती को तली तक न जलने दें। 20 मिमी मोम शेष रहने दें।",
+            ],
+          },
+        ],
+      },
+      bn: {
+        title: "মোমবাতির যত্ন ও নিরাপত্তা",
+        sections: [
+          {
+            heading: "মোমবাতির যত্ন",
+            body: "",
+            items: [
+              "মোমবাতি তৈরি শিল্পও, বিজ্ঞানও। সেই অংশগুলোর নিখুঁত মিল যা মিলে একটি উজ্জ্বল সৌন্দর্য হয়।",
+              "মারোমার মোমবাতি ১০০% হাতে তৈরি। মেশিন নয়, মানুষই এগুলোকে বিশেষ করে।",
+              "মানুষের মতো মোমবাতিও যত্নে সাড়া দেয়। যেকোনো আকারের স্তম্ভ মোমবাতি প্রথমবার বেশি সময় জ্বালান, যাতে পরে সমান জ্বলে। শলাকা দেখুন এবং ছুরি দিয়ে আলতো করে মাঝখানে রাখুন।",
+              "পাত্র মোমবাতিতে উপরের মোম তাড়াতাড়ি গলে। আমাদের পাত্র মোমবাতি প্যারাফিনের চেয়ে নরম উদ্ভিজ্জ মোমের, ধোঁয়াহীন জ্বলে এবং শলাকা নিজে ঠিক থাকে। উপরের মোম তাড়াতাড়ি গললে স্তম্ভ মোমবাতির মতো শলাকা মাঝখানে রাখুন।",
+            ],
+          },
+          {
+            heading: "সতর্কতা",
+            body: "",
+            items: [
+              "জ্বলন্ত মোমবাতির মধ্যে অন্তত ১০ সেমি ফাঁক রাখুন।",
+              "শিশু ও পোষা প্রাণীর নাগালের বাইরে জ্বালান।",
+              "জ্বলন্ত মোমবাতি কখনো অযত্নে ফেলে রাখবেন না।",
+              "আগুন ধরতে পারে এমন কিছুর কাছে মোমবাতি জ্বালাবেন না।",
+              "গলিত মোম ধরার উপযুক্ত হোল্ডারে এবং শুধু তাপসহনশীল তলে রাখুন। দিয়াশলাই ও অন্য আবর্জনার মতো দ্বিতীয় শলাকামুক্ত রাখুন, অন্য তাপের উৎস ও হাওয়া থেকে দূরে রাখুন যাতে শিখা না বাড়ে। চুল্লি বা হিটার মোমবাতি ফেলে দিতে পারে, হাওয়া দাহ্য জিনিস তার উপর উড়িয়ে আনতে পারে।",
+              "ব্যবহারের আগে শলাকা ১০ মিমি কেটে নিন।",
+              "ব্যবহারের আগে সব মোড়ক ও লেবেল খুলে ফেলুন।",
+              "সোজা অবস্থায় জ্বালান।",
+              "টেলিভিশন বা স্টেরিওর উপর কখনো রাখবেন না।",
+              "জ্বলতে থাকা অবস্থায় সরবেন না। সরানোর আগে ঠান্ডা হতে দিন।",
+              "একবারে ৪ ঘণ্টার বেশি জ্বালাবেন না।",
+              "ধোঁয়া বেরোলে, বারবার মিটমিট করলে বা শিখা খুব উঁচু হলে সঙ্গে সঙ্গে নিভান।",
+              "স্নাফার বা ধাতব চামচের পিছন দিয়ে নিভান, শলাকা নষ্ট না হয়। নিভাতে তরল ব্যবহার করবেন না।",
+              "মোমবাতি তলা পর্যন্ত জ্বলতে দেবেন না। ২০ মিমি মোম থাকতে দিন।",
+            ],
+          },
+        ],
+      },
+    },
+  },
+];
