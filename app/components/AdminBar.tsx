@@ -17,13 +17,13 @@ export async function AdminBar() {
   const session = await verifySessionPayload(token, secret);
   if (!session || session.role !== "admin") return null;
 
-  const links = [
+  const links: { href: string; label: string; button?: boolean }[] = [
     { href: "/?skipIntro=1", label: "Home" },
     { href: "/newsletter", label: "Newsletter" },
     { href: "/admin/products", label: "Products" },
+    { href: "/admin/marketing", label: "Marketing" },
     { href: "/admin/restricted-areas", label: "Regional limits" },
     { href: "/admin/gift-3d", label: "3D products" },
-    { href: "/admin/site", label: "Promo" },
     { href: "/admin/mobile-promo", label: "Phone layout" },
     { href: "/admin/qr-pages", label: "QR / guides" },
     { href: "/admin/media", label: "Media" },
@@ -39,6 +39,8 @@ export async function AdminBar() {
         .admin-bar-label { color:rgba(255,255,255,0.3);margin-right:12px;text-transform:uppercase;letter-spacing:.1em;font-size:10px; }
         .admin-bar a { color:rgba(255,255,255,0.65);text-decoration:none;padding:0 12px;height:100%;display:flex;align-items:center;border-right:1px solid rgba(255,255,255,0.06);transition:color .15s,background .15s; }
         .admin-bar a:hover { color:#fff;background:rgba(255,255,255,0.07); }
+        .admin-bar a.admin-bar-btn { height:24px;margin:0 6px;padding:0 12px;border-right:0;border-radius:999px;background:rgba(255,255,255,0.14);color:#fff;font-weight:600;letter-spacing:.06em;text-transform:uppercase;font-size:10px; }
+        .admin-bar a.admin-bar-btn:hover { background:rgba(255,255,255,0.24); }
         .admin-bar-b2b { position:relative;height:100%;display:flex;align-items:center;border-right:1px solid rgba(255,255,255,0.06); }
         .admin-bar-b2b summary { color:rgba(255,255,255,.65);padding:0 12px;height:100%;display:flex;align-items:center;cursor:pointer;list-style:none; }
         .admin-bar-b2b summary::-webkit-details-marker { display:none; }
@@ -52,8 +54,8 @@ export async function AdminBar() {
       `}</style>
       <div className="admin-bar">
         <span className="admin-bar-label">Admin</span>
-        {links.map(({ href, label }) => (
-          <a key={href} href={href}>{label}</a>
+        {links.map(({ href, label, button }) => (
+          <a key={href} href={href} className={button ? "admin-bar-btn" : undefined}>{label}</a>
         ))}
         <details className="admin-bar-b2b">
           <summary>B2B</summary>

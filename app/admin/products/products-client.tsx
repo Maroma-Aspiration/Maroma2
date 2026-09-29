@@ -242,6 +242,9 @@ export default function AdminProductsClient() {
             <Link href="/" className="button secondary">
               Home
             </Link>
+            <Link href="/admin/marketing" className="button secondary">
+              Marketing
+            </Link>
             <Link href="/admin/qr-pages" className="button secondary">
               QR codes
             </Link>

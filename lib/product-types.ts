@@ -17,4 +17,7 @@ export type ProductRecord = {
   attributes: Record<string, string[]>;
   /** Internal shipping rule derived from legacy catalogue wording; never customer copy. */
   ukAndChannelIslandsRestricted?: boolean;
+  /** Live Maroma.com Store API review summary, when synced. */
+  averageRating?: number;
+  reviewCount?: number;
 };

@@ -1,5 +1,5 @@
 import type { ProductRecord } from "./product-types";
-import { isPlaceholderImageUrl } from "./product-image";
+import { getDisplayImageUrl, isPlaceholderImageUrl } from "./product-image";
 
 /** Unique, non-placeholder image URLs for PDP gallery (main + thumbnails). */
 export function getGalleryImageUrls(product: ProductRecord): string[] {
@@ -17,4 +17,12 @@ export function getGalleryImageUrls(product: ProductRecord): string[] {
     out.push(url);
   }
   return out;
+}
+
+/** Front and optional rear photos for listing cards. */
+export function getProductCardImages(product: ProductRecord): { front: string; rear: string } {
+  const gallery = getGalleryImageUrls(product);
+  const front = gallery[0] || getDisplayImageUrl(product);
+  const rear = gallery.find((url) => url !== front) || "";
+  return { front, rear };
 }

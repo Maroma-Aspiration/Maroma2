@@ -7,6 +7,7 @@ import { getDisplayImageUrl } from "../../../lib/product-image";
 import { decodeBasicHtmlEntities } from "../../../lib/decode-html-entities";
 import { readSafetySet } from "../../../lib/safety-guidelines-store";
 import { resolveSafetyLanguageFromRequest } from "../../../lib/safety-language-detect";
+import { videoMimeType } from "../../../lib/video-source";
 import {
   pickSafetyHighlight,
   resolveSafetyTranslation,
@@ -50,7 +51,10 @@ export default async function CareGuidePage({ params, searchParams }: Props) {
     ? `/safety-guidelines?lang=${safety?.language ?? language}#${safetySet.id}`
     : "/safety-guidelines";
   const related = guide.relatedProductIds.map((id) => catalog.products.find((item) => item.id === id)).filter(Boolean);
-  const heroImage = guide.imageUrl || (product ? getDisplayImageUrl(product) : "");
+  const productImage = product ? getDisplayImageUrl(product) : "";
+  const isAsianDelight = /asian delight/i.test(`${guide.productName} ${product?.name ?? ""} ${guide.slug}`);
+  const looksLikeAmber = /amber/i.test(guide.imageUrl || "");
+  const heroImage = (isAsianDelight || looksLikeAmber) && productImage ? productImage : (guide.imageUrl || productImage);
   return <main className="qr-guide-page">
     <section className="qr-guide-hero">
       <div className="qr-guide-hero-copy"><p className="qr-guide-kicker">How to use our:</p><h1>{guideDisplayTitle(guide.title, guide.productName)}</h1>{guide.intro ? <p>{guide.intro}</p> : null}{product ? <Link href={`/product/${product.id}`} className="qr-guide-product-link">View product</Link> : null}
@@ -70,7 +74,7 @@ export default async function CareGuidePage({ params, searchParams }: Props) {
       {heroImage ? <img className="qr-guide-hero-image" src={heroImage} alt="" /> : null}
     </section>
     <section className="qr-guide-content">
-      {guide.videoUrl ? <video className="qr-guide-video" controls playsInline preload="metadata" poster={heroImage || undefined}><source src={guide.videoUrl} />Your browser does not support this video.</video> : null}
+      {guide.videoUrl ? <video className="qr-guide-video" controls playsInline preload="metadata" poster={heroImage || undefined}><source src={guide.videoUrl} {...(videoMimeType(guide.videoUrl) ? { type: videoMimeType(guide.videoUrl) } : {})} />Your browser does not support this video.</video> : null}
       <div className="qr-guide-main">
         <div><p className="qr-guide-kicker">A gentle ritual</p><h2>How to use</h2></div>
         <ol className="qr-guide-steps">{guide.instructions.map((item, index) => <li key={item.id}><span>{String(index + 1).padStart(2, "0")}</span><div><h3>{item.heading}</h3><p>{item.body}</p></div></li>)}</ol>

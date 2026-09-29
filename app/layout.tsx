@@ -72,8 +72,6 @@ export const metadata: Metadata = buildPageMetadata({
 export const viewport = {
   width: "device-width",
   initialScale: 1,
-  maximumScale: 1,
-  userScalable: false,
   viewportFit: "cover",
 } as const;
 
@@ -105,13 +103,6 @@ export default async function RootLayout({
           }}
         />
         <JsonLd data={[organizationJsonLd(), websiteJsonLd()]} />
-        <Script
-          id="maroma-force-device-viewport"
-          strategy="beforeInteractive"
-          dangerouslySetInnerHTML={{
-            __html: `(function(){var m=document.querySelector('meta[name="viewport"]');if(!m){m=document.createElement('meta');m.name='viewport';document.head.appendChild(m);}m.content='width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover';})();`,
-          }}
-        />
         <Script
           id="maroma-viewport-sync"
           strategy="beforeInteractive"

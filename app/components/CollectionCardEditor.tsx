@@ -17,9 +17,10 @@ type CollectionCardEditorProps = {
   card: ResolvedCategoryCard;
   open: boolean;
   onClose: () => void;
+  onDraftChange?: (draft: Pick<ResolvedCategoryCard, "label" | "description" | "imageUrl" | "objectPosition" | "backgroundScale">) => void;
 };
 
-export function CollectionCardEditor({ card, open, onClose }: CollectionCardEditorProps) {
+export function CollectionCardEditor({ card, open, onClose, onDraftChange }: CollectionCardEditorProps) {
   const router = useRouter();
   const [label, setLabel] = useState(card.label);
   const [description, setDescription] = useState(card.description);
@@ -55,6 +56,30 @@ export function CollectionCardEditor({ card, open, onClose }: CollectionCardEdit
   useEffect(() => {
     resetDraftFromCard();
   }, [resetDraftFromCard]);
+
+  useEffect(() => {
+    if (!open) return;
+    const tile = document.querySelector<HTMLElement>(`[data-collection-tile="${CSS.escape(card.slug)}"]`);
+    if (tile) {
+      const image = tile.querySelector<HTMLElement>(".home-collection-card-image");
+      const title = tile.querySelector<HTMLElement>(".home-collection-card-title");
+      const copy = tile.querySelector<HTMLElement>(".home-collection-card-desc");
+      if (image) {
+        if (imageUrl) image.setAttribute("src", imageUrl);
+        image.style.objectPosition = `${Math.round(posX)}% 50%`;
+        image.style.transform = `translateY(${(50 - posY) / 2}%) scale(${scale / 100})`;
+      }
+      if (title) title.textContent = label;
+      if (copy) copy.textContent = description;
+    }
+    onDraftChange?.({
+      label,
+      description,
+      imageUrl,
+      objectPosition: formatBackgroundPosition(posX, posY),
+      backgroundScale: scale,
+    });
+  }, [open, label, description, imageUrl, posX, posY, scale, onDraftChange]);
 
   useEffect(() => {
     if (!open) {
@@ -199,16 +224,21 @@ export function CollectionCardEditor({ card, open, onClose }: CollectionCardEdit
 
         <div className="category-banner-drawer-body">
           {imageUrl ? (
-            <div
-              className="home-collection-editor-preview"
-              style={{
-                backgroundImage: `url(${imageUrl})`,
-                backgroundPosition: formatBackgroundPosition(posX, posY),
-                backgroundSize: formatBackgroundSize(scale),
-              }}
-              role="img"
-              aria-label={`${label} preview`}
-            />
+            <div className="home-collection-editor-preview-shell" aria-label={`${label} live tile preview`}>
+              <div className="home-collection-editor-preview">
+                <img
+                  src={imageUrl}
+                  alt=""
+                  style={{
+                    objectPosition: `${Math.round(posX)}% 50%`,
+                    transform: `translateY(${(50 - posY) / 2}%) scale(${scale / 100})`,
+                  }}
+                />
+                <span className="home-collection-editor-preview-veil" aria-hidden="true" />
+                <strong>{label || "Collection title"}</strong>
+              </div>
+              <p>{description || "Collection description"}</p>
+            </div>
           ) : null}
 
           {imageUrl ? (

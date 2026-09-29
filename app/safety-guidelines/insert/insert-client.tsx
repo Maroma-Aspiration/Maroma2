@@ -67,7 +67,7 @@ export default function SafetyInsertClient({ set, language }: Props) {
         ))}
         <footer>
           <span>maroma.com/safety-guidelines</span>
-          <span>Maroma, Auroville, Tamil Nadu 605101, India</span>
+          <span>Maroma, Aspiration Road, Auroville, Tamil Nadu 605101, India</span>
         </footer>
       </article>
     </main>

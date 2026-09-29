@@ -40,7 +40,7 @@ html:not(.maroma-viewport-mobile):not([data-maroma-viewport-mobile]) .maroma-nav
   display: flex;
   align-items: center;
   gap: 4px;
-  width: min(100%, 108px);
+  width: min(100%, 216px);
   height: 24px;
   padding: 0 8px 0 6px;
   box-sizing: border-box;

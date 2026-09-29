@@ -53,12 +53,17 @@ type PromoBannerSequenceProps = {
     | "heroMarqueeEndOffsetCm"
     | "heroMarqueeEndOffsetPx"
     | "stripBackgroundImageUrl"
+    | "stripBackgroundCarouselUrls"
+    | "stripBackgroundCarouselEnabled"
+    | "stripBackgroundCarouselIntervalMs"
+    | "stripBackgroundCarouselFadeMs"
     | "stripBackgroundMediaKind"
     | "stripBackgroundVideoLoop"
     | "stripBackgroundFallbackImageUrl"
     | "stripAspectRatio"
     | "ctaOffsetX"
     | "ctaOffsetY"
+    | "ctaScale"
     | "thumbnailOffsetX"
     | "thumbnailOffsetY"
   >;
@@ -121,7 +126,7 @@ function renderMedia(frame: PromoFrame, mediaScale: number) {
   }
   return (
     <div className="promo-banner-media-wrap promo-sequence-media-wrap" style={wrapStyle}>
-      <img src={frame.mediaUrl} alt="" className="promo-banner-media" style={mediaStyle} />
+      <img src={frame.mediaUrl} alt="" className="promo-banner-media" style={mediaStyle} loading="eager" fetchPriority="high" decoding="async" />
     </div>
   );
 }
@@ -142,6 +147,7 @@ function renderFrameBody(
   marqueePreviewMode?: "start" | "end",
   ctaOffsetX = 0,
   ctaOffsetY = 0,
+  ctaScale = 100,
   thumbnailOffsetX = 0,
   thumbnailOffsetY = 0,
   ctaDraggable = false,
@@ -199,6 +205,7 @@ function renderFrameBody(
             cta={renderCta(frame, linkable, frame.ctaScale ?? 1)}
             ctaOffsetX={ctaOffsetX}
             ctaOffsetY={ctaOffsetY}
+            ctaScale={ctaScale}
             thumbnailOffsetX={thumbnailOffsetX}
             thumbnailOffsetY={thumbnailOffsetY}
             ctaDraggable={ctaDraggable}
@@ -734,6 +741,7 @@ export function PromoBannerSequence({
                   marqueePreviewMode,
                   banner.ctaOffsetX,
                   banner.ctaOffsetY,
+                  banner.ctaScale,
                   banner.thumbnailOffsetX,
                   banner.thumbnailOffsetY,
                   ctaDraggable,

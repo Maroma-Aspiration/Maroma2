@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { decodeBasicHtmlEntities } from "../../lib/decode-html-entities";
 import { parseInrPriceNumber } from "../../lib/format-price";
 import { useCurrency } from "../../context/CurrencyContext";
@@ -19,14 +19,12 @@ import {
   type PerfumeGender,
   type PerfumeNavSelection,
 } from "../../lib/perfume-shop-nav";
+import { catalogKeywordMatches, isHomeFragranceProduct } from "../../lib/catalog-categories";
 import { getDisplayImageUrl } from "../../lib/product-image";
-import { productImageTransform } from "../../lib/product-image-focus";
-import { isGift3dPreviewProduct } from "../../lib/gift-builder-catalog";
-import { isGiftingProduct } from "../../lib/product-gifting";
 import { productPriceState } from "../../lib/product-pricing";
 import type { ProductRecord } from "../../lib/product-types";
 import { useAdminSession } from "../../lib/use-admin-session";
-import { ProductCardBuyNow } from "./ProductCardBuyNow";
+import { StorefrontProductCard } from "./StorefrontProductCard";
 
 type Props = {
   products: ProductRecord[];
@@ -37,6 +35,32 @@ type Props = {
 type ShopType = { id: string; label: string; tokens: string[] };
 type ProductSort = "featured" | "price-low" | "price-high" | "newest";
 
+const RECOMMENDATION_GOALS = [
+  { id: "gentle", label: "Gentle everyday care", tokens: ["gentle", "sensitive", "soothing", "calm", "baby"] },
+  { id: "nourish", label: "Deep nourishment", tokens: ["nourish", "moistur", "hydrating", "butter", "oil", "cream"] },
+  { id: "refresh", label: "Refresh and restore", tokens: ["refresh", "clean", "wash", "scrub", "mist", "toner"] },
+  { id: "scent", label: "Scent and wellbeing", tokens: ["aroma", "perfume", "fragrance", "incense", "relax", "wellness"] },
+] as const;
+
+const RECOMMENDATION_ROUTINES = [
+  { id: "simple", label: "One simple essential", tokens: ["daily", "everyday", "essential"] },
+  { id: "ritual", label: "A complete ritual", tokens: ["set", "kit", "collection", "ritual"] },
+  { id: "gift", label: "Something thoughtful", tokens: ["gift", "set", "box", "collection"] },
+] as const;
+
+const RECOMMENDATION_DETAIL_QUESTIONS = [
+  {
+    id: "feel",
+    label: "How would you like it to feel?",
+    options: ["Light and refreshing", "Rich and nourishing", "Calm and gentle"]
+  },
+  {
+    id: "priority",
+    label: "What matters most?",
+    options: ["Natural ingredients", "A beautiful scent", "Easy daily use"]
+  }
+] as const;
+
 const SHOP_TYPES: Record<string, ShopType[]> = {
   "face-care": [
     { id: "cleanser", label: "Cleansers", tokens: ["cleanser", "face wash", "cleansing"] },
@@ -44,7 +68,7 @@ const SHOP_TYPES: Record<string, ShopType[]> = {
     { id: "serum", label: "Serums", tokens: ["serum"] },
     { id: "scrub-mask", label: "Scrubs & Masks", tokens: ["face scrub", "facial scrub", "mask", "pack"] },
     { id: "mist", label: "Mists & Toners", tokens: ["mist", "toner", "rose water"] },
-    { id: "lip-eye", label: "Lip & Eye Care", tokens: ["lip", "under eye", "eye cream"] },
+    { id: "lip-eye", label: "Lip & Eye Care", tokens: ["lip", "lip balm", "lip care", "under eye", "under-eye", "eye cream", "eye gel", "eye serum", "eye care"] },
   ],
   "body-care": [
     { id: "colibri", label: "Colibri", tokens: ["colibri"] },
@@ -87,13 +111,14 @@ const SHOP_TYPES: Record<string, ShopType[]> = {
     { id: "colibri", label: "Colibri", tokens: ["colibri"] },
     { id: "incense", label: "Incense", tokens: ["incense", "smudge"] },
     { id: "candles", label: "Candles", tokens: ["candle", "votive"] },
+    { id: "holders", label: "Incense & Candle Holders", tokens: ["holder"] },
     { id: "diffusers", label: "Diffusers", tokens: ["diffuser", "perfume mat"] },
     { id: "sachets", label: "Sachets", tokens: ["sachet"] },
     { id: "home-care", label: "Everyday Care", tokens: ["dish wash", "hand wash"] },
   ],
   colibri: [
     { id: "colibri-incense", label: "Incense", tokens: ["incense", "leaf", "leaves", "cone"] },
-    { id: "colibri-body", label: "Body Protection", tokens: ["body spray", "roll-on", "roll on"] },
+    { id: "colibri-body", label: "Body Care", tokens: ["body spray", "body care", "roll-on", "roll on", "protection"] },
     { id: "colibri-candle", label: "Candles", tokens: ["candle", "votive"] },
     { id: "colibri-set", label: "Sets", tokens: ["set", "kit"] },
   ],
@@ -109,9 +134,43 @@ const SHOP_TYPES: Record<string, ShopType[]> = {
   ],
 };
 
+const isHolderProduct = (product: ProductRecord): boolean =>
+  catalogKeywordMatches([product.name, ...product.categories, ...product.tags].join(" "), ["holder"]);
+
 const matchesShopType = (product: ProductRecord, tokens: string[]): boolean => {
-  const text = [product.name, ...product.categories, ...product.tags].join(" ").toLowerCase();
-  return tokens.some((token) => text.includes(token));
+  const text = [product.name, ...product.categories, ...product.tags].join(" ");
+  if (!catalogKeywordMatches(text, tokens)) return false;
+  if (tokens.some((token) => ["man", "men", "him", "male"].includes(token)) && isHomeFragranceProduct(product)) {
+    return false;
+  }
+  const holderFilter = tokens.includes("holder");
+  if (!holderFilter && isHolderProduct(product) && tokens.some((token) => ["incense", "smudge", "candle", "votive"].includes(token))) {
+    return false;
+  }
+  return true;
+};
+
+const productSizeRank = (product: ProductRecord): number => {
+  const match = `${product.name} ${product.sku ?? ""}`.match(/(\d+(?:\.\d+)?)\s*(ml|g|kg|l|oz)\b/i);
+  if (!match) return Number.POSITIVE_INFINITY;
+  const amount = Number(match[1]);
+  const unit = match[2].toLowerCase();
+  if (unit === "kg" || unit === "l") return amount * 1000;
+  if (unit === "oz") return amount * 29.57;
+  return amount;
+};
+
+const productTypeGroupIndex = (product: ProductRecord, types: ShopType[]): number => {
+  const index = types.findIndex((type) => matchesShopType(product, type.tokens));
+  return index === -1 ? types.length : index;
+};
+
+const compareFeaturedProducts = (a: ProductRecord, b: ProductRecord, types: ShopType[]): number => {
+  const group = productTypeGroupIndex(a, types) - productTypeGroupIndex(b, types);
+  if (group) return group;
+  const size = productSizeRank(a) - productSizeRank(b);
+  if (size) return size;
+  return a.name.localeCompare(b.name, undefined, { sensitivity: "base" });
 };
 
 const cloneSelection = (selected: Record<string, string[]>): Record<string, string[]> => {
@@ -206,7 +265,7 @@ const containsAnyToken = (product: ProductRecord, tokens: string[]): boolean => 
   ]
     .join(" ")
     .toLowerCase();
-  return tokens.some((token) => searchBase.includes(token));
+  return catalogKeywordMatches(searchBase, tokens);
 };
 
 const matchesGiftPriceBand = (product: ProductRecord, band: GiftPriceBand): boolean => {
@@ -232,7 +291,7 @@ const matchesGiftPriceBand = (product: ProductRecord, band: GiftPriceBand): bool
 export function ProductListingWithFilters({ products, categorySlug, searchQuery = "" }: Props) {
   const { formatMoney, formatCatalogPrice, isEstimated } = useCurrency();
   const [selected, setSelected] = useState<Record<string, string[]>>({});
-  const [shopTypeId, setShopTypeId] = useState<string | null>(null);
+  const [shopTypeId, setShopTypeId] = useState<string | null>(categorySlug ? "all" : null);
   const [sortBy, setSortBy] = useState<ProductSort>("featured");
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [isGridLoading, setIsGridLoading] = useState(false);
@@ -241,6 +300,13 @@ export function ProductListingWithFilters({ products, categorySlug, searchQuery 
   const [giftFor, setGiftFor] = useState<(typeof giftingAudienceOptions)[number]["value"]>("any");
   const [giftEvent, setGiftEvent] = useState<(typeof giftingEventOptions)[number]["value"]>("any");
   const [giftPriceBand, setGiftPriceBand] = useState<GiftPriceBand>("any");
+  const [recommendationTypeId, setRecommendationTypeId] = useState<string | null>(null);
+  const [recommendationGoalId, setRecommendationGoalId] = useState<string | null>(null);
+  const [recommendationRoutineId, setRecommendationRoutineId] = useState<string | null>(null);
+  const [recommenderOpen, setRecommenderOpen] = useState(false);
+  const [recommendationsOpen, setRecommendationsOpen] = useState(false);
+  const [activeRecommendationId, setActiveRecommendationId] = useState<string | null>(null);
+  const [recommendationDetails, setRecommendationDetails] = useState<Record<string, string>>({});
   const [perfumeNavSelection, setPerfumeNavSelection] = useState<PerfumeNavSelection>({
     gender: null,
     typeKey: null,
@@ -248,6 +314,23 @@ export function ProductListingWithFilters({ products, categorySlug, searchQuery 
   });
   const [ready3dIds, setReady3dIds] = useState<Set<string>>(() => new Set());
   const { adminModeEnabled: isAdmin } = useAdminSession();
+  const skipFilterScrollRef = useRef(true);
+
+  const scrollToProductResults = useCallback(() => {
+    if (skipFilterScrollRef.current) return;
+    const el = document.getElementById("product-results");
+    if (!el) return;
+    const padding = Number.parseFloat(getComputedStyle(document.documentElement).scrollPaddingTop) || 120;
+    const top = el.getBoundingClientRect().top + window.scrollY - padding - 8;
+    window.scrollTo({ top: Math.max(0, top), behavior: "smooth" });
+  }, []);
+
+  useEffect(() => {
+    const frame = window.requestAnimationFrame(() => {
+      skipFilterScrollRef.current = false;
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, []);
 
   const availableShopTypes = useMemo(() => {
     const configured = SHOP_TYPES[categorySlug ?? ""] ?? [];
@@ -327,6 +410,7 @@ export function ProductListingWithFilters({ products, categorySlug, searchQuery 
       return shopTypeProducts;
     }
     return shopTypeProducts.filter((product) => {
+      if (giftFor === "him" && isHomeFragranceProduct(product)) return false;
       const audiencePass =
         giftFor === "any" ? true : containsAnyToken(product, giftingAudienceTokens[giftFor] ?? []);
       const eventPass =
@@ -394,9 +478,11 @@ export function ProductListingWithFilters({ products, categorySlug, searchQuery 
         if (Number.isFinite(aId) && Number.isFinite(bId)) return bId - aId;
         return b.id.localeCompare(a.id, undefined, { numeric: true });
       });
+    } else {
+      result.sort((a, b) => compareFeaturedProducts(a, b, availableShopTypes));
     }
     return result;
-  }, [filtered, sortBy]);
+  }, [availableShopTypes, filtered, sortBy]);
 
   const revealLoadingState = useCallback(() => {
     setIsGridLoading(true);
@@ -456,7 +542,8 @@ export function ProductListingWithFilters({ products, categorySlug, searchQuery 
       }
       return next;
     });
-  }, []);
+    scrollToProductResults();
+  }, [scrollToProductResults]);
 
   const clearAll = useCallback(() => {
     setSelected({});
@@ -478,7 +565,8 @@ export function ProductListingWithFilters({ products, categorySlug, searchQuery 
       }
       return next;
     });
-  }, []);
+    scrollToProductResults();
+  }, [scrollToProductResults]);
 
   const perfumeNavChipLabel = useMemo(
     () => perfumeSelectionLabel(perfumeNavSelection, perfumeGenderNav),
@@ -493,27 +581,46 @@ export function ProductListingWithFilters({ products, categorySlug, searchQuery 
   // first column reserved for the filter panel on desktop.
   const showFilterAside = shopTypeProducts.length > 0 && (!categorySlug || shopTypeId !== null);
 
+  const recommendationReady = Boolean(recommendationTypeId && recommendationGoalId && recommendationRoutineId);
+
   const recommendedProducts = useMemo(() => {
-    const picked: ProductRecord[] = [];
-    for (const type of availableShopTypes) {
-      const product = products.find((entry) =>
-        !picked.some((pickedProduct) => pickedProduct.id === entry.id) &&
-        matchesShopType(entry, type.tokens) &&
-        Boolean(getDisplayImageUrl(entry))
-      );
-      if (product) picked.push(product);
-      if (picked.length === 4) break;
-    }
-    if (picked.length < 4) {
-      for (const product of products) {
-        if (getDisplayImageUrl(product) && !picked.some((entry) => entry.id === product.id)) {
-          picked.push(product);
-        }
-        if (picked.length === 4) break;
-      }
-    }
-    return picked;
-  }, [availableShopTypes, products]);
+    const selectedType = availableShopTypes.find((type) => type.id === recommendationTypeId);
+    const selectedGoal = RECOMMENDATION_GOALS.find((goal) => goal.id === recommendationGoalId);
+    const selectedRoutine = RECOMMENDATION_ROUTINES.find((routine) => routine.id === recommendationRoutineId);
+    const tokens = [...(selectedType?.tokens ?? []), ...(selectedGoal?.tokens ?? []), ...(selectedRoutine?.tokens ?? [])];
+
+    return products
+      .map((product, index) => {
+        const text = [
+          product.name,
+          product.description,
+          product.shortDescription,
+          ...product.tags,
+          ...product.categories,
+          ...Object.keys(product.attributes),
+          ...Object.values(product.attributes).flat()
+        ].join(" ").toLowerCase();
+        const tokenScore = tokens.reduce((score, token) => score + (text.includes(token) ? 3 : 0), 0);
+        const typeScore = selectedType && matchesShopType(product, selectedType.tokens) ? 8 : 0;
+        return { product, score: tokenScore + typeScore, index };
+      })
+      .filter(({ product }) => Boolean(getDisplayImageUrl(product)))
+      .sort((a, b) => b.score - a.score || a.index - b.index)
+      .slice(0, 4)
+      .map(({ product }) => product);
+  }, [availableShopTypes, products, recommendationGoalId, recommendationRoutineId, recommendationTypeId]);
+
+  const activeRecommendation = recommendedProducts.find((product) => product.id === activeRecommendationId) ?? null;
+
+  const updateRecommendationChoice = (
+    setter: (value: string) => void,
+    value: string
+  ) => {
+    setter(value);
+    setRecommendationsOpen(false);
+    setActiveRecommendationId(null);
+    setRecommendationDetails({});
+  };
 
   const recommendedSection = recommendedProducts.length > 0 ? (
     <section className="collection-recommended" aria-labelledby="collection-recommended-title">
@@ -528,9 +635,18 @@ export function ProductListingWithFilters({ products, categorySlug, searchQuery 
           const convertedPrice = formatCatalogPrice(priceState.active);
           const priceLabel = convertedPrice ? `${isEstimated ? "≈ " : ""}${convertedPrice}` : "Price on request";
           return (
-            <Link key={product.id} href={`/product/${product.id}`} className="collection-recommended-card">
+            <button
+              key={product.id}
+              type="button"
+              className={`collection-recommended-card${activeRecommendationId === product.id ? " is-active" : ""}`}
+              aria-expanded={activeRecommendationId === product.id}
+              onClick={() => {
+                setActiveRecommendationId((current) => current === product.id ? null : product.id);
+                setRecommendationDetails({});
+              }}
+            >
               <div className="collection-recommended-image">
-                {imageSrc ? <img src={imageSrc} alt={`${decodeBasicHtmlEntities(product.name)} — Maroma`} /> : null}
+                  {imageSrc ? <img src={imageSrc} alt={`${decodeBasicHtmlEntities(product.name)} - Maroma`} loading="lazy" decoding="async" /> : null}
               </div>
               <div className="collection-recommended-copy">
                 <h3>{decodeBasicHtmlEntities(product.name)}</h3>
@@ -538,22 +654,181 @@ export function ProductListingWithFilters({ products, categorySlug, searchQuery 
                   {priceState.onSale ? <s>{formatCatalogPrice(priceState.regular)}</s> : null}
                   <span>{priceLabel}</span>
                 </p>
-                <span>View product <span aria-hidden="true">→</span></span>
+                <span>Personalise this choice <span aria-hidden="true">→</span></span>
               </div>
-            </Link>
+            </button>
           );
         })}
       </div>
+      {activeRecommendation ? (
+        <section className="collection-recommendation-detail" aria-label={`Fine-tune ${decodeBasicHtmlEntities(activeRecommendation.name)}`}>
+          <div className="collection-recommendation-detail-head">
+            <div>
+              <p>Let&apos;s make it more personal</p>
+              <h3>{decodeBasicHtmlEntities(activeRecommendation.name)}</h3>
+            </div>
+            <button type="button" onClick={() => setActiveRecommendationId(null)} aria-label="Close detailed questions">×</button>
+          </div>
+          <div className="collection-recommendation-detail-questions">
+            {RECOMMENDATION_DETAIL_QUESTIONS.map((question) => (
+              <fieldset key={question.id} className="collection-recommendation-detail-group">
+                <legend>{question.label}</legend>
+                <div>
+                  {question.options.map((option) => (
+                    <button
+                      key={option}
+                      type="button"
+                      className={recommendationDetails[question.id] === option ? "is-selected" : ""}
+                      aria-pressed={recommendationDetails[question.id] === option}
+                      onClick={() => setRecommendationDetails((current) => ({ ...current, [question.id]: option }))}
+                    >
+                      {option}
+                    </button>
+                  ))}
+                </div>
+              </fieldset>
+            ))}
+          </div>
+          <Link href={`/product/${activeRecommendation.id}`} className="collection-recommendation-product-link">
+            View your guided product choice <span aria-hidden="true">→</span>
+          </Link>
+        </section>
+      ) : null}
+      <aside className="collection-curations-invite">
+        <div className="collection-curations-mark" aria-hidden="true">
+          <svg viewBox="0 0 48 48" role="img">
+            <path d="M24 6c7 6 13 13 13 22a13 13 0 0 1-26 0C11 19 17 12 24 6Z" />
+            <path d="M17 29c4-1 8-5 10-11 2 7 2 14-3 20" />
+          </svg>
+        </div>
+        <div>
+          <h3>Would you like us to save your recommendations?</h3>
+          <p>Create your own personal Maroma page, where you will find all your recommended products, special offers just for you, health and beauty tips, and more.</p>
+        </div>
+        <Link href="/curations">Join Maroma Curations</Link>
+      </aside>
     </section>
   ) : null;
 
   return (
     <div className={`product-listing-experience${shopTypeId ? " has-selection" : ""}`}>
+      {categorySlug ? (
+        <section className={`collection-recommender${recommenderOpen ? " is-open" : " is-collapsed"}`} aria-labelledby="collection-recommender-title">
+          {!recommenderOpen ? (
+            <button
+              type="button"
+              className="collection-recommender-toggle"
+              aria-expanded="false"
+              onClick={() => setRecommenderOpen(true)}
+            >
+              <span className="collection-recommender-label">
+                <span className="collection-recommender-icon" aria-hidden="true">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
+                    <circle cx="12" cy="12" r="8.25" />
+                    <path d="M12 3.6v2.2M12 18.2v2.2M3.6 12h2.2M18.2 12h2.2" />
+                    <path d="M12 7.2l3.35 8.05-3.35-1.55-3.35 1.55Z" />
+                  </svg>
+                </span>
+                <span id="collection-recommender-title">Like a personal recommendation?</span>
+              </span>
+              <span aria-hidden="true">+</span>
+            </button>
+          ) : (
+          <>
+          <div className="collection-recommender-intro">
+            <button type="button" onClick={() => setRecommenderOpen(false)} aria-label="Close personal recommendations">×</button>
+            <h2 id="collection-recommender-title">What are you looking for?</h2>
+            <span>Make three simple choices and we&apos;ll curate a thoughtful starting point for you.</span>
+          </div>
+          <div className="collection-recommender-questions">
+            <fieldset className="collection-recommender-question">
+              <legend><span>1</span> What would you like to explore?</legend>
+              <div className="collection-recommender-options">
+                <button
+                  type="button"
+                  className={recommendationTypeId === "all" ? "is-selected" : ""}
+                  aria-pressed={recommendationTypeId === "all"}
+                  onClick={() => updateRecommendationChoice(setRecommendationTypeId, "all")}
+                >
+                  A little of everything
+                </button>
+                {availableShopTypes.map((type) => (
+                  <button
+                    key={type.id}
+                    type="button"
+                    className={recommendationTypeId === type.id ? "is-selected" : ""}
+                    aria-pressed={recommendationTypeId === type.id}
+                    onClick={() => updateRecommendationChoice(setRecommendationTypeId, type.id)}
+                  >
+                    {type.label}
+                  </button>
+                ))}
+              </div>
+            </fieldset>
+            <fieldset className="collection-recommender-question">
+              <legend><span>2</span> What matters most today?</legend>
+              <div className="collection-recommender-options">
+                {RECOMMENDATION_GOALS.map((goal) => (
+                  <button
+                    key={goal.id}
+                    type="button"
+                    className={recommendationGoalId === goal.id ? "is-selected" : ""}
+                    aria-pressed={recommendationGoalId === goal.id}
+                    onClick={() => updateRecommendationChoice(setRecommendationGoalId, goal.id)}
+                  >
+                    {goal.label}
+                  </button>
+                ))}
+              </div>
+            </fieldset>
+            <fieldset className="collection-recommender-question">
+              <legend><span>3</span> What kind of choice suits you?</legend>
+              <div className="collection-recommender-options">
+                {RECOMMENDATION_ROUTINES.map((routine) => (
+                  <button
+                    key={routine.id}
+                    type="button"
+                    className={recommendationRoutineId === routine.id ? "is-selected" : ""}
+                    aria-pressed={recommendationRoutineId === routine.id}
+                    onClick={() => updateRecommendationChoice(setRecommendationRoutineId, routine.id)}
+                  >
+                    {routine.label}
+                  </button>
+                ))}
+              </div>
+            </fieldset>
+          </div>
+          <div className="collection-recommender-action-row">
+            <span>{[recommendationTypeId, recommendationGoalId, recommendationRoutineId].filter(Boolean).length} of 3 choices made</span>
+            <button
+              type="button"
+              disabled={!recommendationReady}
+              onClick={() => {
+                const params = new URLSearchParams({
+                  category: categorySlug,
+                  type: recommendationTypeId ?? "all",
+                  goal: recommendationGoalId ?? "",
+                  routine: recommendationRoutineId ?? "",
+                  products: recommendedProducts.map((product) => product.id).join(",")
+                });
+                window.location.assign(`/curations?${params.toString()}`);
+              }}
+            >
+              Recommended for you <span aria-hidden="true">→</span>
+            </button>
+          </div>
+          </>
+          )}
+        </section>
+      ) : null}
+
+      {categorySlug && recommendationsOpen ? recommendedSection : null}
+
       {categorySlug ? <section className="collection-shop-types" aria-label="Shop by product type">
         <div className="collection-shop-types-heading">
           <div>
-            <p>Shop by type</p>
-            <h2>What are you looking for?</h2>
+            <p>Browse the collection</p>
+            <h2>Or shop by type</h2>
           </div>
           {shopTypeId ? <span>{shopTypeProducts.length} products</span> : null}
         </div>
@@ -575,6 +850,7 @@ export function ProductListingWithFilters({ products, categorySlug, searchQuery 
                     if (!shopTypeId) setShopTypeId("all");
                     selectPerfumeGender(section.gender);
                     revealLoadingState();
+                    scrollToProductResults();
                   }}
                 >
                   <span className="collection-shop-type-photo" aria-hidden="true">
@@ -608,9 +884,17 @@ export function ProductListingWithFilters({ products, categorySlug, searchQuery 
               setShopTypeId("all");
               clearAll();
               revealLoadingState();
+              scrollToProductResults();
             }}
           >
-            <span className="collection-shop-type-photo collection-browse-all-icon" aria-hidden="true">✦</span>
+            <span className="collection-shop-type-photo collection-browse-all-icon" aria-hidden="true">
+              <svg viewBox="0 0 16 16" fill="currentColor">
+                <rect x="1.4" y="1.4" width="5.4" height="5.4" rx="1.2" />
+                <rect x="9.2" y="1.4" width="5.4" height="5.4" rx="1.2" />
+                <rect x="1.4" y="9.2" width="5.4" height="5.4" rx="1.2" />
+                <rect x="9.2" y="9.2" width="5.4" height="5.4" rx="1.2" />
+              </svg>
+            </span>
             <span>Browse all</span>
             <small>{products.length}</small>
           </button>
@@ -628,6 +912,7 @@ export function ProductListingWithFilters({ products, categorySlug, searchQuery 
                   setPerfumeNavSelection({ gender: selectedGender, typeKey: null, lineKey: null });
                 }
                 revealLoadingState();
+                scrollToProductResults();
               }}
             >
               <span className="collection-shop-type-photo" aria-hidden="true">
@@ -645,8 +930,10 @@ export function ProductListingWithFilters({ products, categorySlug, searchQuery 
         </div>
       </section> : null}
 
-      {categorySlug && !shopTypeId ? (
-        recommendedSection
+      {categorySlug && recommendationsOpen ? (
+        null
+      ) : categorySlug && !shopTypeId ? (
+        null
       ) : (
       <div className="product-listing-layout">
       <button
@@ -659,6 +946,7 @@ export function ProductListingWithFilters({ products, categorySlug, searchQuery 
       </button>
       {showFilterAside ? (
         <aside className={`product-filters-aside${filtersOpen ? " is-open" : ""}`} aria-label="Product filters">
+          <div className="product-filters-sticky">
           <div className="product-refine-mobile-head">
             <strong>Refine results</strong>
             <button type="button" onClick={() => setFiltersOpen(false)} aria-label="Close filters">×</button>
@@ -669,7 +957,7 @@ export function ProductListingWithFilters({ products, categorySlug, searchQuery 
               <p className="gifting-selector-subtitle">Find the right gift set in seconds</p>
               <label>
                 Who&apos;s it for?
-                <select value={giftFor} onChange={(event) => setGiftFor(event.target.value as typeof giftFor)}>
+                <select value={giftFor} onChange={(event) => { setGiftFor(event.target.value as typeof giftFor); scrollToProductResults(); }}>
                   {giftingAudienceOptions.map((option) => (
                     <option key={option.value} value={option.value}>
                       {option.label}
@@ -679,7 +967,7 @@ export function ProductListingWithFilters({ products, categorySlug, searchQuery 
               </label>
               <label>
                 What&apos;s the event?
-                <select value={giftEvent} onChange={(event) => setGiftEvent(event.target.value as typeof giftEvent)}>
+                <select value={giftEvent} onChange={(event) => { setGiftEvent(event.target.value as typeof giftEvent); scrollToProductResults(); }}>
                   {giftingEventOptions.map((option) => (
                     <option key={option.value} value={option.value}>
                       {option.label}
@@ -691,7 +979,7 @@ export function ProductListingWithFilters({ products, categorySlug, searchQuery 
                 Price range
                 <select
                   value={giftPriceBand}
-                  onChange={(event) => setGiftPriceBand(event.target.value as GiftPriceBand)}
+                  onChange={(event) => { setGiftPriceBand(event.target.value as GiftPriceBand); scrollToProductResults(); }}
                 >
                   <option value="any">Any budget</option>
                   <option value="under-1000">Under Rs. 1,000</option>
@@ -721,7 +1009,7 @@ export function ProductListingWithFilters({ products, categorySlug, searchQuery 
                     role="tab"
                     aria-selected={perfumeNavSelection.gender === section.gender}
                     className={`perfume-gender-tab${perfumeNavSelection.gender === section.gender ? " is-active" : ""}`}
-                    onClick={() => selectPerfumeGender(section.gender)}
+                    onClick={() => { selectPerfumeGender(section.gender); scrollToProductResults(); }}
                   >
                     {section.label}
                     <span className="perfume-gender-tab-count">{section.productCount}</span>
@@ -752,7 +1040,7 @@ export function ProductListingWithFilters({ products, categorySlug, searchQuery 
                                 <button
                                   type="button"
                                   className={`perfume-gender-line-btn${active ? " is-active" : ""}`}
-                                  onClick={() => selectPerfumeLine(section.gender, type.key, line.key)}
+                                  onClick={() => { selectPerfumeLine(section.gender, type.key, line.key); scrollToProductResults(); }}
                                 >
                                   <span>{line.line}</span>
                                   <span className="perfume-gender-line-count">{line.productIds.length}</span>
@@ -931,22 +1219,23 @@ export function ProductListingWithFilters({ products, categorySlug, searchQuery 
               </details>
             ))}
           </div>
+          </div>
         </aside>
       ) : null}
 
-      <div className="product-listing-main">
-        <div className="product-listing-toolbar">
-          <span>{filtered.length} {filtered.length === 1 ? "product" : "products"}</span>
-          <label>
-            <span>Sort by</span>
-            <select value={sortBy} onChange={(event) => { setSortBy(event.target.value as ProductSort); revealLoadingState(); }}>
-              <option value="featured">Featured</option>
-              <option value="price-low">Price: low to high</option>
-              <option value="price-high">Price: high to low</option>
-              <option value="newest">Newest</option>
-            </select>
-          </label>
-        </div>
+      <div className="product-listing-toolbar">
+        <span>{filtered.length} {filtered.length === 1 ? "product" : "products"}</span>
+        <label>
+          <span>Sort by</span>
+          <select value={sortBy} onChange={(event) => { setSortBy(event.target.value as ProductSort); revealLoadingState(); }}>
+            <option value="featured">Featured</option>
+            <option value="price-low">Price: low to high</option>
+            <option value="price-high">Price: high to low</option>
+            <option value="newest">Newest</option>
+          </select>
+        </label>
+      </div>
+      <div className="product-listing-main" id="product-results">
         <div className={`product-grid${isGridLoading ? " is-loading" : ""}`} aria-busy={isGridLoading}>
           {isGridLoading ? Array.from({ length: 8 }, (_, index) => (
             <div key={index} className="product-grid-skeleton" aria-hidden="true">
@@ -955,44 +1244,12 @@ export function ProductListingWithFilters({ products, categorySlug, searchQuery 
               <span className="product-grid-skeleton-line" />
             </div>
           )) : sortedProducts.map((product) => {
-            const imageSrc = getDisplayImageUrl(product);
-            const priceState = productPriceState(product);
-            const convertedPrice = formatCatalogPrice(priceState.active);
-            const priceLabel = convertedPrice ? `${isEstimated ? "≈ " : ""}${convertedPrice}` : "Price on request";
             const productHref = searchQuery.trim()
               ? `/product/${product.id}?search=${encodeURIComponent(searchQuery.trim())}`
               : `/product/${product.id}`;
             return (
               <div key={product.id} className="product-card-wrap">
-                <article className="product-card">
-                  <Link href={productHref} className="product-card-link">
-                    <div className="product-card-media">
-                      <div className="product-image">
-                        {imageSrc ? (
-                          <img src={imageSrc} alt={`${decodeBasicHtmlEntities(product.name)} — Maroma`} style={{ transform: productImageTransform(product.id) }} />
-                        ) : (
-                          <span>No image</span>
-                        )}
-                      </div>
-                      {isGiftingProduct(product) && isGift3dPreviewProduct(product.id) ? (
-                        <span className="product-card-3d-badge">
-                          3D
-                        </span>
-                      ) : null}
-                    </div>
-                    <div className="product-copy">
-                      <h3 className="product-card-title">{decodeBasicHtmlEntities(product.name)}</h3>
-                      <p className={priceState.onSale ? "product-card-price is-on-sale" : "product-card-price"}>
-                        {priceState.onSale ? <s>{formatCatalogPrice(priceState.regular)}</s> : null}
-                        <span>{priceLabel}</span>
-                      </p>
-                    </div>
-                  </Link>
-                  <div className="product-card-actions">
-                    <Link href={productHref} className="product-card-cta">Add to Basket</Link>
-                    <ProductCardBuyNow product={product} />
-                  </div>
-                </article>
+                <StorefrontProductCard product={product} href={productHref} />
                 {isAdmin && (
                   <div className="product-admin-upload-panel">
                     <div className="admin-upload-label">Upload images</div>

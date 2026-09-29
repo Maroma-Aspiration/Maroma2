@@ -20,6 +20,7 @@ type PromoCtaClusterProps = {
   linkable?: boolean;
   ctaOffsetX?: number;
   ctaOffsetY?: number;
+  ctaScale?: number;
   thumbnailOffsetX?: number;
   thumbnailOffsetY?: number;
   ctaDraggable?: boolean;
@@ -141,6 +142,7 @@ function renderBuyLink(link: PromoCtaBuyLink, linkable: boolean, side: "left" | 
 export function PromoCtaCluster({
   buyLinks = [], cta, linkable = true,
   ctaOffsetX = 0, ctaOffsetY = 0,
+  ctaScale = 100,
   thumbnailOffsetX = 0, thumbnailOffsetY = 0,
   ctaDraggable = false, thumbnailsDraggable = false,
   onCtaPositionChange, onThumbnailsPositionChange,
@@ -159,7 +161,7 @@ export function PromoCtaCluster({
         </DraggableLayer>
       ) : null}
       {cta ? (
-        <DraggableLayer className="promo-cta-cluster-main" offsetX={ctaOffsetX} offsetY={ctaOffsetY} draggable={ctaDraggable} onPositionChange={onCtaPositionChange} title="Drag the CTA button separately" selected={selected === "cta"} onSelect={() => setSelected("cta")}>{cta}</DraggableLayer>
+        <DraggableLayer className="promo-cta-cluster-main" offsetX={ctaOffsetX} offsetY={ctaOffsetY} draggable={ctaDraggable} onPositionChange={onCtaPositionChange} title="Drag the CTA button separately" selected={selected === "cta"} onSelect={() => setSelected("cta")}><span style={{ display: "inline-flex", transform: `scale(${ctaScale / 100})`, transformOrigin: "center" }}>{cta}</span></DraggableLayer>
       ) : null}
     </div>
   );

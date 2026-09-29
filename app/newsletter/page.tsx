@@ -9,6 +9,7 @@ import { readStoriesState } from "../../lib/story-storage";
 import { buildOgImageFromCanvas } from "../../lib/newsletter-archive-seo";
 import type { NewsletterBlock, StoriesState, StoryRecord } from "../../lib/story-types";
 import NewsletterPageClient from "./newsletter-page-client";
+import { collectMastheadImagePreloads } from "../../lib/canvas-display-image";
 
 export const dynamic = "force-dynamic";
 
@@ -161,13 +162,28 @@ export default async function NewsletterPage({
   }
 
   const state = await loadNewsletterState();
+  const mastheadPreloads = collectMastheadImagePreloads(state.newsletterCanvas?.elements);
 
   return (
-    <NewsletterPageClient
-      initialState={state}
-      editMode
-      isAdmin={session?.role === "admin"}
-      canEditNewsletter={canEdit}
-    />
+    <>
+      {mastheadPreloads.map((item) => (
+        <link
+          key={item.id}
+          rel="preload"
+          as="image"
+          href={item.href}
+          imageSrcSet={item.imageSrcSet}
+          imageSizes={item.imageSizes}
+          type={item.type}
+          fetchPriority="high"
+        />
+      ))}
+      <NewsletterPageClient
+        initialState={state}
+        editMode
+        isAdmin={session?.role === "admin"}
+        canEditNewsletter={canEdit}
+      />
+    </>
   );
 }

@@ -26,7 +26,7 @@ export function ProductPdpBuyRow({ product }: Props) {
   const handleBuyNow = async () => {
     const ok = await addToCart(product, undefined, qty);
     if (!ok) return;
-    router.push("/cart");
+    router.push("/checkout");
   };
 
   return (

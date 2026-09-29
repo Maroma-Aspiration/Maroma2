@@ -1,0 +1,94 @@
+.carousel-shell {
+  position: relative;
+  overflow: visible;
+  z-index: 3;
+}
+
+.carousel-nudge {
+  position: absolute;
+  top: 34%;
+  z-index: 8;
+  display: inline-flex;
+  width: 44px;
+  height: 56px;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: none;
+  color: #fff;
+  box-shadow: none;
+  cursor: pointer;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.2s ease, transform 0.2s ease;
+}
+
+.carousel-nudge svg {
+  width: 30px;
+  height: 30px;
+  fill: currentColor;
+  filter: drop-shadow(0 1px 2px rgba(19, 74, 87, 0.45));
+}
+
+.carousel-nudge--prev {
+  left: 6px;
+}
+
+.carousel-nudge--next {
+  right: calc(6px + 2mm);
+}
+
+.carousel-nudge.is-active {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.carousel-nudge:disabled {
+  opacity: 0;
+  pointer-events: none;
+}
+
+.carousel-nudge--next.is-active {
+  animation: carousel-nudge-pulse 1.8s ease-in-out infinite;
+}
+
+@media (min-width: 761px) {
+  .carousel-nudge {
+    top: 38%;
+    width: 52px;
+    height: 64px;
+  }
+
+  .carousel-nudge svg {
+    width: 34px;
+    height: 34px;
+  }
+
+  .carousel-nudge--prev {
+    left: 10px;
+  }
+
+  .carousel-nudge--next {
+    right: 12px;
+  }
+
+  .carousel-nudge--next.is-active {
+    animation: none;
+  }
+
+  .carousel-nudge.is-active:hover {
+    transform: scale(1.08);
+  }
+}
+
+@keyframes carousel-nudge-pulse {
+  0%,
+  100% {
+    transform: translateX(0);
+  }
+  50% {
+    transform: translateX(5px);
+  }
+}

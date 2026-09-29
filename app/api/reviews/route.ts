@@ -3,6 +3,7 @@ import { cookies } from "next/headers";
 import { getSessionSecret, SESSION_COOKIE, verifySessionPayload } from "../../../lib/auth-session";
 import {
   addProductReview,
+  addReviewHelpfulVote,
   listAllReviews,
   listPublishedReviews,
   setReviewStatus,
@@ -44,6 +45,12 @@ export async function POST(request: Request) {
     return NextResponse.json({ review: updated });
   }
 
+  if (typeof body.helpfulId === "string") {
+    const updated = await addReviewHelpfulVote(body.helpfulId);
+    if (!updated) return NextResponse.json({ error: "Review not found." }, { status: 404 });
+    return NextResponse.json({ review: updated });
+  }
+
   const productId = typeof body.productId === "string" ? body.productId.trim() : "";
   const bodyText = typeof body.body === "string" ? body.body.trim() : "";
   if (!productId || !bodyText) {
@@ -53,6 +60,8 @@ export async function POST(request: Request) {
     productId,
     author: typeof body.author === "string" ? body.author : "",
     rating: Number(body.rating),
+    title: typeof body.title === "string" ? body.title : "",
+    verifiedPurchase: body.verifiedPurchase === true,
     body: bodyText,
     source: body.source === "google" ? "google" : "site",
     status: isAdmin && body.status === "published" ? "published" : "pending",

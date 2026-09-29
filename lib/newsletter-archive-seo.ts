@@ -3,14 +3,14 @@ import type { NewsletterArchiveIssue, NewsletterArchiveSummary } from "./newslet
 import type { NewsletterCanvas } from "./story-types";
 import { archiveIssueDisplayTitle, pickThumbnailFromCanvas, previewFromCanvas } from "./newsletter-archive-utils";
 
-export const SITE_URL = (process.env.NEXT_PUBLIC_SITE_URL ?? "https://maroma.com").replace(/\/$/, "");
+export const SITE_URL = "https://maromashopping.com";
 export const ARCHIVE_INDEX_URL = `${SITE_URL}/newsletter/archive`;
 
 function safeMetadataBase(url: string): URL {
   try {
     return new URL(url);
   } catch {
-    return new URL("https://maroma.com");
+    return new URL("https://maromashopping.com");
   }
 }
 

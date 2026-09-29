@@ -1,10 +1,8 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { JsonLd } from "../../components/JsonLd";
-import { CurrencyPrice } from "../../components/CurrencyPrice";
+import { StorefrontProductCard } from "../../components/StorefrontProductCard";
 import { readLiveStorefrontCatalog } from "../../../lib/product-catalog-admin";
-import { getDisplayImageUrl } from "../../../lib/product-image";
-import { stripIndiaOnlyFromProductName } from "../../../lib/product-sale-region";
 import {
   getIngredientPage,
   listIngredientPages,
@@ -56,7 +54,10 @@ export default async function IngredientPage({ params }: Props) {
             {page.imageUrl ? <img src={page.imageUrl} alt={page.name} /> : <span>Image to be added</span>}
           </div>
           <div className="ingredient-page-copy">
+            {page.inci ? <p className="ingredient-page-inci"><strong>INCI</strong> {page.inci}</p> : null}
             <p>{page.description}</p>
+            {page.scentProfile ? <p className="ingredient-page-scent"><strong>Scent profile</strong> {page.scentProfile}</p> : null}
+            {page.extraNotes ? <p>{page.extraNotes}</p> : null}
             <section className="ingredient-page-benefits" aria-labelledby="ingredient-benefits">
               <h2 id="ingredient-benefits">Benefits</h2>
               <ul>
@@ -65,26 +66,20 @@ export default async function IngredientPage({ params }: Props) {
                 ))}
               </ul>
             </section>
+            <Link href={page.rangeHref} className="ingredient-page-range">
+              {page.rangeLabel}
+            </Link>
           </div>
         </div>
         {related.length ? (
           <section className="ingredient-page-related" aria-labelledby="ingredient-related">
             <h2 id="ingredient-related">Used in these products</h2>
             <div className="ingredient-page-related-grid">
-              {related.map((product) => {
-                const { displayName } = stripIndiaOnlyFromProductName(product.name);
-                const image = getDisplayImageUrl(product);
-                return (
-                  <Link key={product.id} href={`/product/${product.id}`} className="ingredient-page-related-card">
-                    {image ? <img src={image} alt="" /> : <span>No image</span>}
-                    <p>
-                      {displayName}
-                      <br />
-                      <CurrencyPrice raw={product.price} fallback="" />
-                    </p>
-                  </Link>
-                );
-              })}
+              {related.map((product) => (
+                <div key={product.id} className="product-card-wrap">
+                  <StorefrontProductCard product={product} />
+                </div>
+              ))}
             </div>
           </section>
         ) : null}

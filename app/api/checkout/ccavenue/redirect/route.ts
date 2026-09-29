@@ -47,6 +47,7 @@ export async function GET(request: Request) {
       "Content-Type": "text/html; charset=utf-8",
       "Cache-Control": "no-store",
       "Referrer-Policy": "origin",
+      "X-Content-Type-Options": "nosniff",
     },
   });
 }

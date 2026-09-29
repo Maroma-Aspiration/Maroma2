@@ -10,7 +10,6 @@ import { HomepagePromoQuickEditor } from "./components/HomepagePromoQuickEditor"
 import { HeroVideoMedia } from "./components/HeroVideoMedia";
 import { isYouTubeUrl } from "../lib/youtube-embed";
 import { MobilePreviewFrame } from "./components/MobilePreviewFrame";
-import { RitualFaceTeaser } from "./components/RitualFaceTeaser";
 import { SiteHeader } from "./components/SiteHeader";
 import { SignOutButton } from "./components/SignOutButton";
 import type { CategoryBannerStore } from "../lib/category-banner-types";
@@ -240,6 +239,10 @@ function createHomepagePromoDraft(): PromoBanner {
     stripBackground: "#134a57",
     stripBackgroundGradient: "linear-gradient(135deg,#083f55 0%,#1688a3 45%,#efc85d 100%)",
     stripBackgroundImageUrl: "",
+    stripBackgroundCarouselUrls: [],
+    stripBackgroundCarouselEnabled: false,
+    stripBackgroundCarouselIntervalMs: 5500,
+    stripBackgroundCarouselFadeMs: 1100,
     stripBackgroundMediaKind: "none",
     stripBackgroundVideoLoop: false,
     stripBackgroundFallbackImageUrl: "",
@@ -2742,8 +2745,17 @@ export default function HomePageClient({
     setReveal(isFading ? 1 : introScrollRevealRef.current);
     if (introPhase === "playing") {
       const fadeDistance = Math.min(320, Math.max(220, window.innerHeight * 0.32));
-      const homepageHoldDistance = Math.min(480, Math.max(340, window.innerHeight * 0.5));
+      const coarsePointer = window.matchMedia("(hover: none) and (pointer: coarse)").matches
+        || window.innerWidth <= 760;
+      const homepageHoldDistance = coarsePointer
+        ? 0
+        : Math.min(480, Math.max(340, window.innerHeight * 0.5));
       let touchY: number | null = null;
+
+      const finishIntroScroll = () => {
+        rememberHeroIntro();
+        setIntroPhase("done");
+      };
 
       const applyScrollDelta = (deltaY: number) => {
         let remainingDelta = deltaY;
@@ -2769,13 +2781,16 @@ export default function HomePageClient({
         }
 
         setReveal(introScrollRevealRef.current);
-        if (introScrollHoldRef.current >= homepageHoldDistance) {
-          rememberHeroIntro();
-          setIntroPhase("done");
+        if (introScrollRevealRef.current >= 1 && introScrollHoldRef.current >= homepageHoldDistance) {
+          finishIntroScroll();
         }
       };
 
       const handleWheel = (event: WheelEvent) => {
+        if (introScrollRevealRef.current >= 1) {
+          finishIntroScroll();
+          return;
+        }
         event.preventDefault();
         applyScrollDelta(event.deltaY);
       };
@@ -2784,6 +2799,10 @@ export default function HomePageClient({
       };
       const handleTouchMove = (event: TouchEvent) => {
         if (touchY === null || !event.touches[0]) return;
+        if (introScrollRevealRef.current >= 1) {
+          finishIntroScroll();
+          return;
+        }
         event.preventDefault();
         const nextY = event.touches[0].clientY;
         applyScrollDelta(touchY - nextY);
@@ -3131,6 +3150,7 @@ export default function HomePageClient({
 
   const heroPromoBanners = useMemo(() => {
     // The mobile edit page pushes an unsaved banner in, so its sliders preview live.
+    if (initialMobilePromoPreview && !mobilePromoPreviewBanner) return [];
     const selected =
       mobilePromoPreviewBanner ?? (promoEditorOpen ? promoEditorBanners : displayPromoBanners)[0];
     const enabled = promoEditorOpen && promoEditorModeOverride !== null
@@ -3144,6 +3164,7 @@ export default function HomePageClient({
     promoEditorBanners,
     promoEditorModeOverride,
     promoEditorOpen,
+    initialMobilePromoPreview,
     showMobileLayout,
   ]);
 
@@ -4308,21 +4329,7 @@ export default function HomePageClient({
     </div>
   ) : null;
 
-  const ritualCarousel = showMobileLayout ? (
-    <RitualFaceTeaser
-      products={products}
-      positionPct={ritualPositionPctForRender}
-      stackZ={heroRitualStackZ}
-      scale={ritualCarouselScaleForRender}
-      liftPx={ritualLiftPx}
-      useArtboardPosition={!useMobileDocumentFlow}
-      adminPositionEditable={canEditRitualPosition}
-      onAdminPositionPointerDown={handleRitualDragDown}
-      onAdminPositionPointerMove={handleRitualDragMove}
-      onAdminPositionPointerUp={handleRitualDragUp}
-      bandBehind={useMobileDocumentFlow ? mobileFlowRitualBand : undefined}
-    />
-  ) : null;
+  const ritualCarousel = null;
 
   const overlayInHeroMedia = !useMobileDocumentFlow || mobileNudgeActive;
   const renderHeroOverlayFrame = () =>
@@ -4609,7 +4616,7 @@ export default function HomePageClient({
                   : undefined
               }
             >
-              <Link href="/special" className="button primary button-gold">
+              <Link href="/promo" className="button primary button-gold">
                 {hero.ctaPrimary}
               </Link>
               <Link href="/rituals" className="button primary button-sage">
@@ -4710,6 +4717,7 @@ export default function HomePageClient({
             "--loved-tint2-left-pct": `${lovedTint2LeftPct}%`,
           } as CSSProperties}
           title="Collections"
+          subtitle="Explore sustainable luxury essentials for body, home and wellbeing"
         />
       ) : null}
     </>
@@ -4814,6 +4822,9 @@ export default function HomePageClient({
             >
               Edit promo
             </button>
+            <a href="/admin/marketing" className="floating-admin-mini-btn">
+              Marketing
+            </a>
           </div>
         ) : (
           <>
@@ -4830,6 +4841,7 @@ export default function HomePageClient({
               >
                 Edit promo
               </button>
+              <a href="/admin/marketing">Marketing</a>
             </div>
             <div className="floating-admin-head">
               <div className="floating-admin-head-row">
@@ -6065,6 +6077,19 @@ export default function HomePageClient({
           status={promoEditorStatus}
           onChange={applyPromoEditorPreview}
           onModeChange={setPromoEditorModeOverride}
+          previewMode={adminDevicePreview}
+          onPreviewModeChange={(mode) => {
+            if (mode === "mobile") {
+              const promoId = promoEditorBanners[0]?.id;
+              window.location.assign(
+                promoId
+                  ? `/admin/mobile-promo?promo=${encodeURIComponent(promoId)}`
+                  : "/admin/mobile-promo"
+              );
+              return;
+            }
+            setDevicePreview("desktop");
+          }}
           onSaved={(banner) => {
             applyPromoEditorPreview(banner);
             setPromoEditorModeOverride(banner.promoModeEnabled !== false);
@@ -6086,11 +6111,10 @@ export default function HomePageClient({
             );
           }}
           onLoadBanner={(banner) => {
-            const loaded = {
-              ...banner,
-              presentation: "static" as const,
-              animation: banner.animation === "marquee" ? "fade" as const : banner.animation,
-            };
+            // Restore the saved presentation exactly. Forcing every library item
+            // to static removes video/sequence frames while leaving its CTA and
+            // product tiles behind, making the saved promo look incomplete.
+            const loaded = { ...banner };
             setPromoEditorModeOverride(loaded.promoModeEnabled !== false);
             applyPromoEditorPreview(loaded);
             setPromoEditorStatus(`Loaded “${loaded.adminName || loaded.title || "Saved promo"}”.`);

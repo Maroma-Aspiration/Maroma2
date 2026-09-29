@@ -7,6 +7,7 @@ import { readSiteContentFromDisk } from "../lib/read-site-content";
 import HomePageClient from "./home-page-client";
 
 export const dynamic = "force-dynamic";
+export const maxDuration = 120;
 
 export default async function Home({
   searchParams,
@@ -29,21 +30,24 @@ export default async function Home({
     readCategoryBannerStore(),
   ]);
   return (
-    <HomePageClient
-      initialHeroVisual={initialHeroVisual}
-      initialSiteContent={initialSiteContent}
-      initialPromoBanners={initialPromoBanners}
-      initialCategoryBanners={initialCategoryBanners}
-      initialViewportIsMobile={promoPreview ? false : mobilePromoPreview ? true : initialViewportIsMobile}
-      initialSkipIntro={
-        promoPreview ||
-        mobilePromoPreview ||
-        searchParams?.skipIntro === "1" ||
-        Boolean(searchParams?.q?.trim())
-      }
-      initialPromoPreview={promoPreview}
-      initialMobilePromoPreview={mobilePromoPreview}
-      initialProductSearch={searchParams?.q ?? ""}
-    />
+    <>
+      <h1 className="sr-only">Maroma natural fragrance and botanical wellbeing from Auroville</h1>
+      <HomePageClient
+        initialHeroVisual={initialHeroVisual}
+        initialSiteContent={initialSiteContent}
+        initialPromoBanners={initialPromoBanners}
+        initialCategoryBanners={initialCategoryBanners}
+        initialViewportIsMobile={promoPreview ? false : mobilePromoPreview ? true : initialViewportIsMobile}
+        initialSkipIntro={
+          promoPreview ||
+          mobilePromoPreview ||
+          searchParams?.skipIntro === "1" ||
+          Boolean(searchParams?.q?.trim())
+        }
+        initialPromoPreview={promoPreview}
+        initialMobilePromoPreview={mobilePromoPreview}
+        initialProductSearch={searchParams?.q ?? ""}
+      />
+    </>
   );
 }

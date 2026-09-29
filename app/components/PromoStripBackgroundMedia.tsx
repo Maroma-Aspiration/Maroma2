@@ -2,11 +2,12 @@
 
 import { useEffect, useRef, useState, type Ref } from "react";
 import type { PromoBanner } from "../../lib/promo-types";
-import { normalizePromoStripFields, stripBackgroundIsVideo } from "../../lib/promo-strip-utils";
+import { normalizePromoStripFields, promoStripUsesCarousel, stripBackgroundIsVideo } from "../../lib/promo-strip-utils";
 import {
   readPromoStripVideoPaused,
   writePromoStripVideoPaused,
 } from "../../lib/promo-strip-video-session";
+import { PromoStripBackgroundCarousel } from "./PromoStripBackgroundCarousel";
 
 type PromoStripBackgroundMediaProps = {
   banner: Partial<PromoBanner>;
@@ -90,6 +91,10 @@ export function PromoStripBackgroundMedia({
       video.removeEventListener("canplay", handleReady);
     };
   }, [autoPlay, isVideo, keepPaused, videoUrl]);
+
+  if (promoStripUsesCarousel(banner)) {
+    return <PromoStripBackgroundCarousel banner={banner} />;
+  }
 
   if (!isVideo || !strip.stripBackgroundImageUrl) {
     return null;

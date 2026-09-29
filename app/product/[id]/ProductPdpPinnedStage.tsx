@@ -8,25 +8,44 @@ function isDesktopPin(): boolean {
   return window.matchMedia("(min-width: 901px)").matches;
 }
 
+function canScroll(el: HTMLElement, deltaY: number): boolean {
+  if (el.scrollHeight <= el.clientHeight + 1) return false;
+  const atTop = el.scrollTop <= 0;
+  const atBottom = el.scrollTop + el.clientHeight >= el.scrollHeight - 1;
+  return (deltaY > 0 && !atBottom) || (deltaY < 0 && !atTop);
+}
+
 export function ProductPdpPinnedStage() {
   useEffect(() => {
     const layout = document.querySelector<HTMLElement>(".product-pdp-layout");
     const details = document.querySelector<HTMLElement>(".product-pdp-details-column");
+    const gallery = document.querySelector<HTMLElement>(".product-pdp-left-column");
     if (!layout || !details) return;
 
     const onWheel = (event: WheelEvent) => {
       if (!isDesktopPin()) return;
       if (Math.abs(event.deltaX) > Math.abs(event.deltaY)) return;
 
-      const atTop = details.scrollTop <= 0;
-      const atBottom = details.scrollTop + details.clientHeight >= details.scrollHeight - 1;
-      const intoDetails = (event.deltaY > 0 && !atBottom) || (event.deltaY < 0 && !atTop);
+      const target = event.target;
+      if (!(target instanceof Node)) return;
 
-      event.preventDefault();
-      if (intoDetails) {
-        details.scrollTop += event.deltaY;
+      if (gallery?.contains(target)) {
+        const thumbs = target instanceof Element ? target.closest(".product-pdp-thumbs") : null;
+        if (thumbs instanceof HTMLElement && canScroll(thumbs, event.deltaY)) {
+          return;
+        }
+        event.preventDefault();
+        gallery.dispatchEvent(
+          new CustomEvent("maroma-pdp-gallery-wheel", { detail: { deltaY: event.deltaY } })
+        );
         return;
       }
+
+      if (details.contains(target)) {
+        return;
+      }
+
+      event.preventDefault();
       window.scrollBy(0, event.deltaY);
     };
 

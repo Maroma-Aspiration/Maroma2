@@ -20,7 +20,9 @@ import {
   canvasExportHeightCanvasPx,
   canvasExportMinY,
   canvasLayoutOrder,
+  clearSpacingLocks,
   effectiveStoryGridHeight,
+  enforceStoryContentBelowGrid,
   MASTHEAD_PORTRAIT_SIZE,
   measureElementHeight,
   NEWSLETTER_CANVAS_WIDTH,
@@ -41,6 +43,7 @@ import {
   gapBetweenStoryElements,
   type StorySpacingGaps,
 } from "./story-spacing-gaps";
+import { stripAiCitationMarkers } from "./strip-ai-citation-markers";
 
 const CANVAS_W = 716;
 const EMAIL_W = 600;
@@ -64,7 +67,6 @@ const MASTHEAD_DESKTOP_PORTRAIT_PX = Math.round((MASTHEAD_PORTRAIT_SIZE / CANVAS
 const MASTHEAD_MOBILE_EMAIL_W = 390;
 /** Gap below masthead hero before mission text (mobile). */
 const MASTHEAD_MOBILE_HERO_TEXT_GAP_PX = 16;
-
 /** Extra breathing room below story images in stacked email (px, pre-scale). */
 const EMAIL_IMAGE_GAP_EXTRA = 12;
 /** Extra space above/below CTA buttons in stacked email (px, pre-scale). */
@@ -101,8 +103,9 @@ export function canvasEmailOptionsFromState(
     missionHeading: state.newsletterMissionHeading,
     missionHtml: state.newsletterMissionHtml,
     missionPlain: state.newsletterMission,
-    // WYSIWYG: email uses the same absolute positions as the canvas editor.
-    preserveDesktopLayout: true,
+    // Email clients such as Gmail do not reliably support scaling an absolute
+    // desktop canvas. Use the responsive flow renderer for delivery/preview.
+    preserveDesktopLayout: false,
     ...overrides,
   };
 }
@@ -181,6 +184,22 @@ function resolveImageSrc(src: string, ctx: RenderCtx): string {
   return src;
 }
 
+/** Public inbox-safe URL for same-site masthead art behind preview access. */
+function inboxMastheadSrc(src: string, ctx: RenderCtx): string {
+  const resolved = resolveImageSrc(src, ctx);
+  if (!resolved) return "";
+  try {
+    const imageUrl = new URL(resolved);
+    const siteUrl = new URL(ctx.siteUrl);
+    const legacyBlob = /\.public\.blob\.vercel-storage\.com$/i.test(imageUrl.hostname);
+    if (imageUrl.origin !== siteUrl.origin && !legacyBlob) return resolved;
+    const source = legacyBlob ? imageUrl.toString() : imageUrl.pathname + imageUrl.search;
+    return `${siteUrl.origin}/api/newsletter/image?src=${encodeURIComponent(source)}`;
+  } catch {
+    return resolved;
+  }
+}
+
 function esc(s: string): string {
   return s
     .replace(/&/g, "&amp;")
@@ -219,11 +238,13 @@ function emailRenderedCropSrc(src: string, el: CanvasImageEl, ctx: RenderCtx): s
 }
 
 function sanitiseHtml(html: string): string {
-  return html
-    .replace(/<script[\s\S]*?<\/script>/gi, "")
-    .replace(/<style[\s\S]*?<\/style>/gi, "")
-    .replace(/\son\w+="[^"]*"/gi, "")
-    .replace(/\son\w+='[^']*'/gi, "");
+  return stripAiCitationMarkers(
+    html
+      .replace(/<script[\s\S]*?<\/script>/gi, "")
+      .replace(/<style[\s\S]*?<\/style>/gi, "")
+      .replace(/\son\w+="[^"]*"/gi, "")
+      .replace(/\son\w+='[^']*'/gi, ""),
+  );
 }
 
 function px(n: number): string {
@@ -536,7 +557,7 @@ function mobileEmailCss(preserveDesktopLayout = false): string {
         margin-bottom: 0 !important;
       }
       .email-story-card-img {
-        height: 56px !important;
+        height: 220px !important;
       }
       .email-layer-story-grid {
         padding-left: 10px !important;
@@ -718,7 +739,7 @@ function renderVisualImage(el: CanvasImageEl, ctx: RenderCtx, allElements: Canva
     : stackedEmailLayout && circle
       ? `width:${px(w)};max-width:100%;height:${px(h)};display:block;margin:0 auto;`
       : !isMontage
-        ? `width:100%;max-width:100%;height:auto;`
+        ? `display:block;width:100%;max-width:100%;height:100%;`
         : `width:100%;height:100%;min-height:100%;`;
   const minH =
     stackedEmailLayout ? "" : isMontage ? "" : `min-height:${px(Math.min(h, scale(140)))};`;
@@ -795,7 +816,7 @@ function renderVisualStoryGrid(
     ctx,
     stackedEmailLayout
       ? `overflow:visible;${gridPad}`
-      : `height:${px(gridH)};overflow:hidden;${gridPad}`,
+      : `height:${px(gridH)};overflow:visible;${gridPad}`,
   );
   const headingColor = safeColor(enriched.headingColor, "#a7c7bc");
   const cardBg = safeColor(enriched.cardBg, "rgba(255,255,255,0.08)");
@@ -814,24 +835,24 @@ function renderVisualStoryGrid(
       const src = s.imageUrl ? resolveImageSrc(s.imageUrl, ctx) : "";
       const imgHtml = src
         ? `<div class="email-story-card-img" style="width:100%;height:${px(cardImgH)};overflow:hidden;line-height:0;background:${cardBg};">
-            <img class="email-img-el" src="${esc(src)}" alt="${esc(s.title)}" width="${scale(560)}" height="${cardImgH}"
+            <img class="email-img-el" src="${esc(src)}" alt="${esc(stripAiCitationMarkers(s.title))}" width="${scale(560)}" height="${cardImgH}"
               style="display:block;width:100%;height:100%;object-fit:cover;border:0;" />
           </div>`
         : "";
       const excerptHtml = s.excerpt
-        ? `<p style="margin:0;font-size:${px(scaleFont(12))};line-height:1.5;color:${textColor};opacity:0.78;flex:1;">${esc(s.excerpt)}</p>`
+        ? `<p style="margin:0;font-size:${px(scaleFont(12))};line-height:1.5;color:${textColor};opacity:0.78;flex:1;">${esc(stripAiCitationMarkers(s.excerpt))}</p>`
         : "";
-      return `<div class="email-story-card" style="border-radius:${cardRadius};overflow:hidden;box-shadow:0 4px 22px rgba(0,0,0,0.18),0 1px 4px rgba(0,0,0,0.10);display:flex;flex-direction:column;min-width:0;background:${cardBg};">
+      return `<div class="email-story-card" style="border-radius:${cardRadius};overflow:hidden;box-shadow:0 4px 22px rgba(0,0,0,0.18),0 1px 4px rgba(0,0,0,0.10);display:flex;flex-direction:column;height:100%;min-width:0;background:${cardBg};">
         ${imgHtml}
         <div style="padding:${px(scale(14))} ${px(scale(16))} ${px(scale(16))};display:flex;flex-direction:column;gap:${px(scale(10))};flex:1;">
-          <p style="margin:0;font-size:${px(scaleFont(14))};font-weight:700;line-height:1.35;color:${textColor};">${esc(s.title)}</p>
+          <p style="margin:0;font-size:${px(scaleFont(14))};font-weight:700;line-height:1.35;color:${textColor};">${esc(stripAiCitationMarkers(s.title))}</p>
           ${excerptHtml}
         </div>
       </div>`;
     })
     .join("");
 
-  const gridStyle = `display:grid;grid-template-columns:repeat(${cols},minmax(0,1fr));gap:${px(Math.max(gap, 16))};align-items:start;`;
+  const gridStyle = `display:grid;grid-template-columns:repeat(${cols},minmax(0,1fr));gap:${px(Math.max(gap, 16))};align-items:stretch;`;
 
   return `<div ${shell}>${heading}<div class="email-story-grid-inner" style="${gridStyle}">${cards}</div></div>`;
 }
@@ -873,9 +894,9 @@ function renderEmailMastheadTable(
   const heroHMobile =
     hero?.w && hero?.h ? Math.round((hero.h / hero.w) * MASTHEAD_MOBILE_EMAIL_W) : 0;
 
-  const bannerSrc = banner?.src ? resolveImageSrc(banner.src, ctx) : "";
-  const heroSrc = hero?.src ? resolveImageSrc(hero.src, ctx) : "";
-  const portraitSrc = portrait?.src ? resolveImageSrc(portrait.src, ctx) : "";
+  const bannerSrc = banner?.src ? inboxMastheadSrc(banner.src, ctx) : "";
+  const heroSrc = hero?.src ? inboxMastheadSrc(hero.src, ctx) : "";
+  const portraitSrc = portrait?.src ? inboxMastheadSrc(portrait.src, ctx) : "";
 
   const bannerBr = "border-radius:0;";
   const heroBr =
@@ -1307,11 +1328,16 @@ export function canvasToEmailHtml(
   };
 
   const laid = layoutNewsletterCanvas(canvasWithMission, storySpacingGaps);
+  const heightOf = laid.heightOf;
   let prepared = normalizeCanvasVisualsForEmail(laid.elements);
+  prepared = enforceStoryContentBelowGrid(
+    clearSpacingLocks(prepared),
+    storySpacingGaps,
+    heightOf,
+  );
   if (!preserveDesktopLayout) {
     prepared = snapStoryCtasForEmailRender(prepared);
   }
-  const heightOf = laid.heightOf;
   const yShift = -canvasExportMinY(prepared);
   const emailTableW = outputEmailWidth();
 
@@ -1363,12 +1389,15 @@ export function canvasToEmailHtml(
   <meta http-equiv="X-UA-Compatible" content="IE=edge" />
   <meta name="x-apple-disable-message-reformatting" />
   <meta name="format-detection" content="telephone=no,address=no,email=no,date=no,url=no" />
+  <meta name="color-scheme" content="light only" />
+  <meta name="supported-color-schemes" content="light only" />
   <title>${esc(subject)}</title>
   <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,600;0,700;1,400&family=Montserrat:wght@200;300;400;600&family=Raleway:wght@200;400&family=Josefin+Sans:wght@300;400;600&display=swap" rel="stylesheet" />
   <!--[if mso]>
   <noscript><xml><o:OfficeDocumentSettings><o:PixelsPerInch>96</o:PixelsPerInch></o:OfficeDocumentSettings></xml></noscript>
   <![endif]-->
   <style>
+    :root { color-scheme: light only; supported-color-schemes: light only; }
     body, table, td, a { -webkit-text-size-adjust: 100%; -ms-text-size-adjust: 100%; }
     table, td { mso-table-lspace: 0pt; mso-table-rspace: 0pt; }
     img { -ms-interpolation-mode: bicubic; border: 0; height: auto; line-height: 100%; outline: none; text-decoration: none; }
@@ -1393,7 +1422,8 @@ export function canvasToEmailHtml(
       height: auto !important;
       overflow: visible !important;
     }
-    .email-story-grid-inner { align-items: start; }
+    .email-story-grid-inner { align-items: stretch; }
+    .email-story-card { height: 100%; }
     .email-masthead-hero-cell { position: relative; overflow: visible; }
     .email-masthead-image-gap { height: 2mm !important; max-height: 2mm !important; line-height: 0; font-size: 0; }
 `

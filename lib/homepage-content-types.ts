@@ -30,7 +30,7 @@ export type HomepageContent = {
 export const defaultHomepageContent = (): HomepageContent => ({
   aboutTitle: "About Maroma",
   aboutBody:
-    "Maroma makes botanical care, natural perfume, incense, and home rituals in Auroville, India. Our work is vegan, cruelty-free, and rooted in the community that has crafted fragrance here for decades.",
+    "Maroma makes botanical care, natural perfume, incense, and home rituals in Auroville, India. Our work is vegan (with the exception of honey), cruelty-free, and rooted in the community that has crafted fragrance here for decades.",
   places: [
     {
       id: "cafe",

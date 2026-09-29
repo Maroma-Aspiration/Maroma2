@@ -16,6 +16,7 @@ import {
   isLegacyHeroLayout,
 } from "./hero-artboard";
 import { clampMobileRitualBandLayout, DEFAULT_HERO_MOBILE_RITUAL_BAND_LAYOUT } from "./hero-mobile-layout";
+import { firstUsablePublicMediaUrl } from "./usable-media-url";
 import type {
   HeroMediaLayout,
   XY,
@@ -351,9 +352,10 @@ export const parseHeroVisualState = (value: unknown, base?: HeroVisualState): He
       ...(overlayRaw as HeroLayerSettings),
     }),
     src:
-      typeof overlayRaw.src === "string" && overlayRaw.src.trim()
-        ? overlayRaw.src
-        : b.overlayLayer.src,
+      firstUsablePublicMediaUrl(overlayRaw.src) ||
+      (typeof overlayRaw.src === "string" && overlayRaw.src.trim()
+        ? ""
+        : firstUsablePublicMediaUrl(b.overlayLayer.src)),
     layout: parseLayout(overlayRaw.layout ?? b.overlayLayer.layout),
   };
 

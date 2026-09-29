@@ -4,6 +4,7 @@ import { getSessionSecret, SESSION_COOKIE, verifySessionPayload } from "../../..
 import { canEditNewsletter } from "../../../lib/auth-roles";
 import { readStoriesState } from "../../../lib/story-storage";
 import EmailPreviewClient from "./email-preview-client";
+import { collectMastheadImagePreloads } from "../../../lib/canvas-display-image";
 
 export default async function EmailPreviewPage() {
   // Auth guard
@@ -17,5 +18,23 @@ export default async function EmailPreviewPage() {
   const state = await readStoriesState();
   const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://maroma-staging-isolated.vercel.app";
 
-  return <EmailPreviewClient initialState={state} siteUrl={siteUrl} />;
+  const mastheadPreloads = collectMastheadImagePreloads(state.newsletterCanvas?.elements);
+
+  return (
+    <>
+      {mastheadPreloads.map((item) => (
+        <link
+          key={item.id}
+          rel="preload"
+          as="image"
+          href={item.href}
+          imageSrcSet={item.imageSrcSet}
+          imageSizes={item.imageSizes}
+          type={item.type}
+          fetchPriority="high"
+        />
+      ))}
+      <EmailPreviewClient initialState={state} siteUrl={siteUrl} />
+    </>
+  );
 }

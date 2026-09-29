@@ -1,10 +1,11 @@
 "use client";
 
-import { useRef, type CSSProperties, type PointerEvent as ReactPointerEvent } from "react";
+import { useRef, useState, type CSSProperties, type PointerEvent as ReactPointerEvent } from "react";
 import type { PromoBanner, PromoOverlayImage } from "../../lib/promo-types";
 import { promoOverlayDepthZIndex } from "../../lib/promo-overlay-utils";
 import { usesPromoSequence } from "../../lib/promo-sequence-utils";
 import { promoStripStyleVars, promoStripBannerClass, promoStripFillColor } from "../../lib/promo-strip-utils";
+import { isUsablePublicMediaUrl } from "../../lib/usable-media-url";
 import { PromoBannerSequence } from "./PromoBannerSequence";
 import { PromoCtaCluster } from "./PromoCtaCluster";
 import { PromoSequenceMarquee } from "./PromoSequenceMarquee";
@@ -50,6 +51,11 @@ export type PromoBannerLike = Pick<
   | "frames"
   | "stripBackground"
   | "stripBackgroundGradient"
+  | "stripBackgroundImageUrl"
+  | "stripBackgroundCarouselUrls"
+  | "stripBackgroundCarouselEnabled"
+  | "stripBackgroundCarouselIntervalMs"
+  | "stripBackgroundCarouselFadeMs"
   | "stripBackgroundFallbackImageUrl"
   | "stripHeightPx"
   | "stripOpacity"
@@ -59,9 +65,10 @@ export type PromoBannerLike = Pick<
   | "heroMarqueeStartOffsetPx"
   | "heroMarqueeEndOffsetCm"
   | "heroMarqueeEndOffsetPx"
-  | "ctaOffsetX"
-  | "ctaOffsetY"
-  | "thumbnailOffsetX"
+    | "ctaOffsetX"
+    | "ctaOffsetY"
+    | "ctaScale"
+    | "thumbnailOffsetX"
   | "thumbnailOffsetY"
   | "overlayImageX"
   | "overlayImageY"
@@ -99,13 +106,16 @@ function PromoSecondaryLayer({
   banner,
   layer,
   editable = false,
+  linkable = true,
   onChange,
 }: {
   banner: PromoBannerLike;
   layer?: PromoOverlayImage;
   editable?: boolean;
+  linkable?: boolean;
   onChange?: (patch: Partial<PromoOverlayImage>) => void;
 }) {
+  const [failed, setFailed] = useState(false);
   const dragRef = useRef<{
     mode: "move" | "resize";
     startX: number;
@@ -118,13 +128,14 @@ function PromoSecondaryLayer({
   } | null>(null);
 
   const imageUrl = layer?.imageUrl ?? banner.mediaUrl;
-  if (!imageUrl) return null;
+  if (!isUsablePublicMediaUrl(imageUrl) || failed) return null;
   const x = layer?.x ?? banner.overlayImageX ?? 50;
   const y = layer?.y ?? banner.overlayImageY ?? 50;
   const scale = layer?.scale ?? banner.overlayImageScale ?? 75;
   const crop = layer?.crop ?? "none";
   const hasShadow = (layer?.shadow ?? banner.overlayImageShadow) !== false;
   const cropAspect = crop === "square" ? "1 / 1" : crop === "portrait" ? "4 / 5" : crop === "landscape" ? "16 / 9" : "auto";
+  const href = linkable && !editable ? layer?.href?.trim() : "";
   const start = (event: ReactPointerEvent<HTMLElement>, mode: "move" | "resize") => {
     if (!editable) return;
     event.preventDefault();
@@ -150,7 +161,7 @@ function PromoSecondaryLayer({
     event.preventDefault();
     event.stopPropagation();
     if (drag.mode === "resize") {
-      onChange?.({ scale: Math.min(220, Math.max(20, drag.scale + ((event.clientX - drag.startX) / drag.width) * 180)) });
+      onChange?.({ scale: Math.min(270, Math.max(20, drag.scale + ((event.clientX - drag.startX) / drag.width) * 230)) });
       return;
     }
     onChange?.({
@@ -161,7 +172,7 @@ function PromoSecondaryLayer({
 
   return (
     <div
-      className={`promo-secondary-layer promo-secondary-layer--${layer?.animation ?? banner.overlayImageAnimation ?? "none"}${editable ? " is-editable" : ""}`}
+      className={`promo-secondary-layer promo-secondary-layer--${layer?.animation ?? banner.overlayImageAnimation ?? "none"}${editable ? " is-editable" : ""}${href ? " is-linked" : ""}`}
       style={{
         left: `${x}%`,
         top: `${y}%`,
@@ -180,9 +191,17 @@ function PromoSecondaryLayer({
       onPointerUp={() => { dragRef.current = null; }}
       onPointerCancel={() => { dragRef.current = null; }}
     >
-      <span className={`promo-secondary-crop-frame${crop === "none" ? "" : " is-cropped"}`}>
-        <img src={imageUrl} alt="" className="promo-banner-media" />
-      </span>
+      {href ? (
+        <a className="promo-secondary-link" href={href} aria-label={layer?.name?.trim() || "Open linked promotion"}>
+          <span className={`promo-secondary-crop-frame${crop === "none" ? "" : " is-cropped"}`}>
+            <img src={imageUrl} alt="" className="promo-banner-media" onError={() => setFailed(true)} />
+          </span>
+        </a>
+      ) : (
+        <span className={`promo-secondary-crop-frame${crop === "none" ? "" : " is-cropped"}`}>
+          <img src={imageUrl} alt="" className="promo-banner-media" onError={() => setFailed(true)} />
+        </span>
+      )}
       {editable ? (
         <span
           className="promo-secondary-resize-handle"
@@ -254,6 +273,7 @@ function PromoBannerStatic({
           banner={banner}
           layer={layer}
           editable={mediaEditable}
+          linkable={linkable}
           onChange={(patch) => onMediaLayoutChange?.({ overlayImages: overlayImages.map((item) => item.id === layer.id ? { ...item, ...patch } : item) })}
         />
       ))}
@@ -300,6 +320,7 @@ function PromoBannerStatic({
           cta={cta}
           ctaOffsetX={banner.ctaOffsetX}
           ctaOffsetY={banner.ctaOffsetY}
+          ctaScale={banner.ctaScale}
           thumbnailOffsetX={banner.thumbnailOffsetX}
           thumbnailOffsetY={banner.thumbnailOffsetY}
           ctaDraggable={ctaDraggable}

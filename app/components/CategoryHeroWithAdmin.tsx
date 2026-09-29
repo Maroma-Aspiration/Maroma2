@@ -33,7 +33,7 @@ function useMobileCategoryHero(): boolean {
   const [isMobile, setIsMobile] = useState(false);
 
   useEffect(() => {
-    const mq = window.matchMedia("(max-width: 900px)");
+    const mq = window.matchMedia("(max-width: 760px)");
     const sync = () => setIsMobile(mq.matches);
     sync();
     mq.addEventListener("change", sync);
@@ -267,6 +267,14 @@ export function CategoryHeroWithAdmin({
 
   const heroCopy = wideCover ? wideCoverTextPill : defaultHeroCopy;
 
+  const mobileWideCoverCopy = (
+    <div className="category-hero-mobile-copy">
+      <span className="category-hero-mobile-eyebrow eyebrow">Maroma Collection</span>
+      <h1>{heroTitle}</h1>
+      <p className={italicTagline ? "category-hero-tagline" : undefined}>{heroTagline}</p>
+    </div>
+  );
+
   const readApiError = async (response: Response, fallback: string): Promise<string> => {
     const data = (await response.json().catch(() => null)) as { error?: string } | null;
     return data?.error || fallback;
@@ -423,31 +431,36 @@ export function CategoryHeroWithAdmin({
         data-review-files="app/components/CategoryHeroWithAdmin.tsx,app/[slug]/page.tsx"
       >
         {wideCover ? (
-          <div
-            ref={bannerMediaRef}
-            className="category-hero-wide-media category-banner-admin-target"
-          >
-            {showEditor ? (
-              <button
-                type="button"
-                className="category-banner-edit-trigger"
-                onClick={openDrawer}
-                aria-expanded={drawerOpen}
-              >
-                Edit banner
-              </button>
-            ) : null}
-            <img
-              className="category-hero-wide-img"
-              src={displayImageUrl}
-              alt={`${categoryLabel} collection — Maroma`}
-              style={{
-                objectPosition: bannerObjectPosition,
-                transform: `scale(${renderedImageScale})`,
-              }}
-            />
-            <div className="category-hero-copy category-hero-copy--overlay">{heroCopy}</div>
-          </div>
+          <>
+            <div
+              ref={bannerMediaRef}
+              className="category-hero-wide-media category-banner-admin-target"
+            >
+              {showEditor ? (
+                <button
+                  type="button"
+                  className="category-banner-edit-trigger"
+                  onClick={openDrawer}
+                  aria-expanded={drawerOpen}
+                >
+                  Edit banner
+                </button>
+              ) : null}
+              <img
+                className="category-hero-wide-img"
+                src={displayImageUrl}
+                alt={`${categoryLabel} collection — Maroma`}
+                style={{
+                  objectPosition: bannerObjectPosition,
+                  transform: `scale(${renderedImageScale})`,
+                }}
+              />
+              {!isMobileCategoryHero ? (
+                <div className="category-hero-copy category-hero-copy--overlay">{heroCopy}</div>
+              ) : null}
+            </div>
+            {isMobileCategoryHero ? mobileWideCoverCopy : null}
+          </>
         ) : (
           <>
             <div className="category-hero-copy">

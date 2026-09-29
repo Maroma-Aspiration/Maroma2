@@ -6,6 +6,7 @@ import { kv } from "@vercel/kv";
 import { normalizeProductInciFields } from "./product-inci-extract";
 import packagedProductOverrides from "../data/product-overrides.json";
 import packagedVideoBlobMap from "../data/product-video-blob-map.json";
+import { firstUsablePublicMediaUrl, isUsablePublicMediaUrl } from "./usable-media-url";
 
 export type { ProductRecord } from "./product-types";
 
@@ -29,16 +30,30 @@ function overrideHasVideos(row?: ProductOverride): boolean {
   return Boolean(row?.videos?.some((url) => String(url || "").trim()));
 }
 
+function isUsableMappedVideoUrl(url: string): boolean {
+  return isUsablePublicMediaUrl(url);
+}
+
 function resolveVideoUrl(url: string): string {
   const trimmed = String(url || "").trim();
   if (!trimmed) return trimmed;
+  if (isUsableMappedVideoUrl(trimmed) && !trimmed.startsWith("/staging-media/product-videos/")) {
+    return trimmed;
+  }
   const mapped = (packagedVideoBlobMap as Record<string, string>)[trimmed];
-  return mapped || trimmed;
+  if (mapped && isUsableMappedVideoUrl(mapped)) return mapped;
+  return trimmed;
 }
 
 function resolveVideoUrls(urls?: string[]): string[] | undefined {
   if (!urls?.length) return urls;
   return urls.map(resolveVideoUrl);
+}
+
+function usableImageList(overrideImages: string[] | undefined, fallback: string[]): string[] {
+  const fromOverride = (overrideImages ?? []).filter((url) => isUsablePublicMediaUrl(url));
+  if (fromOverride.length > 0) return fromOverride;
+  return fallback;
 }
 
 function packagedOverrideStore(): ProductOverrideStore {
@@ -131,13 +146,16 @@ export const withOverrides = (
   return products.map((product) => {
     const override = store.overrides[product.id];
     if (!override) {
-      return product;
+      return {
+        ...product,
+        videos: resolveVideoUrls(product.videos),
+      };
     }
     return {
       ...product,
-      imageUrl: override.imageUrl ?? product.imageUrl,
-      images: override.images && override.images.length > 0 ? override.images : product.images,
-      videos: resolveVideoUrls(overrideHasVideos(override) ? override.videos : product.videos)
+      imageUrl: firstUsablePublicMediaUrl(override.imageUrl, product.imageUrl) || product.imageUrl,
+      images: usableImageList(override.images, product.images),
+      videos: resolveVideoUrls(overrideHasVideos(override) ? override.videos : product.videos),
     };
   });
 };

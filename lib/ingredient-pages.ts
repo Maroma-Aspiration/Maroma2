@@ -1,3 +1,4 @@
+import { extraForIngredientSlug } from "./ingredient-extras";
 import { normalizeKeyIngredientName, resolveKeyIngredientImage } from "./key-ingredient-media";
 import type { ProductRecord } from "./product-types";
 
@@ -8,6 +9,11 @@ export type IngredientPageContent = {
   description: string;
   benefits: string[];
   imageUrl: string;
+  inci: string;
+  scentProfile: string;
+  extraNotes: string;
+  rangeLabel: string;
+  rangeHref: string;
 };
 
 type IngredientDraft = {
@@ -1443,6 +1449,7 @@ function titleCase(value: string): string {
 }
 
 function withImage(draft: IngredientDraft): IngredientPageContent {
+  const extra = extraForIngredientSlug(draft.slug);
   return {
     slug: draft.slug,
     name: draft.name,
@@ -1450,6 +1457,11 @@ function withImage(draft: IngredientDraft): IngredientPageContent {
     description: draft.description,
     benefits: draft.benefits,
     imageUrl: resolveKeyIngredientImage(draft.name) || resolveKeyIngredientImage(draft.aliases?.[0] || ""),
+    inci: extra.inci || draft.name,
+    scentProfile: extra.scentProfile || "Used for texture, care, and botanical character.",
+    extraNotes: extra.extraNotes || "",
+    rangeLabel: extra.rangeLabel || "Shop Maroma",
+    rangeHref: extra.rangeHref || "/shop",
   };
 }
 
@@ -1480,6 +1492,11 @@ function fallbackPage(name: string): IngredientPageContent {
       "Part of Maroma's plant-based palette from Auroville",
     ],
     imageUrl: resolveKeyIngredientImage(name),
+    inci: name,
+    scentProfile: "Used for texture, care, and botanical character.",
+    extraNotes: "",
+    rangeLabel: "Shop Maroma",
+    rangeHref: "/shop",
   };
 }
 

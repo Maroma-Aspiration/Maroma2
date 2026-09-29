@@ -25,6 +25,7 @@ export type CategoryBannerOverride = {
 
 export type CategoryBannerStore = {
   banners: Record<string, CategoryBannerOverride>;
+  firebaseMediaVersion?: string;
 };
 
 export type ResolvedCategoryBanner = {

@@ -196,6 +196,8 @@ export type CanvasImageEl = {
   /** User-placed Y — skip auto spacing until ⇕ Apply spacing. */
   spacingLocked?: boolean;
   src: string;
+  /** Ready-to-show retina file. Screen uses this; `src` stays the original. */
+  displaySrc?: string;
   borderRadius: number;
   objectFit: "contain" | "cover";
   objectPositionX: number;

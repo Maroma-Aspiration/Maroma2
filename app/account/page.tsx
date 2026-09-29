@@ -7,6 +7,7 @@ import { getSessionSecret, SESSION_COOKIE, verifySessionPayload } from "../../li
 import { getB2bCompanyByUserEmail } from "../../lib/b2b-store";
 import { listOrdersForEmail } from "../../lib/commerce-orders";
 import { formatInrPrice } from "../../lib/format-price";
+import { CurationsAccountPrompt } from "./CurationsAccountPrompt";
 
 export const dynamic = "force-dynamic";
 
@@ -17,7 +18,16 @@ export const metadata = {
 export default async function AccountPage({
   searchParams,
 }: {
-  searchParams: { reason?: string };
+  searchParams: {
+    reason?: string;
+    view?: string;
+    category?: string;
+    products?: string;
+    type?: string;
+    goal?: string;
+    routine?: string;
+    name?: string;
+  };
 }) {
   const secret = getSessionSecret();
   const token = cookies().get(SESSION_COOKIE)?.value;
@@ -29,6 +39,43 @@ export default async function AccountPage({
     redirect("/login?next=/account&reason=sign_in_required");
   }
 
+  if (searchParams.view === "curations") {
+    const selection = {
+      category: searchParams.category ?? "face-care",
+      productIds: (searchParams.products ?? "").split(",").map((value) => value.trim()).filter(Boolean),
+      choices: {
+        type: searchParams.type ?? "",
+        goal: searchParams.goal ?? "",
+        routine: searchParams.routine ?? ""
+      }
+    };
+    const returnParams = new URLSearchParams({
+      category: selection.category,
+      products: selection.productIds.join(","),
+      type: selection.choices.type,
+      goal: selection.choices.goal,
+      routine: selection.choices.routine,
+      saved: "1"
+    });
+    const accountParams = new URLSearchParams({
+      view: "curations",
+      category: selection.category,
+      products: selection.productIds.join(","),
+      type: selection.choices.type,
+      goal: selection.choices.goal,
+      routine: selection.choices.routine
+    });
+    return (
+      <CurationsAccountPrompt
+        email={session.email}
+        initialName={(searchParams.name ?? "").trim().slice(0, 60)}
+        selection={selection}
+        returnHref={`/curations?${returnParams.toString()}`}
+        createNewHref={`/signup?source=maroma-curations&next=${encodeURIComponent(`/account?${accountParams.toString()}`)}`}
+      />
+    );
+  }
+
   const orders = await listOrdersForEmail(session.email, 20);
   const b2bCompany = await getB2bCompanyByUserEmail(session.email);
 
@@ -38,7 +85,7 @@ export default async function AccountPage({
       : null;
 
   return (
-    <main className="login-page">
+    <main className="login-page account-settings-page">
       <section className="login-card" style={{ maxWidth: 720, width: "100%" }}>
         <p className="login-eyebrow">Signed in</p>
         <h1 className="login-title">Account</h1>

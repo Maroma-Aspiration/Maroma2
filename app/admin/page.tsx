@@ -1,4 +1,34 @@
 import Link from "next/link";
+
 export const dynamic = "force-dynamic";
-const areas=[{href:"/admin/products",title:"Products",text:"Manage your catalog, product details and availability."},{href:"/admin/site",title:"Promo",text:"Manage homepage promotions and sequences."},{href:"/admin/qr-pages",title:"Product guides & QR",text:"Create customer guides and downloadable QR labels."},{href:"/admin/restricted-areas",title:"Restricted areas",text:"Set product delivery restrictions by region."},{href:"/admin/orders",title:"Orders",text:"Review and manage customer orders."}];
-export default function AdminPage(){return <main className="admin-home-page"><header><p>Maroma admin</p><h1>Manage your store</h1><span>Choose an area to update.</span></header><section>{areas.map(area=><Link key={area.href} href={area.href}><h2>{area.title}</h2><p>{area.text}</p><span>Open →</span></Link>)}</section></main>}
+
+const areas = [
+  { href: "/admin/products", title: "Products", text: "Manage your catalog, product details and availability." },
+  { href: "/admin/video-id", title: "Video ID", text: "Preview videos, choose products, and publish Firebase links." },
+  { href: "/admin/site", title: "Promo", text: "Manage homepage promotions and sequences." },
+  { href: "/admin/marketing", title: "Marketing lookbook", text: "Ananya customer profile, voice, and suggested promotions." },
+  { href: "/admin/qr-pages", title: "Product guides & QR", text: "Create customer guides and downloadable QR labels." },
+  { href: "/admin/restricted-areas", title: "Restricted areas", text: "Set product delivery restrictions by region." },
+  { href: "/admin/orders", title: "Orders", text: "Review and manage customer orders." },
+];
+
+export default function AdminPage() {
+  return (
+    <main className="admin-home-page">
+      <header>
+        <p>Maroma admin</p>
+        <h1>Manage your store</h1>
+        <span>Choose an area to update.</span>
+      </header>
+      <section>
+        {areas.map((area) => (
+          <Link key={area.href} href={area.href}>
+            <h2>{area.title}</h2>
+            <p>{area.text}</p>
+            <span>Open →</span>
+          </Link>
+        ))}
+      </section>
+    </main>
+  );
+}

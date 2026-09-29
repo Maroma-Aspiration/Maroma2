@@ -1,0 +1,123 @@
+.bestsellers-scroller {
+  margin: calc(8px * 0.3) 0 28px;
+}
+
+.bestsellers-scroller-head {
+  margin: 0 0 16px;
+  text-align: center;
+}
+
+.bestsellers-scroller-head p {
+  margin: 0 0 6px;
+  color: #4b8d79;
+  font: 800 0.68rem/1.2 var(--font-sans), sans-serif;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+.bestsellers-scroller-head h2 {
+  margin: 0;
+  color: #145366;
+  font: 500 clamp(1.8rem, 3vw, 2.6rem)/1.1 var(--font-serif), serif;
+}
+
+.bestsellers-track {
+  display: flex;
+  gap: 16px;
+  overflow-x: auto;
+  padding: 4px 2px 18px;
+  scroll-snap-type: x mandatory;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+}
+
+.bestsellers-track::-webkit-scrollbar {
+  display: none;
+}
+
+.bestsellers-card {
+  flex: 0 0 min(260px, 78vw);
+  scroll-snap-align: start;
+  max-width: 260px;
+}
+
+@media (max-width: 760px) {
+  .bestsellers-scroller {
+    margin-top: 5mm;
+    padding-inline: 16px;
+    box-sizing: border-box;
+  }
+
+  .bestsellers-scroller-head {
+    text-align: center;
+  }
+
+  .bestsellers-carousel .carousel-nudge {
+    display: none;
+  }
+
+  .bestsellers-track {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 14px 12px;
+    overflow: visible;
+    padding: 0;
+    scroll-snap-type: none;
+  }
+
+  .bestsellers-card {
+    flex: none;
+    width: 100%;
+    min-width: 0;
+    max-width: none;
+    scroll-snap-align: unset;
+  }
+
+  .bestsellers-card .product-card-actions {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 8px;
+    padding: 0 10px 12px;
+  }
+
+  .bestsellers-card .product-card-actions .product-card-cta,
+  .bestsellers-card .product-card-actions .product-card-cta--primary {
+    flex: none;
+    width: 100%;
+    min-width: 0;
+    min-height: 44px;
+    height: 44px;
+    padding: 0 16px;
+    font-size: 0.68rem;
+    letter-spacing: 0.04em;
+    border-radius: 999px;
+    white-space: nowrap;
+  }
+
+  .bestsellers-card .product-card-buy-now {
+    background: #fff;
+    border-radius: 999px;
+  }
+
+  .bestsellers-card .product-image {
+    align-items: center;
+    padding: 0;
+  }
+
+  .bestsellers-card .product-image img {
+    width: 100%;
+    height: 100%;
+    max-width: none;
+    max-height: none;
+    object-fit: cover;
+    object-position: center;
+    align-self: stretch;
+    transform: none;
+  }
+
+  .bestsellers-card .product-image-rear {
+    inset: 0;
+    bottom: 0;
+    margin: 0;
+  }
+}

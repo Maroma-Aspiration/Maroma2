@@ -9,7 +9,7 @@ import { createClient } from "@vercel/kv";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const reviewsPath = path.join(__dirname, "..", "data", "product-reviews.json");
-const KV_KEY = "maroma:product-reviews";
+const KV_KEY = "maroma:product-reviews:amazon-v2";
 
 async function loadEnvFile(filePath) {
   try {
@@ -27,6 +27,7 @@ async function loadEnvFile(filePath) {
       ) {
         value = value.slice(1, -1);
       }
+      if (value === "[SENSITIVE]" || value === "SENSITIVE") continue;
       if (!process.env[key]) process.env[key] = value;
     }
   } catch {

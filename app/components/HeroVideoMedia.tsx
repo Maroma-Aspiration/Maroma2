@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useId, useRef, useState, type CSSProperties } from "react";
+import { videoMimeType } from "../../lib/video-source";
 import {
   bindYouTubePlayer,
   isYouTubeUrl,
@@ -112,7 +113,7 @@ function HeroNativeVideo({
           onPlaying?.();
         }}
       >
-        <source src={src} />
+        {videoMimeType(src) ? <source src={src} type={videoMimeType(src)} /> : <source src={src} />}
       </video>
       {needsTap ? (
         <button

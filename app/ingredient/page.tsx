@@ -28,6 +28,7 @@ export default function IngredientIndexPage() {
         <p className="ingredient-page-copy">
           Click any botanical for a short description, its benefits in Maroma formulas, and the products that use it.
         </p>
+        <div className="ingredient-index-scroller">
         <div className="ingredient-index-grid">
           {pages.map((item) => (
             <Link key={item.slug} href={`/ingredient/${item.slug}`} className="ingredient-index-card">
@@ -39,6 +40,7 @@ export default function IngredientIndexPage() {
               <strong>{item.name}</strong>
             </Link>
           ))}
+        </div>
         </div>
       </div>
     </main>

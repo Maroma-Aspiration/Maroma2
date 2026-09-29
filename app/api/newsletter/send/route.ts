@@ -25,6 +25,7 @@ import { ensureCanvasPublicImageUrlsDetailed } from "../../../../lib/canvas-emai
 import { parseStorySpacingGaps, type StorySpacingGaps } from "../../../../lib/story-spacing-gaps";
 import { canvasToEmailHtml, canvasEmailOptionsFromState } from "../../../../lib/canvas-to-email";
 import type { NewsletterCanvas, StoriesState } from "../../../../lib/story-types";
+import { signNewsletterImageUrls } from "../../../../lib/newsletter-image-proxy";
 
 async function prepareCanvasForEmail(
   state: StoriesState,
@@ -123,6 +124,7 @@ export async function POST(request: Request) {
   let previewText = "";
   let testOnly = false;
   let plainTest = false;
+  let sendToSessionUser = false;
   let testRecipients: string[] = [];
   let storySpacingGaps: StorySpacingGaps | undefined;
   let mailingListId: string | undefined;
@@ -132,6 +134,7 @@ export async function POST(request: Request) {
       previewText?: string;
       testOnly?: boolean;
       plainTest?: boolean;
+      sendToSessionUser?: boolean;
       testEmail?: string;
       testEmails?: string | string[];
       storySpacingGaps?: unknown;
@@ -145,6 +148,7 @@ export async function POST(request: Request) {
     }
     testOnly = body.testOnly === true;
     plainTest = body.plainTest === true;
+    sendToSessionUser = body.sendToSessionUser === true;
     testRecipients = parseTestRecipients(body);
     storySpacingGaps = parseStorySpacingGaps(body.storySpacingGaps);
     if (typeof body.mailingListId === "string" && body.mailingListId.trim()) {
@@ -155,6 +159,17 @@ export async function POST(request: Request) {
   }
 
   const origin = siteOriginFromRequest(request);
+
+  if (testOnly && sendToSessionUser) {
+    const sessionEmail = session.email?.trim().toLowerCase();
+    if (!sessionEmail || !EMAIL_RE.test(sessionEmail)) {
+      return NextResponse.json(
+        { error: "Your signed-in account does not have a valid email address." },
+        { status: 400 }
+      );
+    }
+    testRecipients = [sessionEmail];
+  }
 
   // ── Test send (one or more addresses) ────────────────────────────────────
   if (testOnly) {
@@ -182,7 +197,7 @@ export async function POST(request: Request) {
         const preparedCanvas = await prepareCanvasForEmail(state, origin);
         canvasForEmail = preparedCanvas;
         stateForMeta = state;
-        html = canvasToEmailHtml(
+        html = signNewsletterImageUrls(canvasToEmailHtml(
           preparedCanvas,
           canvasEmailOptionsFromState(state, {
             subject,
@@ -196,7 +211,7 @@ export async function POST(request: Request) {
               viewOnlineUrl: `${origin}/newsletter/view`,
             },
           })
-        );
+        ), trackingSecret);
       } catch (err) {
         return NextResponse.json(
           { error: err instanceof Error ? err.message : "Could not prepare newsletter images." },
@@ -327,7 +342,7 @@ export async function POST(request: Request) {
     await Promise.all(
       slice.map(async (r) => {
         const urls = buildTrackedNewsletterUrls(origin, r.id, campaignId, trackingSecret);
-        const html = canvasToEmailHtml(
+        const html = signNewsletterImageUrls(canvasToEmailHtml(
           canvasForEmail,
           canvasEmailOptionsFromState(state, {
             subject,
@@ -341,7 +356,7 @@ export async function POST(request: Request) {
               viewOnlineUrl,
             },
           })
-        );
+        ), trackingSecret);
         const result = await sendEmail({ from, to: r.email, subject, html });
         if (result.ok) {
           ok += 1;

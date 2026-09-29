@@ -6,6 +6,8 @@ import { getSessionSecret, SESSION_COOKIE, verifySessionPayload } from "../../..
 import { readStoriesState } from "../../../lib/story-storage";
 import { ensureCanvasPublicImageUrls } from "../../../lib/canvas-email-images";
 import { canvasToEmailHtml, canvasEmailOptionsFromState } from "../../../lib/canvas-to-email";
+import { signNewsletterImageUrls } from "../../../lib/newsletter-image-proxy";
+import { optimizeMastheadImagesInEmailHtml } from "../../../lib/canvas-display-image";
 
 export const dynamic = "force-dynamic";
 
@@ -33,7 +35,7 @@ export async function GET(request: Request) {
     "",
   );
   const publicCanvas = await ensureCanvasPublicImageUrls(canvas, siteUrl);
-  const html = canvasToEmailHtml(publicCanvas, {
+  const unsignedHtml = canvasToEmailHtml(publicCanvas, {
     ...canvasEmailOptionsFromState(state, {
       siteUrl,
       allowDataUrls: false,
@@ -44,6 +46,9 @@ export async function GET(request: Request) {
       viewOnlineUrl: `${siteUrl}/newsletter/view`,
     },
   });
+  const trackingSecret = process.env.NEWSLETTER_TRACKING_SECRET?.trim();
+  const signedHtml = trackingSecret ? signNewsletterImageUrls(unsignedHtml, trackingSecret) : unsignedHtml;
+  const html = optimizeMastheadImagesInEmailHtml(signedHtml, publicCanvas.elements);
 
   return new Response(html, {
     headers: {

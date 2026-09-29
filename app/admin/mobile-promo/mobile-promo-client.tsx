@@ -79,15 +79,23 @@ export default function MobilePromoClient() {
         return;
       }
       const rows = data.banners ?? [];
+      const requestedPromoId = new URLSearchParams(window.location.search).get("promo") ?? "";
       setBanners(rows);
-      setBannerId((current) => current || (rows.find((item) => item.active) ?? rows[0])?.id || "");
+      setBannerId(
+        (current) =>
+          current ||
+          rows.find((item) => item.id === requestedPromoId)?.id ||
+          (rows.find((item) => item.active) ?? rows[0])?.id ||
+          ""
+      );
     };
     void load();
   }, []);
 
   useEffect(() => {
     if (!banner) return;
-    setLayout(banner.mobile ?? null);
+    const nextLayout = banner.mobile ?? null;
+    setLayout(nextLayout?.textBannerHeightPct === 200 ? { ...nextLayout, textBannerHeightPct: 300 } : nextLayout);
     setStatus("");
   }, [banner]);
 
@@ -187,8 +195,9 @@ export default function MobilePromoClient() {
           <h1>Phone promo layout</h1>
           <span>Place every promo element for phones with sliders, and watch it update in the frame.</span>
         </div>
-        <nav>
-          <Link href="/admin/site">Promo</Link>
+        <nav className="mobile-promo-view-toggle" aria-label="Promo view">
+          <Link href="/?openPromoEditor=1">Desktop</Link>
+          <Link href="/admin/mobile-promo" aria-current="page" className="is-active">Mobile</Link>
           <Link href="/admin/qr-pages">QR codes</Link>
           <Link href="/">Home</Link>
         </nav>
@@ -263,6 +272,21 @@ export default function MobilePromoClient() {
               <details open>
                 <summary>Strip</summary>
                 <Slider
+                  label="Strip width"
+                  value={layout.stripWidthPct ?? banner?.stripWidthPct ?? 100}
+                  min={20}
+                  max={150}
+                  suffix="%"
+                  onChange={(value) => update({ stripWidthPct: value })}
+                />
+                <Slider
+                  label="Up / down"
+                  value={layout.stripPositionOffsetPx ?? 0}
+                  min={-400}
+                  max={400}
+                  onChange={(value) => update({ stripPositionOffsetPx: value })}
+                />
+                <Slider
                   label="Strip height"
                   value={layout.stripHeightPx}
                   min={PROMO_MOBILE_HEIGHT_MIN}
@@ -297,7 +321,7 @@ export default function MobilePromoClient() {
                 <Slider label="Left / right" value={layout.textBannerOffsetX} min={-300} max={300} onChange={(value) => update({ textBannerOffsetX: value })} />
                 <Slider label="Up / down" value={layout.textBannerOffsetY} min={-300} max={300} onChange={(value) => update({ textBannerOffsetY: value })} />
                 <Slider label="Width" value={layout.textBannerWidthPct} min={20} max={200} suffix="%" onChange={(value) => update({ textBannerWidthPct: value })} />
-                <Slider label="Height" value={layout.textBannerHeightPct} min={20} max={200} suffix="%" onChange={(value) => update({ textBannerHeightPct: value })} />
+                <Slider label="Height" value={layout.textBannerHeightPct} min={20} max={300} suffix="%" onChange={(value) => update({ textBannerHeightPct: value })} />
                 <Slider label="Overall size" value={layout.textBannerScale} min={20} max={220} suffix="%" onChange={(value) => update({ textBannerScale: value })} />
               </details>
 
@@ -305,6 +329,7 @@ export default function MobilePromoClient() {
                 <summary>Button</summary>
                 <Slider label="Left / right" value={layout.ctaOffsetX} min={-300} max={300} onChange={(value) => update({ ctaOffsetX: value })} />
                 <Slider label="Up / down" value={layout.ctaOffsetY} min={-300} max={300} onChange={(value) => update({ ctaOffsetY: value })} />
+                <Slider label="Size" value={layout.ctaScale} min={40} max={220} suffix="%" onChange={(value) => update({ ctaScale: value })} />
               </details>
 
               <details>
@@ -320,7 +345,7 @@ export default function MobilePromoClient() {
                     <summary>{layer.name?.trim() || `Image ${index + 1}`}</summary>
                     <Slider label="Across" value={row.x} min={0} max={100} suffix="%" onChange={(value) => updateOverlay(layer.id, { x: value })} />
                     <Slider label="Down" value={row.y} min={0} max={100} suffix="%" onChange={(value) => updateOverlay(layer.id, { y: value })} />
-                    <Slider label="Size" value={row.scale} min={20} max={220} suffix="%" onChange={(value) => updateOverlay(layer.id, { scale: value })} />
+                    <Slider label="Size" value={row.scale} min={20} max={270} suffix="%" onChange={(value) => updateOverlay(layer.id, { scale: value })} />
                   </details>
                 );
               })}

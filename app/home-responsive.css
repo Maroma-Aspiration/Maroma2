@@ -93,7 +93,7 @@ html[data-maroma-viewport-mobile] .maroma-nav-shell--mobile {
   }
 
   html:not(.maroma-viewport-mobile) .maroma-nav-shell--desktop .nav-search-bar {
-    width: clamp(88px, 8vw, 108px);
+    width: clamp(176px, 16vw, 216px);
     height: 22px;
   }
 
@@ -168,6 +168,8 @@ html[data-maroma-viewport-mobile] .maroma-nav-shell--mobile {
     max-width: 100%;
     height: auto;
     min-height: 100%;
+    background-image: none !important;
+    background-color: transparent !important;
     background-attachment: scroll !important;
     -webkit-overflow-scrolling: touch;
   }
@@ -873,13 +875,23 @@ body.admin-mobile-preview-active .admin-mobile-preview-frame .hero-artboard {
   max-width: 100% !important;
   min-width: 0 !important;
   height: auto !important;
-  margin: calc(-1 * clamp(24px, calc(var(--mobile-design-width, 390px) * 0.06), 48px)) 0 0 !important;
+  margin: clamp(32px, calc(var(--mobile-design-width, 390px) * 0.1), 40px) 0 0 !important;
   padding: 0 !important;
   overflow: visible !important;
   pointer-events: none !important;
   box-sizing: border-box !important;
   z-index: var(--page-layer-z-rituals, 20) !important;
   isolation: isolate !important;
+}
+
+.page.maroma.is-mobile-document-flow
+  .hero-ritual-page-layer.is-mobile-ritual-stack
+  .hero-ritual-panel.is-mobile-stack-panel,
+.page.maroma.is-mobile-document-flow
+  .hero-ritual-page-layer.is-mobile-ritual-stack
+  .hero-ritual-panel:not(.is-mobile-stack-panel) {
+  left: auto !important;
+  top: 4cm !important;
 }
 
 .page.maroma.is-mobile-document-flow .hero-ritual-page-layer.is-mobile-ritual-stack .hero-ritual-panel.is-mobile-stack-panel {
@@ -1111,7 +1123,7 @@ body.admin-mobile-preview-active .page.maroma.is-mobile-document-flow .hero-ritu
   margin-top: calc(-48px + var(--loved-divider-offset-y, 0px)) !important;
 }
 
-.page.maroma.is-mobile-document-flow .scroller-loved-for-a-reason::before {
+.page.maroma.is-mobile-document-flow .scroller-loved-for-a-reason:not(.home-collections-section)::before {
   top: 0 !important;
   left: 0 !important;
   right: 0 !important;
@@ -1121,8 +1133,8 @@ body.admin-mobile-preview-active .page.maroma.is-mobile-document-flow .hero-ritu
   inset: unset !important;
 }
 
-.page.maroma.is-mobile-document-flow .scroller-loved-for-a-reason .loved-veil-wash,
-.page.maroma.is-mobile-document-flow .scroller-loved-for-a-reason .loved-veil-band {
+.page.maroma.is-mobile-document-flow .scroller-loved-for-a-reason:not(.home-collections-section) .loved-veil-wash,
+.page.maroma.is-mobile-document-flow .scroller-loved-for-a-reason:not(.home-collections-section) .loved-veil-band {
   top: 0 !important;
   bottom: auto !important;
   height: min(320px, 52%) !important;
@@ -1218,10 +1230,40 @@ body.admin-mobile-preview-active .page.maroma.is-mobile-document-flow .hero-ritu
 
 .page.maroma.is-mobile-layout .ticker-top-banner img,
 .page.maroma.is-mobile-document-flow .ticker-top-banner img {
-  width: 100%;
-  max-width: 100%;
+  width: auto;
+  max-width: none;
   height: auto;
   display: block;
+}
+
+@media (max-width: 760px) {
+  .page.maroma.is-mobile-layout .ticker-top-banner-track,
+  .page.maroma.is-mobile-document-flow .ticker-top-banner-track,
+  .ticker-top-banner-track {
+    display: flex !important;
+    width: max-content !important;
+    align-items: center !important;
+    gap: 0 !important;
+    animation: care-banner-mobile-loop 22s linear infinite !important;
+  }
+
+  .page.maroma.is-mobile-layout .ticker-top-banner,
+  .page.maroma.is-mobile-document-flow .ticker-top-banner,
+  .ticker-top-banner {
+    min-height: 0 !important;
+    height: auto !important;
+    padding-block: 10px !important;
+  }
+
+  .page.maroma.is-mobile-layout .ticker-top-banner-track img,
+  .page.maroma.is-mobile-document-flow .ticker-top-banner-track img,
+  .ticker-top-banner-track img {
+    width: auto !important;
+    height: 56px !important;
+    max-width: none !important;
+    object-fit: contain !important;
+    flex: 0 0 auto !important;
+  }
 }
 
 @container admin-mobile-preview (max-width: 900px) {
@@ -1285,13 +1327,70 @@ body.admin-mobile-preview-active .page.maroma.is-mobile-document-flow .hero-ritu
     max-width: calc(100vw - 24px);
   }
 
-  /* Pull shop database over the ethics ticker — mobile homepage only */
   .page.maroma.is-mobile-layout .product-database,
   .page.maroma.is-mobile-document-flow .product-database {
-    margin-top: calc(-1 * var(--mobile-ethics-ticker-height, 34px));
+    margin-top: 0 !important;
+    gap: 5px !important;
+    padding-top: 4px !important;
+    padding-bottom: 6px !important;
     position: relative;
     z-index: 2;
-    background: var(--maroma-site-bg);
+    background: transparent !important;
+    overflow-anchor: none;
+  }
+
+  .page.maroma.is-mobile-layout .product-database .bestsellers-scroller,
+  .page.maroma.is-mobile-document-flow .product-database .bestsellers-scroller {
+    margin-top: calc(2px + 5mm) !important;
+    margin-bottom: 8px !important;
+  }
+
+  .page.maroma.is-mobile-layout .bestsellers-track,
+  .page.maroma.is-mobile-document-flow .bestsellers-track {
+    display: grid !important;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 14px 12px;
+    overflow: visible;
+    padding: 0;
+    scroll-snap-type: none;
+  }
+
+  .page.maroma.is-mobile-layout .bestsellers-scroller,
+  .page.maroma.is-mobile-document-flow .bestsellers-scroller {
+    padding-inline: 16px;
+    box-sizing: border-box;
+  }
+
+  .page.maroma.is-mobile-layout .bestsellers-card .product-card-actions,
+  .page.maroma.is-mobile-document-flow .bestsellers-card .product-card-actions {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 8px;
+    padding: 0 10px 12px;
+  }
+
+  .page.maroma.is-mobile-layout .bestsellers-card .product-card-actions .product-card-cta,
+  .page.maroma.is-mobile-document-flow .bestsellers-card .product-card-actions .product-card-cta,
+  .page.maroma.is-mobile-layout .bestsellers-card .product-card-actions .product-card-cta--primary,
+  .page.maroma.is-mobile-document-flow .bestsellers-card .product-card-actions .product-card-cta--primary {
+    flex: none;
+    width: 100%;
+    min-width: 0;
+    min-height: 44px;
+    height: 44px;
+    padding: 0 16px;
+    border-radius: 999px;
+    white-space: nowrap;
+  }
+
+  .page.maroma.is-mobile-layout .bestsellers-carousel .carousel-nudge,
+  .page.maroma.is-mobile-document-flow .bestsellers-carousel .carousel-nudge {
+    display: none;
+  }
+
+  .page.maroma.is-mobile-layout .home-about-teaser,
+  .page.maroma.is-mobile-document-flow .home-about-teaser {
+    background: transparent;
   }
 
   .page.maroma.is-mobile-layout .scrolling-ticker-section,

@@ -1,4 +1,4 @@
-export type ReviewSource = "site" | "google";
+export type ReviewSource = "site" | "google" | "amazon";
 export type ReviewStatus = "pending" | "published" | "hidden";
 
 export type ProductReview = {
@@ -6,10 +6,15 @@ export type ProductReview = {
   productId: string;
   author: string;
   rating: number;
+  title: string;
   body: string;
   source: ReviewSource;
+  marketplace?: string;
+  translated?: boolean;
   status: ReviewStatus;
   createdAt: string;
+  verifiedPurchase: boolean;
+  helpfulCount: number;
 };
 
 export function averageRating(reviews: ProductReview[]): { average: number; count: number } {

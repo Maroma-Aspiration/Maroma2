@@ -93,6 +93,8 @@ import {
   DEFAULT_STORY_SPACING_GAPS,
   type StorySpacingGaps,
 } from "../../lib/story-spacing-gaps";
+import { CanvasDisplayImage } from "./CanvasDisplayImage";
+import { createBrowserDisplayFile } from "./create-display-file";
 
 const DIVIDER_FALLBACK: DividerDefaults = {
   color: "rgba(120,170,160,0.85)",
@@ -572,9 +574,12 @@ function ImageElView({
       onPointerDown={canEdit ? onPointerDown : undefined}
     >
       {hasImage ? (
-        <img
-          src={el.src} alt=""
-          draggable={false}
+        <CanvasDisplayImage
+          key={`${el.src}|${el.displaySrc ?? ""}`}
+          id={el.id}
+          src={el.src}
+          displaySrc={el.displaySrc}
+          width={el.w}
           onPointerDown={canEdit && selected && inMontage ? handleCropPanStart : undefined}
           style={{
             width: "100%", height: "100%", objectFit: el.objectFit ?? "cover", display: "block",
@@ -769,8 +774,13 @@ function StoryGridElView({
           <div key={i} className="nl-sgrid-card" style={{ background: el.cardBg }}>
             {s.imageUrl && (
               <div className="nl-sgrid-card-img-wrap">
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={s.imageUrl} alt={s.title} className="nl-sgrid-card-img" />
+                <CanvasDisplayImage
+                  id={`${el.id}-card-${i}`}
+                  src={s.imageUrl}
+                  width={Math.round(660 / Math.max(1, el.columns))}
+                  alt={s.title}
+                  className="nl-sgrid-card-img"
+                />
               </div>
             )}
             <div className="nl-sgrid-card-body">
@@ -2100,23 +2110,26 @@ export const NewsletterCanvas = forwardRef<NewsletterCanvasHandle, CanvasProps>(
     return uploadRefs.current.get(id)!;
   };
 
-  const uploadCanvasImages = useCallback((files: File[]) => {
-    if (files.length === 0) return Promise.resolve([] as string[]);
+  const uploadCanvasImages = useCallback((files: File[], elementId?: string) => {
+    if (files.length === 0) return Promise.resolve([] as Array<{ url: string; displaySrc?: string }>);
     return Promise.all(files.map(async (f) => {
       try {
         const form = new FormData();
         form.append("file", f);
+        const display = await createBrowserDisplayFile(f, elementId);
+        if (display) form.append("display", display);
         const res = await fetch("/api/upload-canvas-image", { method: "POST", body: form });
         if (res.ok) {
-          const data = await res.json() as { url?: string };
-          if (data.url) return data.url;
+          const data = await res.json() as { url?: string; displaySrc?: string };
+          if (data.url) return { url: data.url, displaySrc: data.displaySrc };
         }
       } catch { /* fall through to base64 */ }
-      return new Promise<string>((resolve) => {
+      const url = await new Promise<string>((resolve) => {
         const r = new FileReader();
         r.onload = (ev) => resolve(ev.target?.result as string);
         r.readAsDataURL(f);
       });
+      return { url };
     }));
   }, []);
 
@@ -2127,7 +2140,7 @@ export const NewsletterCanvas = forwardRef<NewsletterCanvasHandle, CanvasProps>(
   ): CanvasEl[] => relayoutMontageGroupElements(current, groupId, tiles),
   []);
 
-  const appendImagesToMontage = useCallback((tileId: string, srcs: string[]) => {
+  const appendImagesToMontage = useCallback((tileId: string, srcs: Array<{ url: string; displaySrc?: string }>) => {
     if (srcs.length === 0) return;
     const current = elementsRef.current;
     const target = current.find((e) => e.id === tileId);
@@ -2149,8 +2162,8 @@ export const NewsletterCanvas = forwardRef<NewsletterCanvasHandle, CanvasProps>(
     );
     const maxIndex = Math.max(-1, ...tiles.map((e) => e.montageIndex ?? 0));
 
-    const newcomers = srcs.slice(0, room).map((src, i) =>
-      makeImageEl(src, {
+    const newcomers = srcs.slice(0, room).map((uploaded, i) =>
+      makeImageEl(uploaded.url, {
         x: CANVAS_COL_X,
         y: originY,
         w: CANVAS_COL_W,
@@ -2160,6 +2173,7 @@ export const NewsletterCanvas = forwardRef<NewsletterCanvasHandle, CanvasProps>(
         shadow: target.shadow,
         montageGroup: groupId,
         montageIndex: maxIndex + 1 + i,
+        displaySrc: uploaded.displaySrc,
       }),
     );
 
@@ -2180,16 +2194,19 @@ export const NewsletterCanvas = forwardRef<NewsletterCanvasHandle, CanvasProps>(
   const handleImageFiles = useCallback((id: string, files: File[]) => {
     if (files.length === 0) return;
 
-    uploadCanvasImages(files).then((srcs) => {
+    uploadCanvasImages(files, id).then((srcs) => {
       const current = elementsRef.current;
       const target = current.find((e) => e.id === id);
       if (!target || !isImage(target)) return;
+      const first = srcs[0];
+      const withUploadedSrc = (e: CanvasEl): CanvasEl =>
+        e.id === id && first
+          ? ({ ...e, src: first.url, displaySrc: first.displaySrc } as CanvasEl)
+          : e;
 
       if (isMastheadOverlayImage(target)) {
         upd({
-          elements: current.map((e) =>
-            e.id === id ? ({ ...e, src: srcs[0] } as CanvasEl) : e,
-          ),
+          elements: current.map(withUploadedSrc),
         });
         return;
       }
@@ -2197,9 +2214,7 @@ export const NewsletterCanvas = forwardRef<NewsletterCanvasHandle, CanvasProps>(
       if (target.montageGroup) {
         if (srcs.length === 1) {
           upd({
-            elements: current.map((e) =>
-              e.id === id ? ({ ...e, src: srcs[0] } as CanvasEl) : e,
-            ),
+            elements: current.map(withUploadedSrc),
           });
         } else {
           appendImagesToMontage(id, srcs);
@@ -2209,16 +2224,14 @@ export const NewsletterCanvas = forwardRef<NewsletterCanvasHandle, CanvasProps>(
 
       if (srcs.length === 1) {
         upd({
-          elements: current.map((e) =>
-            e.id === id ? ({ ...e, src: srcs[0] } as CanvasEl) : e,
-          ),
+          elements: current.map(withUploadedSrc),
         });
         return;
       }
 
       const heroH = target.h >= 100 ? target.h : 260;
-      const draft: CanvasImageEl[] = srcs.map((src, i) =>
-        makeImageEl(src, {
+      const draft: CanvasImageEl[] = srcs.map((uploaded, i) =>
+        makeImageEl(uploaded.url, {
           id: i === 0 ? id : uid(),
           x: CANVAS_COL_X,
           y: target.y,
@@ -2230,6 +2243,7 @@ export const NewsletterCanvas = forwardRef<NewsletterCanvasHandle, CanvasProps>(
           montageGroup: id,
           montageCols: 2,
           montageIndex: i,
+          displaySrc: uploaded.displaySrc,
         }),
       );
       const montage = layoutMontageMosaic(draft, { originY: target.y });
@@ -2457,7 +2471,7 @@ export const NewsletterCanvas = forwardRef<NewsletterCanvasHandle, CanvasProps>(
                   }
                   uploadRef={ref}
                   onReplace={(files) => handleImageFiles(el.id, files)}
-                  onSelectSavedImage={(src) => updEl(el.id, { src, objectPositionX: 0, objectPositionY: 0, imageZoom: 1 })}
+                  onSelectSavedImage={(src) => updEl(el.id, { src, displaySrc: undefined, objectPositionX: 0, objectPositionY: 0, imageZoom: 1 })}
                   onDelete={() => delEl(el.id)}
                 />
                 {sel && canEdit && !el.montageGroup && (() => {

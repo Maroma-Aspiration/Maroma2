@@ -11,6 +11,7 @@ import {
   type StorySpacingGaps,
 } from "../../../lib/story-spacing-gaps";
 import { NewsletterCanvas, type NewsletterCanvasHandle } from "../newsletter-canvas";
+import { optimizeMastheadImagesInEmailHtml } from "../../../lib/canvas-display-image";
 import StorySpacingControls from "../story-spacing-controls";
 
 const CANVAS_LS_KEY = "maroma-newsletter-canvas-draft";
@@ -150,6 +151,16 @@ export default function EmailPreviewClient({ initialState, siteUrl }: Props) {
       })
     );
   }, [hasCanvas, state, siteUrl, subject, previewText, storyGaps]);
+
+  const previewHtml = useMemo(() => {
+    if (!html) return null;
+    const withDisplayImages = optimizeMastheadImagesInEmailHtml(html, state.newsletterCanvas?.elements);
+    const origin = typeof window !== "undefined" ? window.location.origin : siteUrl;
+    return withDisplayImages.replace(
+      /(src|href)="\/(newsletter\/display|_next\/image)/g,
+      (_m, attr: string, path: string) => `${attr}="${origin}/${path}`,
+    );
+  }, [html, state.newsletterCanvas?.elements, siteUrl]);
 
   const saveStories = useCallback(async () => {
     setSaveState("saving");
@@ -609,9 +620,9 @@ export default function EmailPreviewClient({ initialState, siteUrl }: Props) {
               <span className="email-preview-output-subject">{subject}</span>
             </div>
             <div className="email-preview-output-frame">
-              {html ? (
+              {previewHtml ? (
                 <iframe
-                  srcDoc={html}
+                  srcDoc={previewHtml}
                   title="Newsletter email preview"
                   className="email-preview-iframe"
                   sandbox="allow-same-origin"

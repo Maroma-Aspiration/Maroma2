@@ -3,26 +3,6 @@ import { NextResponse } from "next/server";
 import { getSessionSecret, SESSION_COOKIE, verifySessionPayload } from "./lib/auth-session";
 import type { SessionPayload } from "./lib/auth-session";
 import { isNewsletterEditorPath } from "./lib/auth-roles";
-import { PREVIEW_COOKIE, previewAccessToken } from "./lib/preview-access";
-
-function isPreviewExempt(pathname: string): boolean {
-  return pathname === "/preview-access" ||
-    pathname === "/admin/install" ||
-    pathname === "/api/preview-access" ||
-    pathname === "/api/promos" ||
-    pathname.startsWith("/_next/") ||
-    pathname === "/favicon.ico" ||
-    pathname === "/robots.txt" ||
-    pathname === "/api/webhooks/razorpay" ||
-    pathname === "/api/checkout/ccavenue/callback" ||
-    pathname === "/api/checkout/ccavenue/start" ||
-    pathname === "/api/checkout/ccavenue/redirect" ||
-    pathname === "/checkout/complete" ||
-    pathname.startsWith("/api/newsletter/track/") ||
-    // Email clients must fetch cropped images + "view in browser" without the site preview cookie.
-    pathname === "/api/newsletter/render-image" ||
-    pathname === "/newsletter/view";
-}
 
 function authFullyConfigured(): boolean {
   return Boolean(getSessionSecret());
@@ -180,19 +160,6 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(url);
   }
 
-  const previewPassword = process.env.MAROMA_PREVIEW_PASSWORD;
-  if (previewPassword && !isPreviewExempt(pathname)) {
-    const expectedToken = await previewAccessToken(previewPassword);
-    if (request.cookies.get(PREVIEW_COOKIE)?.value !== expectedToken) {
-      if (api) return NextResponse.json({ error: "Preview password required." }, { status: 401 });
-      const url = request.nextUrl.clone();
-      url.pathname = "/preview-access";
-      url.search = "";
-      url.searchParams.set("next", `${pathname}${request.nextUrl.search}`);
-      return NextResponse.redirect(url);
-    }
-  }
-
   if (isPublicAuthPath(pathname)) {
     return NextResponse.next();
   }
@@ -268,8 +235,14 @@ export async function middleware(request: NextRequest) {
         return NextResponse.redirect(url);
       }
       const url = request.nextUrl.clone();
-      url.pathname = safeNext && safeNext !== "/" ? safeNext : "/account";
-      url.search = "";
+      if (safeNext && safeNext !== "/") {
+        const destination = new URL(safeNext, request.nextUrl.origin);
+        url.pathname = destination.pathname;
+        url.search = destination.search;
+      } else {
+        url.pathname = "/account";
+        url.search = "";
+      }
       return NextResponse.redirect(url);
     }
     return NextResponse.next();
@@ -277,7 +250,7 @@ export async function middleware(request: NextRequest) {
 
   if (pathname.startsWith("/account")) {
     if (!session) {
-      return redirectToLogin(request, pathname, "sign_in_required");
+      return redirectToLogin(request, `${pathname}${request.nextUrl.search}`, "sign_in_required");
     }
     return NextResponse.next();
   }

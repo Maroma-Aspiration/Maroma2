@@ -9,6 +9,7 @@ import {
 import type { CategoryBannerOverride, ResolvedCategoryCard } from "./category-banner-types";
 import type { CatalogCategory } from "./catalog-categories";
 import { catalogCategories } from "./catalog-categories";
+import { firstUsablePublicMediaUrl } from "./usable-media-url";
 
 export function resolveCategoryCardObjectPosition(
   slug: string,
@@ -30,16 +31,30 @@ export function resolveCategoryCardBackgroundScale(
   return DEFAULT_COLLECTION_CARD_BACKGROUND_SCALE;
 }
 
+function oneLineCardDescription(
+  override: string | undefined,
+  tileDescription: string | undefined,
+  description: string
+): string {
+  const custom = override?.trim() || "";
+  if (custom && custom.length <= 42 && !/[.:]/.test(custom)) return custom;
+  return tileDescription || description;
+}
+
 export function resolveCategoryCardFromOverride(
   slug: string,
-  category: Pick<CatalogCategory, "bannerImage" | "label" | "description">,
+  category: Pick<CatalogCategory, "bannerImage" | "label" | "description" | "tileDescription">,
   override: CategoryBannerOverride | undefined
 ): ResolvedCategoryCard {
   return {
     slug,
     label: override?.cardLabel?.trim() || category.label,
-    description: override?.cardDescription?.trim() || category.description,
-    imageUrl: override?.cardImageUrl ?? override?.imageUrl ?? category.bannerImage,
+    description: oneLineCardDescription(
+      override?.cardDescription,
+      category.tileDescription,
+      category.description
+    ),
+    imageUrl: firstUsablePublicMediaUrl(override?.cardImageUrl, override?.imageUrl, category.bannerImage) || undefined,
     objectPosition: resolveCategoryCardObjectPosition(slug, override),
     backgroundScale: resolveCategoryCardBackgroundScale(override),
   };

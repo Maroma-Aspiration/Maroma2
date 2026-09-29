@@ -7,6 +7,7 @@ import type { CategoryBannerOverride } from "../../../lib/category-banner-types"
 import { readCategoryBannerStore, writeCategoryBannerStore } from "../../../lib/category-banner-store";
 
 export const runtime = "nodejs";
+export const maxDuration = 120;
 
 async function requireAdmin(): Promise<boolean> {
   const secret = getSessionSecret();

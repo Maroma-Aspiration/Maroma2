@@ -1,10 +1,12 @@
 import { FREE_SHIPPING_THRESHOLD, FLAT_SHIPPING_INR } from "../../lib/commerce-config";
 import { LegalPageShell } from "../components/LegalPageShell";
+import { buildPageMetadata } from "../../lib/site-seo";
 
-export const metadata = {
+export const metadata = buildPageMetadata({
   title: "Shipping Policy | Maroma",
   description: "Shipping rates, delivery expectations, and order dispatch for Maroma.",
-};
+  path: "/shipping",
+});
 
 export default function ShippingPage() {
   return (

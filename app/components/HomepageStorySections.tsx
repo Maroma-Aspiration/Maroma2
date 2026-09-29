@@ -39,26 +39,33 @@ export function HomepageStorySections() {
         data-review-files="app/components/HomepageStorySections.tsx"
       >
         <div className="home-about-teaser-inner">
-          <p className="about-eyebrow">Maison · Since 1976</p>
+          <p className="about-eyebrow">
+            <span>Botanical • Ethical • Essential</span>
+            <span>Since 1976</span>
+          </p>
           <h2>{content.aboutTitle || "Every scent tells a story"}</h2>
           <p>
             {content.aboutBody ||
-              "Botanical care, natural perfume, and home rituals crafted in Auroville, India. Fair Trade, vegan, and made with the community that has shaped fragrance here for decades."}
+              "Maroma makes botanical care, natural perfume, incense, and home rituals in Auroville, India. Our work is vegan (with the exception of honey), cruelty-free, and rooted in the community that has crafted fragrance here for decades."}
           </p>
           <div className="home-about-pillars">
             <Link href="/about#story">
+              <img src="/staging-media/about/story-timeline.webp" alt="Maroma story in Auroville" />
               <strong>Our story</strong>
               <span>From incense under thatch to a global maison of botanical care.</span>
             </Link>
             <Link href="/about#founders">
+              <img src="/staging-media/about/paul-pinthon.jpg" alt="Maroma founder Paul Pinthon" />
               <strong>The founders</strong>
               <span>Paul and Laura, craft and voice, joined in Auroville.</span>
             </Link>
             <Link href="/about#values">
+              <img src="/staging-media/about/vision-mission.webp" alt="Maroma mission and vision" />
               <strong>Mission &amp; vision</strong>
               <span>Quality, earth-friendly practice, and the Auroville Charter.</span>
             </Link>
             <Link href="/about#fair-trade">
+              <img src="/staging-media/about/fair-trade-team.webp" alt="Maroma Fair Trade team" />
               <strong>Fair Trade</strong>
               <span>People before machines. Ten principles we live by.</span>
             </Link>

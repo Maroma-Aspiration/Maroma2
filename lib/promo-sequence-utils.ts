@@ -9,6 +9,7 @@ import type {
 import type { PromoCtaBuyLink } from "./promo-types";
 import { visibleCtaBuyLinks } from "./promo-buy-links-utils";
 import { promoStripVideoThenCta } from "./promo-strip-utils";
+import { firstUsablePublicMediaUrl } from "./usable-media-url";
 
 export const PROMO_FRAME_KIND_LABELS: Record<PromoFrameKind, string> = {
   empty: "Empty strip",
@@ -121,7 +122,7 @@ export function normalizePromoFrame(raw: unknown, index: number): PromoFrame | n
     fadeOutMs: normalizeFrameFadeMs(row.fadeOutMs),
     title: typeof row.title === "string" ? row.title : undefined,
     body: typeof row.body === "string" ? row.body : undefined,
-    mediaUrl: typeof row.mediaUrl === "string" ? row.mediaUrl : undefined,
+    mediaUrl: firstUsablePublicMediaUrl(row.mediaUrl) || undefined,
     mediaKind: row.mediaKind ? normalizeMediaKind(row.mediaKind) : undefined,
     ctaLabel: typeof row.ctaLabel === "string" ? row.ctaLabel : undefined,
     ctaHref: typeof row.ctaHref === "string" ? row.ctaHref : undefined,
@@ -157,7 +158,7 @@ export type PromoContentSource = Pick<
 >;
 
 export function resolveFrameContent(frame: PromoFrame, source: PromoContentSource): PromoFrame {
-  const mediaUrl = frame.mediaUrl?.trim() || source.mediaUrl?.trim() || "";
+  const mediaUrl = firstUsablePublicMediaUrl(frame.mediaUrl, source.mediaUrl);
   const mediaKind = mediaUrl
     ? frame.mediaKind === "video" || source.mediaKind === "video"
       ? "video"

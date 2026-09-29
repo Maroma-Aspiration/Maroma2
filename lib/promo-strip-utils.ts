@@ -1,6 +1,7 @@
 import type { CSSProperties } from "react";
 import type { PromoBanner } from "./promo-types";
 import { visibleCtaBuyLinks } from "./promo-buy-links-utils";
+import { firstUsablePublicMediaUrl } from "./usable-media-url";
 
 export const PROMO_STRIP_HEIGHT_MIN = 48;
 export const PROMO_STRIP_HEIGHT_MAX = 1440;
@@ -11,9 +12,21 @@ export const PROMO_STRIP_POSITION_PX_MAX = 1200;
 export const PROMO_STRIP_ASPECT_21_9 = "21:9" as const;
 export const PROMO_STRIP_ASPECT_FIXED = "fixed" as const;
 
+export const PROMO_STRIP_CAROUSEL_MAX = 8;
+export const PROMO_STRIP_CAROUSEL_INTERVAL_MS_DEFAULT = 5500;
+export const PROMO_STRIP_CAROUSEL_FADE_MS_DEFAULT = 1100;
+export const PROMO_STRIP_CAROUSEL_INTERVAL_MS_MIN = 3000;
+export const PROMO_STRIP_CAROUSEL_INTERVAL_MS_MAX = 16000;
+export const PROMO_STRIP_CAROUSEL_FADE_MS_MIN = 400;
+export const PROMO_STRIP_CAROUSEL_FADE_MS_MAX = 2000;
+
 export const PROMO_STRIP_DEFAULTS = {
   stripBackground: "#134a57",
   stripBackgroundImageUrl: "",
+  stripBackgroundCarouselUrls: [] as string[],
+  stripBackgroundCarouselEnabled: false,
+  stripBackgroundCarouselIntervalMs: PROMO_STRIP_CAROUSEL_INTERVAL_MS_DEFAULT,
+  stripBackgroundCarouselFadeMs: PROMO_STRIP_CAROUSEL_FADE_MS_DEFAULT,
   stripBackgroundMediaKind: "none" as const,
   stripBackgroundVideoLoop: true,
   stripBackgroundFallbackImageUrl: "",
@@ -44,6 +57,10 @@ function clampNum(value: unknown, min: number, max: number, fallback: number): n
 export type PromoStripFields = {
   stripBackground: string;
   stripBackgroundImageUrl: string;
+  stripBackgroundCarouselUrls: string[];
+  stripBackgroundCarouselEnabled: boolean;
+  stripBackgroundCarouselIntervalMs: number;
+  stripBackgroundCarouselFadeMs: number;
   stripBackgroundMediaKind: "none" | "image" | "video";
   stripBackgroundVideoLoop: boolean;
   stripBackgroundFallbackImageUrl: string;
@@ -134,14 +151,54 @@ export function promoStripFillColor(background: string, opacity: number): string
 
 const VIDEO_URL_PATTERN = /\.(mp4|webm|mov|m4v|ogv)(\?|$)/i;
 
+export function normalizePromoStripCarouselUrls(
+  value: unknown,
+  fallbackUrl = ""
+): string[] {
+  const seen = new Set<string>();
+  const urls: string[] = [];
+  const push = (raw: unknown) => {
+    const url = firstUsablePublicMediaUrl(raw);
+    if (!url || seen.has(url)) return;
+    seen.add(url);
+    urls.push(url);
+  };
+  if (Array.isArray(value)) {
+    for (const item of value) {
+      push(item);
+      if (urls.length >= PROMO_STRIP_CAROUSEL_MAX) return urls;
+    }
+  }
+  if (urls.length === 0) push(fallbackUrl);
+  return urls;
+}
+
+export function promoStripCarouselUrls(banner: Partial<PromoBanner>): string[] {
+  return normalizePromoStripCarouselUrls(
+    banner.stripBackgroundCarouselUrls,
+    banner.stripBackgroundImageUrl
+  );
+}
+
+export function promoStripUsesCarousel(banner: Partial<PromoBanner>): boolean {
+  if (banner.stripBackgroundCarouselEnabled !== true) return false;
+  if (banner.stripBackgroundMediaKind === "video") return false;
+  return promoStripCarouselUrls(banner).length >= 2;
+}
+
 export function resolveStripBackgroundMediaKind(
   banner: Partial<PromoBanner>
 ): "none" | "image" | "video" {
-  const url =
-    typeof banner.stripBackgroundImageUrl === "string" ? banner.stripBackgroundImageUrl.trim() : "";
-  if (!url) return "none";
-  if (banner.stripBackgroundMediaKind === "video") return "video";
+  if (banner.stripBackgroundMediaKind === "video") {
+    const url = firstUsablePublicMediaUrl(banner.stripBackgroundImageUrl);
+    return url ? "video" : "none";
+  }
+  const carouselUrls = promoStripCarouselUrls(banner);
+  const url = firstUsablePublicMediaUrl(banner.stripBackgroundImageUrl, carouselUrls[0]);
+  if (!url && carouselUrls.length === 0) return "none";
   if (banner.stripBackgroundMediaKind === "image") return "image";
+  if (banner.stripBackgroundCarouselEnabled === true && carouselUrls.length > 0) return "image";
+  if (!url) return "none";
   return VIDEO_URL_PATTERN.test(url) ? "video" : "image";
 }
 
@@ -154,17 +211,40 @@ export function normalizePromoStripFields(banner: Partial<PromoBanner>): PromoSt
     typeof banner.stripBackground === "string" && banner.stripBackground.trim()
       ? banner.stripBackground.trim()
       : PROMO_STRIP_DEFAULTS.stripBackground;
+  const carouselUrls = normalizePromoStripCarouselUrls(
+    banner.stripBackgroundCarouselUrls,
+    banner.stripBackgroundImageUrl
+  );
+  const carouselEnabled = banner.stripBackgroundCarouselEnabled === true;
+  const imageUrl =
+    firstUsablePublicMediaUrl(banner.stripBackgroundImageUrl) ||
+    (carouselEnabled ? carouselUrls[0] ?? "" : "");
 
   return {
     stripBackground: bg,
-    stripBackgroundImageUrl:
-      typeof banner.stripBackgroundImageUrl === "string" ? banner.stripBackgroundImageUrl.trim() : "",
-    stripBackgroundMediaKind: resolveStripBackgroundMediaKind(banner),
+    stripBackgroundImageUrl: imageUrl,
+    stripBackgroundCarouselUrls: carouselUrls,
+    stripBackgroundCarouselEnabled: carouselEnabled,
+    stripBackgroundCarouselIntervalMs: clampNum(
+      banner.stripBackgroundCarouselIntervalMs,
+      PROMO_STRIP_CAROUSEL_INTERVAL_MS_MIN,
+      PROMO_STRIP_CAROUSEL_INTERVAL_MS_MAX,
+      PROMO_STRIP_CAROUSEL_INTERVAL_MS_DEFAULT
+    ),
+    stripBackgroundCarouselFadeMs: clampNum(
+      banner.stripBackgroundCarouselFadeMs,
+      PROMO_STRIP_CAROUSEL_FADE_MS_MIN,
+      PROMO_STRIP_CAROUSEL_FADE_MS_MAX,
+      PROMO_STRIP_CAROUSEL_FADE_MS_DEFAULT
+    ),
+    stripBackgroundMediaKind: resolveStripBackgroundMediaKind({
+      ...banner,
+      stripBackgroundImageUrl: imageUrl,
+      stripBackgroundCarouselUrls: carouselUrls,
+      stripBackgroundCarouselEnabled: carouselEnabled,
+    }),
     stripBackgroundVideoLoop: banner.stripBackgroundVideoLoop !== false,
-    stripBackgroundFallbackImageUrl:
-      typeof banner.stripBackgroundFallbackImageUrl === "string"
-        ? banner.stripBackgroundFallbackImageUrl.trim()
-        : "",
+    stripBackgroundFallbackImageUrl: firstUsablePublicMediaUrl(banner.stripBackgroundFallbackImageUrl),
     stripBackgroundImageScale: clampNum(
       banner.stripBackgroundImageScale,
       25,
@@ -278,9 +358,11 @@ export function promoStripStyleVars(banner: Partial<PromoBanner>): CSSProperties
   const strip = normalizePromoStripFields(banner);
   const frameScale = (strip.stripFrameScale ?? 100) / 100;
   const frameHeight = strip.stripHeightPx * frameScale;
+  const usesCarousel = promoStripUsesCarousel(strip);
   const hasBackgroundImage = Boolean(strip.stripBackgroundImageUrl && strip.stripBackgroundMediaKind === "image");
-  const bgImage =
-    strip.stripBackgroundImageUrl && strip.stripBackgroundMediaKind === "image"
+  const bgImage = usesCarousel
+    ? "none"
+    : strip.stripBackgroundImageUrl && strip.stripBackgroundMediaKind === "image"
       ? `url(${JSON.stringify(strip.stripBackgroundImageUrl)})`
       : typeof banner.stripBackgroundGradient === "string" && banner.stripBackgroundGradient.trim()
         ? banner.stripBackgroundGradient.trim()
@@ -293,15 +375,18 @@ export function promoStripStyleVars(banner: Partial<PromoBanner>): CSSProperties
     ["--promo-responsive-height" as string]: `${frameHeight / 14.4}vw`,
     ["--promo-strip-min-height" as string]: `${frameHeight}px`,
     ["--promo-strip-bg" as string]: strip.stripBackground,
-    ["--promo-strip-bg-fill" as string]: bgImage !== "none" || strip.stripBackgroundMediaKind === "video"
-      ? "transparent"
-      : promoStripFillColor(strip.stripBackground, strip.stripOpacity),
+    ["--promo-strip-bg-fill" as string]: usesCarousel
+      ? promoStripFillColor(strip.stripBackground, strip.stripOpacity)
+      : bgImage !== "none" || strip.stripBackgroundMediaKind === "video"
+        ? "transparent"
+        : promoStripFillColor(strip.stripBackground, strip.stripOpacity),
     ["--promo-strip-bg-image" as string]: bgImage,
     ["--promo-strip-bg-image-size" as string]: hasBackgroundImage ? `${strip.stripBackgroundImageScale}% auto` : "100% 100%",
-    ["--promo-frame-image-size" as string]: hasBackgroundImage ? `${strip.stripBackgroundImageScale}cqw auto` : "100% 100%",
-    ["--promo-frame-image-position" as string]: hasBackgroundImage ? `calc(50% + ${strip.stripBackgroundImageOffsetX - 50}cqw) calc(50% + ${(strip.stripBackgroundImageOffsetY - 50) * 0.416667}cqw)` : "center",
-    ["--promo-strip-bg-image-position" as string]: hasBackgroundImage || strip.stripBackgroundMediaKind === "video" ? `${strip.stripBackgroundImageOffsetX}% ${strip.stripBackgroundImageOffsetY}%` : "center",
+    ["--promo-frame-image-size" as string]: hasBackgroundImage ? `${strip.stripBackgroundImageScale}vw auto` : "100% 100%",
+    ["--promo-frame-image-position" as string]: hasBackgroundImage ? `calc(50% + ${strip.stripBackgroundImageOffsetX - 50}vw) calc(50% + ${(strip.stripBackgroundImageOffsetY - 50) * 0.416667}vw)` : "center",
+    ["--promo-strip-bg-image-position" as string]: hasBackgroundImage || strip.stripBackgroundMediaKind === "video" || usesCarousel ? `${strip.stripBackgroundImageOffsetX}% ${strip.stripBackgroundImageOffsetY}%` : "center",
     ["--promo-strip-bg-video-scale" as string]: String(strip.stripBackgroundImageScale / 100),
+    ["--promo-strip-carousel-fade-ms" as string]: `${strip.stripBackgroundCarouselFadeMs}ms`,
     ["--promo-strip-opacity" as string]: String(strip.stripOpacity),
     ["--promo-media-offset-x" as string]: `${strip.mediaOffsetXCm}cm`,
   };

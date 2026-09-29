@@ -2,12 +2,10 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
-import { getDisplayImageUrl } from "../../lib/product-image";
-import { decodeBasicHtmlEntities } from "../../lib/decode-html-entities";
-import { useCurrency } from "../../context/CurrencyContext";
 import type { ProductRecord } from "../../lib/product-types";
 import type { SiteContent } from "../content";
 import { useAdminSession } from "../../lib/use-admin-session";
+import { StorefrontProductCard } from "../components/StorefrontProductCard";
 
 type Props = {
   query: string;
@@ -17,7 +15,6 @@ type Props = {
 };
 
 export default function SearchPageClient({ query, ritualName, products, initialSiteContent }: Props) {
-  const { formatCatalogPrice, isEstimated } = useCurrency();
   const [isVisible, setIsVisible] = useState(false);
   const { adminModeEnabled: isAdmin } = useAdminSession();
 
@@ -84,23 +81,9 @@ export default function SearchPageClient({ query, ritualName, products, initialS
           {products.length > 0 ? (
             <div className="curated-grid">
               {products.map((product) => {
-                const imageSrc = getDisplayImageUrl(product);
                 return (
                   <div key={product.id} className="product-card-wrap">
-                    <Link href={`/product/${product.id}`} className="product-card">
-                      <div className="product-visual">
-                        {imageSrc ? (
-                          <img src={imageSrc} alt={decodeBasicHtmlEntities(product.name)} />
-                        ) : (
-                          <div className="placeholder-image">✧</div>
-                        )}
-                        <div className="view-link">View Details →</div>
-                      </div>
-                      <div className="product-meta">
-                        <h3 className="product-name">{decodeBasicHtmlEntities(product.name)}</h3>
-                        <p className="product-price">{formatCatalogPrice(product.price) ? `${isEstimated ? "≈ " : ""}${formatCatalogPrice(product.price)}` : "Price on request"}</p>
-                      </div>
-                    </Link>
+                    <StorefrontProductCard product={product} />
                     {isAdmin && (
                       <div className="product-admin-upload-panel">
                         <div className="admin-upload-label">Upload images</div>
@@ -260,91 +243,8 @@ export default function SearchPageClient({ query, ritualName, products, initialS
 
         .curated-grid {
           display: grid;
-          grid-template-columns: repeat(3, 1fr);
-          gap: 60px 40px;
-        }
-
-        .product-card {
-          text-decoration: none;
-          color: inherit;
-          display: block;
-        }
-
-        .product-visual {
-          position: relative;
-          aspect-ratio: 4 / 5.75;
-          background: var(--maroma-site-bg);
-          border-radius: 8px;
-          overflow: hidden;
-          margin-bottom: 24px;
-          transition: transform 0.4s cubic-bezier(0.19, 1, 0.22, 1);
-        }
-
-        .product-visual img {
-          width: 100%;
-          height: 100%;
-          object-fit: cover;
-          object-position: center;
-          transition: transform 0.8s cubic-bezier(0.19, 1, 0.22, 1);
-        }
-
-        .product-card:hover .product-visual {
-          transform: translateY(-8px);
-        }
-
-        .product-card:hover .product-visual img {
-          transform: scale(1.05);
-        }
-
-        .view-link {
-          position: absolute;
-          bottom: 0;
-          left: 0;
-          right: 0;
-          padding: 20px;
-          background: linear-gradient(to top, rgba(0,0,0,0.3), transparent);
-          color: #fff;
-          font-size: 0.75rem;
-          text-transform: uppercase;
-          letter-spacing: 0.1em;
-          font-weight: 700;
-          opacity: 0;
-          transform: translateY(10px);
-          transition: all 0.4s ease;
-        }
-
-        .product-card:hover .view-link {
-          opacity: 1;
-          transform: translateY(0);
-        }
-
-        .placeholder-image {
-          width: 100%;
-          height: 100%;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          font-size: 2rem;
-          color: #eee;
-        }
-
-        .product-meta {
-          text-align: center;
-        }
-
-        .product-name {
-          font-size: 1.05rem;
-          font-weight: 500;
-          margin-bottom: 8px;
-          color: #1a1816;
-          line-height: 1.4;
-        }
-
-        .product-price {
-          font-family: var(--font-serif), serif;
-          font-style: italic;
-          color: #8c8882;
-          font-size: 0.95rem;
+          grid-template-columns: repeat(3, minmax(0, 1fr));
+          gap: 28px 24px;
         }
 
         .empty-state {

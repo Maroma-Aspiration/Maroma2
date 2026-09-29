@@ -54,12 +54,17 @@ export function SiteFooter() {
         <div>
           <strong>Maroma</strong>
           <p>
-            Kuilapalayam, Auroville
+            Aspiration Road
+            <br />
+            Auroville
             <br />
             Tamil Nadu 605101, India
           </p>
           <p>
-            <a href="mailto:info@maroma.com">info@maroma.com</a>
+            <a href="mailto:maroma@maroma.com">maroma@maroma.com</a>
+          </p>
+          <p>
+            <a href="tel:+914132622126">+91 413 262 2126</a>
           </p>
         </div>
         <nav aria-label="Shop">
@@ -72,6 +77,7 @@ export function SiteFooter() {
         <nav aria-label="Company">
           <h2>Company</h2>
           <Link href="/about">About</Link>
+          <Link href="/careers">Careers</Link>
           <Link href="/ingredient">Ingredients</Link>
           <Link href="/blog">Journal</Link>
           <Link href={user?.role === "admin" || user?.role === "newsletter" ? "/newsletter" : "/newsletter/archive"}>
@@ -84,7 +90,7 @@ export function SiteFooter() {
           <a href="https://www.instagram.com/maromaindia/" target="_blank" rel="noopener noreferrer">
             Instagram
           </a>
-          <a href="https://www.facebook.com/maromaindia" target="_blank" rel="noopener noreferrer">
+          <a href="https://www.facebook.com/MaromaAuroville/" target="_blank" rel="noopener noreferrer">
             Facebook
           </a>
           <a href="https://www.youtube.com/@maroma" target="_blank" rel="noopener noreferrer">

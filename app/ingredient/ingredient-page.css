@@ -109,41 +109,8 @@
 
 .ingredient-page-related-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
-  gap: 16px;
-}
-
-.ingredient-page-related-card {
-  text-decoration: none;
-  color: inherit;
-  border-radius: 14px;
-  overflow: hidden;
-  background: #fffdf8;
-  border: 1px solid rgba(19, 74, 87, 0.1);
-  box-shadow: 0 6px 16px rgba(16, 52, 58, 0.06);
-}
-
-.ingredient-page-related-card img,
-.ingredient-page-related-card span {
-  display: block;
-  width: 100%;
-  aspect-ratio: 3 / 4;
-  object-fit: contain;
-  background: #f4f2e9;
-}
-
-.ingredient-page-related-card span {
-  display: grid;
-  place-items: center;
-  color: #567;
-  font-size: 0.75rem;
-}
-
-.ingredient-page-related-card p {
-  margin: 0;
-  padding: 10px 12px 14px;
-  font: 600 0.82rem/1.35 var(--font-sans);
-  color: #174d57;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 18px;
 }
 
 .ingredient-page-back {
@@ -156,8 +123,43 @@
 
 .ingredient-index-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 16px;
+}
+
+.ingredient-index-scroller {
+  overflow-x: auto;
+  padding-bottom: 8px;
+}
+
+@media (max-width: 900px) {
+  .ingredient-index-grid {
+    display: flex;
+    gap: 14px;
+    min-width: min-content;
+  }
+
+  .ingredient-index-card {
+    flex: 0 0 62vw;
+  }
+}
+
+.ingredient-page-inci,
+.ingredient-page-scent {
+  color: #315f64;
+}
+
+.ingredient-page-range {
+  display: inline-flex;
+  margin-top: 18px;
+  padding: 10px 16px;
+  border-radius: 999px;
+  background: #174d57;
+  color: #fff;
+  text-decoration: none;
+  font: 800 0.72rem/1.2 var(--font-sans);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
 }
 
 .ingredient-index-card {
@@ -191,5 +193,13 @@
 @media (max-width: 800px) {
   .ingredient-page-hero {
     grid-template-columns: 1fr;
+  }
+
+  .ingredient-index-card img,
+  .ingredient-page-image img {
+    object-fit: contain;
+    background: #fff;
+    padding: 14%;
+    box-sizing: border-box;
   }
 }

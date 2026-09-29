@@ -30,6 +30,7 @@ import {
 } from "../../lib/newsletter-issue-reset";
 import { preferServerCanvasOverLocalDraft } from "../../lib/newsletter-restore-issue";
 import { reconcileNewsletterCanvasState } from "../../lib/canvas-reconcile-stories";
+import { sanitizeStoriesStateCitations } from "../../lib/strip-ai-citation-markers";
 import type { NewsletterArchiveSummary } from "../../lib/newsletter-archive-types";
 import { refreshStorySnapshotsInBlocks, storyToBlock } from "../../lib/newsletter-migrate-legacy-blocks";
 import { hideNewsletterExcerptBecauseBodyCoversIt } from "../../lib/newsletter-story-display";
@@ -1476,7 +1477,7 @@ const CANVAS_LS_KEY = "maroma-newsletter-canvas-draft";
 const CANVAS_LS_SAVED_KEY = "maroma-newsletter-canvas-saved-at";
 
 function withCanvasStoryGaps(s: StoriesState): StoriesState {
-  const reconciled = reconcileNewsletterCanvasState(s);
+  const reconciled = sanitizeStoriesStateCitations(reconcileNewsletterCanvasState(s)).state;
   const existing = parseStorySpacingGaps(reconciled.newsletterCanvas?.storySpacingGaps);
   if (existing) {
     return {
@@ -1695,6 +1696,8 @@ export default function NewsletterPageClient({
   const [newTestEmail, setNewTestEmail] = useState("");
   const [sendingTest, setSendingTest] = useState(false);
   const [testSent, setTestSent] = useState(false);
+  const [testSendTarget, setTestSendTarget] = useState<"list" | "me" | null>(null);
+  const [testSentTarget, setTestSentTarget] = useState<"list" | "me" | null>(null);
   const [sendingCampaign, setSendingCampaign] = useState(false);
   const [campaignSent, setCampaignSent] = useState(false);
 
@@ -4942,15 +4945,17 @@ export default function NewsletterPageClient({
     }
   };
 
-  const sendTestNewsletter = async () => {
+  const sendTestNewsletter = async (target: "list" | "me" = "list") => {
     const raw = formatEmailList(testMailingList);
-    if (!raw) {
+    if (target === "list" && !raw) {
       setDeliveryStatus("Add at least one address to your test mailing list.");
       return;
     }
     setSendingTest(true);
+    setTestSendTarget(target);
     setTestSent(false);
-    setDeliveryStatus("Sending test…");
+    setTestSentTarget(null);
+    setDeliveryStatus(target === "me" ? "Sending to your signed-in email…" : "Sending test…");
     try {
       await saveStories();
       const response = await fetch("/api/newsletter/send", {
@@ -4960,7 +4965,8 @@ export default function NewsletterPageClient({
         body: JSON.stringify({
           subject: campaignSubject,
           testOnly: true,
-          testEmails: raw,
+          testEmails: target === "list" ? raw : undefined,
+          sendToSessionUser: target === "me",
           storySpacingGaps: storyGaps,
         }),
       });
@@ -5017,11 +5023,13 @@ export default function NewsletterPageClient({
       ].filter(Boolean);
       setDeliveryStatus(parts.join(" "));
       setTestSent(true);
+      setTestSentTarget(target);
     } catch (error) {
       const message = error instanceof Error ? error.message : "Test send request failed.";
       setDeliveryStatus(message.includes("Save failed") ? message : `Test send request failed. ${message}`);
     } finally {
       setSendingTest(false);
+      setTestSendTarget(null);
     }
   };
 
@@ -5469,11 +5477,19 @@ export default function NewsletterPageClient({
                   </button>
                   <button
                     type="button"
-                    className={`button newsletter-test-send${sendingTest ? " is-sending" : ""}${testSent ? " is-sent" : ""}`}
-                    disabled={sendingTest || testMailingList.length === 0}
-                    onClick={() => void sendTestNewsletter()}
+                    className={`button newsletter-test-send${sendingTest && testSendTarget === "list" ? " is-sending" : ""}${testSent && testSentTarget === "list" ? " is-sent" : ""}`}
+                    disabled={sendingTest || sendingCampaign || testMailingList.length === 0}
+                    onClick={() => void sendTestNewsletter("list")}
                   >
-                    {sendingTest ? "Sending" : testSent ? "Sent!" : "Send newsletter test"}
+                    {sendingTest && testSendTarget === "list" ? "Sending" : testSent && testSentTarget === "list" ? "Sent!" : "Send newsletter test"}
+                  </button>
+                  <button
+                    type="button"
+                    className={`button newsletter-test-send${sendingTest && testSendTarget === "me" ? " is-sending" : ""}${testSent && testSentTarget === "me" ? " is-sent" : ""}`}
+                    disabled={sendingTest || sendingCampaign}
+                    onClick={() => void sendTestNewsletter("me")}
+                  >
+                    {sendingTest && testSendTarget === "me" ? "Sending" : testSent && testSentTarget === "me" ? "Sent!" : "Send to Me"}
                   </button>
                   <button
                     type="button"

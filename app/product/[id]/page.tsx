@@ -5,6 +5,7 @@ import { notFound } from "next/navigation";
 import { ProductPdpTitle } from "../../components/ProductPdpTitle";
 import { ProductPdpPinnedStage } from "./ProductPdpPinnedStage";
 import { ProductPdpBuyRow } from "../../components/ProductPdpBuyRow";
+import { StorefrontProductCard } from "../../components/StorefrontProductCard";
 import { ProductPdpGallery } from "../../components/ProductPdpGallery";
 import { ProductReviews } from "../../components/ProductReviews";
 import { ProductAdminToolbar } from "../../components/ProductAdminToolbar";
@@ -42,11 +43,11 @@ import {
   readIngredientGalleryStore,
 } from "../../../lib/product-ingredient-gallery-store";
 import { normalizeKeyIngredientName, resolveKeyIngredientImage } from "../../../lib/key-ingredient-media";
-import { ingredientSlugFromName } from "../../../lib/ingredient-pages";
+import { getIngredientPage, ingredientSlugFromName } from "../../../lib/ingredient-pages";
 
 export const runtime = "nodejs";
 
-type Props = { params: { id: string }; searchParams?: { search?: string } };
+type Props = { params: { id: string }; searchParams?: { search?: string; curations?: string } };
 
 async function canPreviewDraftProduct(): Promise<boolean> {
   const secret = getSessionSecret();
@@ -89,21 +90,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 }
 
 function SuggestedCard({ product }: { product: ProductRecord }) {
-  const imageSrc = getDisplayImageUrl(product);
-  const { displayName } = stripIndiaOnlyFromProductName(product.name);
-  return (
-    <Link href={`/product/${product.id}`} className="product-pdp-suggestion-card">
-      <div className="product-pdp-suggestion-media">
-        {imageSrc ? <img src={imageSrc} alt={`${displayName}, Maroma`} /> : <span>No image</span>}
-      </div>
-      <div className="product-pdp-suggestion-copy">
-        <p className="product-pdp-suggestion-name">{displayName}</p>
-        {productPriceState(product).onSale ? (
-          <p className="product-pdp-suggestion-price is-on-sale"><s><CurrencyPrice raw={productPriceState(product).regular} fallback="-" /></s><span><CurrencyPrice raw={productPriceState(product).active} fallback="-" /></span></p>
-        ) : <p className="product-pdp-suggestion-price"><CurrencyPrice raw={product.price} fallback="-" /></p>}
-      </div>
-    </Link>
-  );
+  return <StorefrontProductCard product={product} compact />;
 }
 
 export default async function ProductPage({ params, searchParams }: Props) {
@@ -138,13 +125,25 @@ export default async function ProductPage({ params, searchParams }: Props) {
     const stored = storedIngredientItems.find(
       (item) => normalizeKeyIngredientName(item.name) === normalizeKeyIngredientName(name)
     );
+    const page = getIngredientPage(name);
     keyIngredientCards.push({
       name,
-      imageUrl: stored?.imageUrl || resolveKeyIngredientImage(name),
+      imageUrl: stored?.imageUrl || resolveKeyIngredientImage(name) || page.imageUrl,
       href,
+      inci: page.inci,
+      description: page.description,
+      benefits: page.benefits,
+      scentProfile: page.scentProfile,
+      extraNotes: page.extraNotes,
+      rangeLabel: page.rangeLabel,
+      rangeHref: page.rangeHref,
     });
   }
   const searchQuery = searchParams?.search?.trim().slice(0, 160) ?? "";
+  const curationsRaw = searchParams?.curations?.trim() ?? "";
+  const curationsHref = curationsRaw.startsWith("/curations") && !curationsRaw.startsWith("//")
+    ? curationsRaw
+    : "";
   const seoAudit = auditProductSeoFacts(product);
   const categorySlug = resolvePrimaryCategorySlug(product);
   const category = categorySlug ? categoryBySlug(categorySlug) : undefined;
@@ -193,6 +192,11 @@ export default async function ProductPage({ params, searchParams }: Props) {
 
         <div className="product-pdp-details-column">
           <div className="product-pdp-details-chrome">
+            {curationsHref ? (
+              <Link href={curationsHref} className="product-pdp-back-to-search product-pdp-back-to-curations">
+                <span aria-hidden="true">←</span> Back to Maroma Curations
+              </Link>
+            ) : null}
             <nav className="product-pdp-breadcrumbs" aria-label="Breadcrumb">
               <ol>
                 <li>
@@ -252,6 +256,14 @@ export default async function ProductPage({ params, searchParams }: Props) {
                   </ul>
                 </div>
               </details>
+              {keyIngredientCards.length > 0 ? (
+              <details className="product-pdp-accordion">
+                <summary>Key Ingredients</summary>
+                <div className="product-pdp-accordion-body">
+                  <ProductKeyIngredients items={keyIngredientCards} />
+                </div>
+              </details>
+              ) : null}
               {sections.howToUse ? (
                 <details className="product-pdp-accordion">
                   <summary>How to use</summary>
@@ -309,21 +321,55 @@ export default async function ProductPage({ params, searchParams }: Props) {
         </div>
       </div>
 
-      <section className="product-pdp-key-ingredients-section" aria-labelledby="pdp-key-ingredients-heading">
-        <h2 id="pdp-key-ingredients-heading" className="product-pdp-key-ingredients-title">
-          Key ingredients
-        </h2>
-        <ProductKeyIngredients items={keyIngredientCards} />
-      </section>
-
       <footer className="product-pdp-trust" aria-label="Certifications">
-        <div className="product-pdp-trust-badge">Fair trade ethos</div>
-        <div className="product-pdp-trust-badge">Hand crafted in Auroville</div>
-        <div className="product-pdp-trust-badge">Cruelty free</div>
-        <div className="product-pdp-trust-badge">Conscious ingredients</div>
-        <div className="product-pdp-trust-badge">Earth friendly</div>
+        <div className="product-pdp-trust-badge">
+          <span className="product-pdp-trust-icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24" fill="none">
+              <path d="M12 3v17M5 6h14M7 6l-3 5h6L7 6Zm10 0-3 5h6l-3-5ZM8 20h8" />
+            </svg>
+          </span>
+          <span className="product-pdp-trust-label">Fair trade ethos</span>
+        </div>
+        <div className="product-pdp-trust-badge">
+          <span className="product-pdp-trust-icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24" fill="none">
+              <path d="M7.5 12V7.5a1.5 1.5 0 0 1 3 0V11m0-4.5a1.5 1.5 0 0 1 3 0V11m0-3a1.5 1.5 0 0 1 3 0v4m0-2a1.5 1.5 0 0 1 3 0v4.5c0 4-2.7 6.5-6.5 6.5h-1.2c-2.2 0-3.6-.8-4.9-2.5L4.7 15.7a1.5 1.5 0 0 1 2.2-2l2.1 1.8" />
+              <path d="m18.5 3 .5 1.2 1.3.5-1.3.5-.5 1.3-.5-1.3-1.2-.5 1.2-.5.5-1.2Z" />
+            </svg>
+          </span>
+          <span className="product-pdp-trust-label">Hand crafted in Auroville</span>
+        </div>
+        <div className="product-pdp-trust-badge">
+          <span className="product-pdp-trust-icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24" fill="none">
+              <path d="M9.2 8.5C7.2 6 7 2.5 8.8 2.2c1.7-.3 2.5 3.2 2.6 6.1m3.4.2c2-2.5 2.2-6 .4-6.3-1.7-.3-2.5 3.2-2.6 6.1" />
+              <path d="M6.5 14.2c0-3.7 2.4-6 5.5-6s5.5 2.3 5.5 6-2.4 6.3-5.5 6.3-5.5-2.6-5.5-6.3Z" />
+              <path d="M9.8 14h.1m4.2 0h.1M11 16.3h2l-1 1-1-1Z" />
+            </svg>
+          </span>
+          <span className="product-pdp-trust-label">Cruelty free</span>
+        </div>
+        <div className="product-pdp-trust-badge">
+          <span className="product-pdp-trust-icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24" fill="none">
+              <path d="M19.8 4.2C13.6 4 8.6 6.5 7.2 10.4c-1.1 3.1.7 5.7 3.8 5.4 4-.3 7-4.8 8.8-11.6Z" />
+              <path d="M4 20c2-4.4 5.2-7.6 10.2-10.2M6.7 14.9c-1.9-.2-3.2-1.2-3.7-3.1 2.2-.5 3.9-.2 5.1.8" />
+            </svg>
+          </span>
+          <span className="product-pdp-trust-label">Conscious ingredients</span>
+        </div>
+        <div className="product-pdp-trust-badge">
+          <span className="product-pdp-trust-icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24" fill="none">
+              <circle cx="12" cy="12" r="8.5" />
+              <path d="M3.8 12h16.4M12 3.5c2.2 2.3 3.3 5.1 3.3 8.5S14.2 18.2 12 20.5C9.8 18.2 8.7 15.4 8.7 12S9.8 5.8 12 3.5Z" />
+              <path d="M16.5 7.2c1.4-1.3 2.7-1.6 4-1.1-.2 1.7-1.2 2.8-3.1 3.3" />
+            </svg>
+          </span>
+          <span className="product-pdp-trust-label">Earth friendly</span>
+        </div>
       </footer>
-      <ProductReviews productId={product.id} />
+      <ProductReviews productId={product.id} productName={displayName} />
     </main>
   );
 }

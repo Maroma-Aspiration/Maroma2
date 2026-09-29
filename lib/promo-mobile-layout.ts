@@ -33,7 +33,7 @@ function normalizeOverlay(raw: unknown): PromoMobileOverlayLayout[] {
       id,
       x: clamp(row.x, 0, 100, 50),
       y: clamp(row.y, 0, 100, 50),
-      scale: clamp(row.scale, 20, 220, 75),
+      scale: clamp(row.scale, 20, 270, 75),
     });
   }
   return rows.slice(0, 24);
@@ -44,12 +44,14 @@ export function normalizePromoMobileLayout(raw: unknown): PromoMobileLayout | un
   const row = raw as Record<string, unknown>;
   return {
     enabled: row.enabled === true,
+    ...(row.stripWidthPct == null ? {} : { stripWidthPct: clamp(row.stripWidthPct, 20, 150, 100) }),
+    stripPositionOffsetPx: clamp(row.stripPositionOffsetPx, -400, 400, 0),
     stripHeightPx: clamp(row.stripHeightPx, PROMO_MOBILE_HEIGHT_MIN, PROMO_MOBILE_HEIGHT_MAX, 300),
     textBannerOffsetX: clamp(row.textBannerOffsetX, -400, 400, 0),
     textBannerOffsetY: clamp(row.textBannerOffsetY, -400, 400, 0),
     textBannerScale: clamp(row.textBannerScale, 20, 220, 100),
     textBannerWidthPct: clamp(row.textBannerWidthPct, 20, 200, 100),
-    textBannerHeightPct: clamp(row.textBannerHeightPct, 20, 200, 100),
+    textBannerHeightPct: clamp(row.textBannerHeightPct, 20, 300, 100),
     headlineOffsetX: clamp(row.headlineOffsetX, -400, 400, 0),
     headlineOffsetY: clamp(row.headlineOffsetY, -400, 400, 0),
     headlineScale: clamp(row.headlineScale, 40, 220, 100),
@@ -58,6 +60,7 @@ export function normalizePromoMobileLayout(raw: unknown): PromoMobileLayout | un
     taglineScale: clamp(row.taglineScale, 40, 220, 100),
     ctaOffsetX: clamp(row.ctaOffsetX, -400, 400, 0),
     ctaOffsetY: clamp(row.ctaOffsetY, -400, 400, 0),
+    ctaScale: clamp(row.ctaScale, 40, 220, 100),
     thumbnailOffsetX: clamp(row.thumbnailOffsetX, -400, 400, 0),
     thumbnailOffsetY: clamp(row.thumbnailOffsetY, -400, 400, 0),
     overlay: normalizeOverlay(row.overlay),
@@ -76,6 +79,8 @@ export function seedPromoMobileLayout(banner: PromoBanner): PromoMobileLayout {
   const capped = (value: number | undefined) => Math.min(100, value ?? 100);
   return normalizePromoMobileLayout({
     enabled: true,
+    stripWidthPct: Math.min(150, Math.max(20, banner.stripWidthPct ?? 100)),
+    stripPositionOffsetPx: Math.round((banner.stripPositionOffsetPx ?? 0) * unitY),
     stripHeightPx: Math.round(mobileHeight),
     textBannerOffsetX: Math.round((banner.textBannerOffsetX ?? 0) * unitX),
     textBannerOffsetY: Math.round((banner.textBannerOffsetY ?? 0) * unitY),
@@ -90,6 +95,7 @@ export function seedPromoMobileLayout(banner: PromoBanner): PromoMobileLayout {
     taglineScale: capped(banner.taglineScale),
     ctaOffsetX: Math.round((banner.ctaOffsetX ?? 0) * unitX),
     ctaOffsetY: Math.round((banner.ctaOffsetY ?? 0) * unitY),
+    ctaScale: 100,
     thumbnailOffsetX: Math.round((banner.thumbnailOffsetX ?? 0) * unitX),
     thumbnailOffsetY: Math.round((banner.thumbnailOffsetY ?? 0) * unitY),
     overlay: (banner.overlayImages ?? []).map((layer) => ({
@@ -112,6 +118,8 @@ export function applyPromoMobileLayout(banner: PromoBanner): PromoBanner {
   return {
     ...banner,
     mobileTuned: true,
+    stripWidthPct: mobile.stripWidthPct ?? banner.stripWidthPct,
+    stripPositionOffsetPx: mobile.stripPositionOffsetPx ?? banner.stripPositionOffsetPx,
     stripHeightPx: mobile.stripHeightPx,
     textBannerOffsetX: mobile.textBannerOffsetX,
     textBannerOffsetY: mobile.textBannerOffsetY,
@@ -126,6 +134,7 @@ export function applyPromoMobileLayout(banner: PromoBanner): PromoBanner {
     taglineScale: mobile.taglineScale,
     ctaOffsetX: mobile.ctaOffsetX,
     ctaOffsetY: mobile.ctaOffsetY,
+    ctaScale: mobile.ctaScale,
     thumbnailOffsetX: mobile.thumbnailOffsetX,
     thumbnailOffsetY: mobile.thumbnailOffsetY,
     overlayImages: banner.overlayImages?.map((layer) => {

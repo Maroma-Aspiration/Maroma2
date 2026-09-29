@@ -28,6 +28,9 @@ export async function POST(request: Request) {
         if (!objectPath || !objectPath.startsWith(`admin-product-videos/${productId}/`)) {
           throw new Error("Invalid product video.");
         }
+        if (!/\.mp4$/i.test(objectPath)) {
+          throw new Error("Product videos must be uploaded as MP4 files.");
+        }
         const store = await readOverrides();
         store.overrides[productId] = {
           ...store.overrides[productId],

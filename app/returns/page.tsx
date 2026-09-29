@@ -1,9 +1,11 @@
 import { LegalPageShell } from "../components/LegalPageShell";
+import { buildPageMetadata } from "../../lib/site-seo";
 
-export const metadata = {
+export const metadata = buildPageMetadata({
   title: "Returns & Refunds | Maroma",
   description: "How returns, exchanges, and refunds work for Maroma orders.",
-};
+  path: "/returns",
+});
 
 export default function ReturnsPage() {
   return (

@@ -12,6 +12,16 @@ import {
   toIsoScheduleValue,
 } from "../../lib/promo-client-utils";
 import {
+  PROMO_STRIP_CAROUSEL_FADE_MS_DEFAULT,
+  PROMO_STRIP_CAROUSEL_FADE_MS_MAX,
+  PROMO_STRIP_CAROUSEL_FADE_MS_MIN,
+  PROMO_STRIP_CAROUSEL_INTERVAL_MS_DEFAULT,
+  PROMO_STRIP_CAROUSEL_INTERVAL_MS_MAX,
+  PROMO_STRIP_CAROUSEL_INTERVAL_MS_MIN,
+  PROMO_STRIP_CAROUSEL_MAX,
+  normalizePromoStripCarouselUrls,
+} from "../../lib/promo-strip-utils";
+import {
   clampPromoOverlayDepth,
   promoOverlayDepthLabel,
   PROMO_OVERLAY_DEPTH_DEFAULT,
@@ -98,6 +108,8 @@ type Props = {
   status?: string;
   onChange: (banner: PromoBanner) => void;
   onModeChange?: (enabled: boolean) => void;
+  previewMode?: "desktop" | "mobile";
+  onPreviewModeChange?: (mode: "desktop" | "mobile") => void;
   onSaved: (banner: PromoBanner) => void;
   onLibrarySaved?: (banner: PromoBanner) => void;
   onLibraryDeleted?: (bannerId: string) => void;
@@ -106,7 +118,7 @@ type Props = {
   onClose: () => void;
 };
 
-export function HomepagePromoQuickEditor({ banner, savedBanners = [], status = "", onChange, onModeChange, onSaved, onLibrarySaved, onLibraryDeleted, onLoadBanner, onCreateNew, onClose }: Props) {
+export function HomepagePromoQuickEditor({ banner, savedBanners = [], status = "", onChange, onModeChange, previewMode = "desktop", onPreviewModeChange, onSaved, onLibrarySaved, onLibraryDeleted, onLoadBanner, onCreateNew, onClose }: Props) {
   const [draft, setDraft] = useState(banner);
   const [panelDragging, setPanelDragging] = useState(false);
   const [dragLeft, setDragLeft] = useState<number | null>(null);
@@ -167,6 +179,11 @@ export function HomepagePromoQuickEditor({ banner, savedBanners = [], status = "
     update({ endsAt: date ? toIsoScheduleValue(`${date}T${time || "23:30"}`) : "" });
 
   const publish = async () => {
+    const name = draft.adminName?.trim() || derivePromoNameFromCopy(draft);
+    if (!name) {
+      setMessage("Add a promo name or a headline first.");
+      return;
+    }
     if (isScheduled && draft.startsAt && draft.endsAt && new Date(draft.endsAt) <= new Date(draft.startsAt)) {
       setMessage("The end time has to be after the start time.");
       return;
@@ -179,14 +196,18 @@ export function HomepagePromoQuickEditor({ banner, savedBanners = [], status = "
         credentials: "same-origin",
         headers: { "Content-Type": "application/json" },
         // publishNow clears the schedule server-side, so only send it for an immediate publish.
-        body: JSON.stringify({ ...draft, publishNow: !isScheduled, active: true }),
+        body: JSON.stringify({ ...draft, adminName: name, publishNow: !isScheduled, active: true }),
       });
       const data = (await res.json()) as { banner?: PromoBanner; error?: string };
       if (!res.ok || !data.banner) throw new Error(data.error || "Unable to save promo.");
       setDraft(data.banner);
       onSaved(data.banner);
+      onLibrarySaved?.(data.banner);
+      setLoadId(data.banner.id);
       setMessage("");
+      setSaved(true);
       setPublished(true);
+      window.setTimeout(() => setSaved(false), 2200);
       window.setTimeout(() => setPublished(false), 2200);
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Unable to save promo.");
@@ -233,8 +254,8 @@ export function HomepagePromoQuickEditor({ banner, savedBanners = [], status = "
     }
   };
 
-  const deleteSelectedPromo = async () => {
-    const target = savedBanners.find((item) => item.id === loadId);
+  const deleteSelectedPromo = async (targetId = loadId) => {
+    const target = savedBanners.find((item) => item.id === targetId);
     if (!target) {
       setMessage("Choose a saved promo to delete first.");
       return;
@@ -255,7 +276,7 @@ export function HomepagePromoQuickEditor({ banner, savedBanners = [], status = "
       });
       const data = (await res.json()) as { ok?: boolean; error?: string };
       if (!res.ok) throw new Error(data.error || "Unable to delete promo.");
-      setLoadId("");
+      if (loadId === target.id) setLoadId("");
       onLibraryDeleted?.(target.id);
       setMessage(`Deleted “${label}”. The design stays here until you close the editor.`);
     } catch (error) {
@@ -286,6 +307,7 @@ export function HomepagePromoQuickEditor({ banner, savedBanners = [], status = "
       update({
         id: crypto.randomUUID(), adminName: `${template.label} promo`, title: template.title, body: template.body,
         mediaUrl: "", mediaKind: "none", overlayImages: [], stripBackgroundImageUrl: "", stripBackgroundMediaKind: "none",
+        stripBackgroundCarouselEnabled: false, stripBackgroundCarouselUrls: [],
         stripBackgroundGradient: template.gradient, stripAspectRatio: "fixed", stripHeightPx: 430, stripOpacity: 1,
         animation: template.animation, animateEnabled: true, sequenceLoop: true, stripBackgroundVideoLoop: true,
         ctaLabel: template.ctaLabel, ctaHref: template.ctaHref, ctaStyle: "magical", ctaBuyLinks: links,
@@ -306,13 +328,89 @@ export function HomepagePromoQuickEditor({ banner, savedBanners = [], status = "
     }
   };
 
-  const backgroundStyle = draft.stripBackgroundMediaKind === "video" ? "video" : "image";
+  const carouselUrls = normalizePromoStripCarouselUrls(
+    draft.stripBackgroundCarouselUrls,
+    draft.stripBackgroundImageUrl
+  );
+  const backgroundStyle =
+    draft.stripBackgroundMediaKind === "video"
+      ? "video"
+      : draft.stripBackgroundCarouselEnabled
+        ? "carousel"
+        : "image";
+
+  const setBackgroundStyle = (next: "image" | "carousel" | "video") => {
+    if (next === "video") {
+      update({
+        stripBackgroundMediaKind: "video",
+        stripBackgroundCarouselEnabled: false,
+        stripBackgroundImageUrl: "",
+        stripAspectRatio: "21:9",
+      });
+      return;
+    }
+    if (next === "carousel") {
+      const seed = normalizePromoStripCarouselUrls(carouselUrls, draft.stripBackgroundImageUrl);
+      update({
+        stripBackgroundMediaKind: seed[0] ? "image" : "none",
+        stripBackgroundCarouselEnabled: true,
+        stripBackgroundCarouselUrls: seed,
+        stripBackgroundImageUrl: seed[0] ?? "",
+        stripBackgroundCarouselIntervalMs:
+          draft.stripBackgroundCarouselIntervalMs ?? PROMO_STRIP_CAROUSEL_INTERVAL_MS_DEFAULT,
+        stripBackgroundCarouselFadeMs:
+          draft.stripBackgroundCarouselFadeMs ?? PROMO_STRIP_CAROUSEL_FADE_MS_DEFAULT,
+        stripAspectRatio: "fixed",
+      });
+      return;
+    }
+    update({
+      stripBackgroundMediaKind: draft.stripBackgroundImageUrl ? "image" : "none",
+      stripBackgroundCarouselEnabled: false,
+      stripAspectRatio: "fixed",
+    });
+  };
+
+  const addCarouselImages = async (files: FileList | null) => {
+    if (!files?.length) return;
+    setBusy(true);
+    setMessage("Uploading carousel images…");
+    try {
+      const remaining = Math.max(0, PROMO_STRIP_CAROUSEL_MAX - carouselUrls.length);
+      const uploaded: string[] = [];
+      for (const file of Array.from(files).slice(0, remaining)) {
+        uploaded.push(await uploadPromoMedia(file, "image"));
+      }
+      const next = normalizePromoStripCarouselUrls([...carouselUrls, ...uploaded]);
+      update({
+        stripBackgroundCarouselEnabled: true,
+        stripBackgroundCarouselUrls: next,
+        stripBackgroundImageUrl: next[0] ?? "",
+        stripBackgroundMediaKind: next[0] ? "image" : "none",
+      });
+      setMessage(next.length > 1 ? "Carousel images ready in preview." : "Add at least one more image to start the fade.");
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "Upload failed.");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const removeCarouselImage = (url: string) => {
+    const next = carouselUrls.filter((item) => item !== url);
+    update({
+      stripBackgroundCarouselUrls: next,
+      stripBackgroundImageUrl: next[0] ?? "",
+      stripBackgroundMediaKind: next[0] ? "image" : "none",
+      stripBackgroundCarouselEnabled: true,
+    });
+  };
   const gradientEnabled = Boolean(draft.stripBackgroundGradient);
   const gradientColours = (draft.stripBackgroundGradient?.match(/#[0-9a-f]{6}\b/gi) ?? ["#083f55", "#1688a3", "#efc85d"]);
   const gradientAngle = Number(draft.stripBackgroundGradient?.match(/linear-gradient\(([-\d.]+)deg/)?.[1] ?? 135);
   const setGradientColour = (index: number, colour: string) => {
     const colours = gradientColours.map((value, i) => i === index ? colour : value);
-    update({ stripBackgroundGradient: `linear-gradient(${gradientAngle}deg,${colours.map((value, i) => `${value} ${Math.round(i * 100 / (colours.length - 1))}%`).join(",")})`, stripBackgroundImageUrl: "", stripBackgroundMediaKind: "none" });
+    update({ stripBackgroundGradient: `linear-gradient(${gradientAngle}deg,${colours.map((value, i) => `${value} ${Math.round(i * 100 / (colours.length - 1))}%`).join(",")})`, stripBackgroundImageUrl: "", stripBackgroundMediaKind: "none", stripBackgroundCarouselEnabled: false, stripBackgroundCarouselUrls: [] });
   };
   const buyLinks = useMemo(() => draft.ctaBuyLinks ?? [], [draft.ctaBuyLinks]);
   const overlayImages = useMemo(() => draft.overlayImages?.length ? draft.overlayImages : draft.mediaUrl ? [{ id: "legacy-overlay", imageUrl: draft.mediaUrl, x: draft.overlayImageX ?? 50, y: draft.overlayImageY ?? 50, scale: draft.overlayImageScale ?? 75, radius: draft.overlayImageRadius ?? 18, shadow: draft.overlayImageShadow !== false, animation: draft.overlayImageAnimation ?? "none" as const, animationDurationMs: draft.overlayImageAnimationDurationMs ?? 2400, crop: "none" as const, cropX: 50, cropY: 50 }] : [], [draft]);
@@ -320,6 +418,7 @@ export function HomepagePromoQuickEditor({ banner, savedBanners = [], status = "
     id: crypto.randomUUID(),
     name,
     imageUrl,
+    href: "",
     x: 50,
     y: 50,
     scale: 75,
@@ -538,6 +637,10 @@ export function HomepagePromoQuickEditor({ banner, savedBanners = [], status = "
           <button type="button" className={draft.promoModeEnabled === false ? "is-active" : ""} onClick={() => { onModeChange?.(false); update({ promoModeEnabled: false }); }}>Home</button>
           <button type="button" className={draft.promoModeEnabled !== false ? "is-active" : ""} onClick={() => { onModeChange?.(true); update({ promoModeEnabled: true }); }}>Promo</button>
         </div>
+        <div className="homepage-mode-switch homepage-preview-mode-switch" role="group" aria-label="Promo preview size">
+          <button type="button" className={previewMode === "desktop" ? "is-active" : ""} onClick={() => onPreviewModeChange?.("desktop")}>Desktop</button>
+          <button type="button" className={previewMode === "mobile" ? "is-active" : ""} onClick={() => onPreviewModeChange?.("mobile")}>Mobile</button>
+        </div>
 
         <details className="homepage-promo-control-section">
           <summary>Banner</summary>
@@ -558,21 +661,51 @@ export function HomepagePromoQuickEditor({ banner, savedBanners = [], status = "
             {([['X', 'stripBackgroundImageOffsetX', 0, 100, 50], ['Y', 'stripBackgroundImageOffsetY', 0, 100, 50], ['Scale', 'stripBackgroundImageScale', 25, 400, 100]] as const).map(([label, field, min, max, fallback]) => <label key={field}><span>Image {label} <b>{draft[field] ?? fallback}%</b></span><input type="range" min={min} max={max} value={draft[field] ?? fallback} onChange={event => update({ [field]: Number(event.target.value) })} /></label>)}
             <button type="button" className="homepage-promo-centre-button" onClick={() => update({ stripBackgroundImageOffsetX: 50, stripBackgroundImageOffsetY: 50, stripBackgroundImageScale: 100 })}>Reset image position and scale</button>
           </div>
-          <label><span>Background type</span><select value={backgroundStyle} onChange={(event) => update({ stripBackgroundMediaKind: event.target.value === "video" ? "video" : "none", stripBackgroundImageUrl: "", stripAspectRatio: event.target.value === "video" ? "21:9" : "fixed" })}><option value="image">Image / colour</option><option value="video">Video</option></select></label>
+          <label><span>Background type</span><select value={backgroundStyle} onChange={(event) => setBackgroundStyle(event.target.value as "image" | "carousel" | "video")}><option value="image">Image / colour</option><option value="carousel">Image carousel</option><option value="video">Video</option></select></label>
           {backgroundStyle === "video" ? (
             <>
               <label className="homepage-promo-upload"><span>{draft.stripBackgroundImageUrl ? "Replace video" : "Upload video"}</span><input type="file" accept="video/*" disabled={busy} onChange={async (event) => { const file = event.target.files?.[0]; if (!file) return; setBusy(true); setMessage("Uploading video…"); try { const url = await uploadPromoMedia(file, "video"); update({ stripBackgroundImageUrl: url, stripBackgroundMediaKind: "video", stripBackgroundVideoLoop: false, stripAspectRatio: "21:9" }); setMessage("Video ready in preview."); } catch (error) { setMessage(error instanceof Error ? error.message : "Upload failed."); } finally { setBusy(false); } }} /></label>
               <label className="homepage-promo-upload secondary"><span>{draft.stripBackgroundFallbackImageUrl ? "Replace end image" : "Upload end image"}</span><small>Shown after the video plays once.</small><input type="file" accept="image/*" disabled={busy} onChange={async (event) => { const file = event.target.files?.[0]; if (!file) return; setBusy(true); setMessage("Uploading end image…"); try { const url = await uploadPromoMedia(file, "image"); update({ stripBackgroundFallbackImageUrl: url }); setMessage("End image ready in preview."); } catch (error) { setMessage(error instanceof Error ? error.message : "Upload failed."); } finally { setBusy(false); } }} /></label>
             </>
+          ) : backgroundStyle === "carousel" ? (
+            <>
+              <p>Add two or more photos. They fade into each other on the homepage banner.</p>
+              {carouselUrls.length ? (
+                <ul className="homepage-promo-carousel-list">
+                  {carouselUrls.map((url, index) => (
+                    <li key={`${url}-${index}`}>
+                      <img src={url} alt="" />
+                      <span>Slide {index + 1}</span>
+                      <button type="button" onClick={() => removeCarouselImage(url)}>Remove</button>
+                    </li>
+                  ))}
+                </ul>
+              ) : null}
+              <label className="homepage-promo-upload">
+                <span>{carouselUrls.length ? "Add carousel images" : "Upload carousel images"}</span>
+                <small>{carouselUrls.length}/{PROMO_STRIP_CAROUSEL_MAX} photos. Fade begins after the second image.</small>
+                <input type="file" accept="image/*" multiple disabled={busy || carouselUrls.length >= PROMO_STRIP_CAROUSEL_MAX} onChange={(event) => { void addCarouselImages(event.target.files); event.currentTarget.value = ""; }} />
+              </label>
+              <div className="homepage-promo-range-grid">
+                <label>
+                  <span>Hold each image <b>{((draft.stripBackgroundCarouselIntervalMs ?? PROMO_STRIP_CAROUSEL_INTERVAL_MS_DEFAULT) / 1000).toFixed(1)}s</b></span>
+                  <input type="range" min={PROMO_STRIP_CAROUSEL_INTERVAL_MS_MIN} max={PROMO_STRIP_CAROUSEL_INTERVAL_MS_MAX} step={100} value={draft.stripBackgroundCarouselIntervalMs ?? PROMO_STRIP_CAROUSEL_INTERVAL_MS_DEFAULT} onChange={(event) => update({ stripBackgroundCarouselIntervalMs: Number(event.target.value) })} />
+                </label>
+                <label>
+                  <span>Fade <b>{((draft.stripBackgroundCarouselFadeMs ?? PROMO_STRIP_CAROUSEL_FADE_MS_DEFAULT) / 1000).toFixed(1)}s</b></span>
+                  <input type="range" min={PROMO_STRIP_CAROUSEL_FADE_MS_MIN} max={PROMO_STRIP_CAROUSEL_FADE_MS_MAX} step={50} value={draft.stripBackgroundCarouselFadeMs ?? PROMO_STRIP_CAROUSEL_FADE_MS_DEFAULT} onChange={(event) => update({ stripBackgroundCarouselFadeMs: Number(event.target.value) })} />
+                </label>
+              </div>
+            </>
           ) : (
             <>
-              <label><span>Colour fill</span><select value={gradientEnabled ? "gradient" : "solid"} onChange={(event) => update({ stripBackgroundGradient: event.target.value === "gradient" ? GRADIENTS[0].value : "", stripBackgroundImageUrl: "", stripBackgroundMediaKind: "none" })}><option value="gradient">Gradient</option><option value="solid">Solid colour (no gradient)</option></select></label>
+              <label><span>Colour fill</span><select value={gradientEnabled ? "gradient" : "solid"} onChange={(event) => update({ stripBackgroundGradient: event.target.value === "gradient" ? GRADIENTS[0].value : "", stripBackgroundImageUrl: "", stripBackgroundMediaKind: "none", stripBackgroundCarouselEnabled: false, stripBackgroundCarouselUrls: [] })}><option value="gradient">Gradient</option><option value="solid">Solid colour (no gradient)</option></select></label>
               {gradientEnabled ? <>
-                <label><span>Gradient preset</span><select value={GRADIENTS.some(item => item.value === draft.stripBackgroundGradient) ? draft.stripBackgroundGradient : "custom"} onChange={(event) => { if (event.target.value !== "custom") update({ stripBackgroundGradient: event.target.value, stripBackgroundImageUrl: "", stripBackgroundMediaKind: "none" }); }}><option value="custom" disabled>Custom colours</option>{GRADIENTS.map(item => <option key={item.name} value={item.value}>{item.name}</option>)}</select></label>
-                <div className="homepage-gradient-swatches">{GRADIENTS.map(item => <button key={item.name} type="button" title={item.name} aria-label={item.name} style={{ background: item.value }} className={draft.stripBackgroundGradient === item.value ? "is-active" : ""} onClick={() => update({ stripBackgroundGradient: item.value, stripBackgroundImageUrl: "", stripBackgroundMediaKind: "none" })} />)}</div>
+                <label><span>Gradient preset</span><select value={GRADIENTS.some(item => item.value === draft.stripBackgroundGradient) ? draft.stripBackgroundGradient : "custom"} onChange={(event) => { if (event.target.value !== "custom") update({ stripBackgroundGradient: event.target.value, stripBackgroundImageUrl: "", stripBackgroundMediaKind: "none", stripBackgroundCarouselEnabled: false, stripBackgroundCarouselUrls: [] }); }}><option value="custom" disabled>Custom colours</option>{GRADIENTS.map(item => <option key={item.name} value={item.value}>{item.name}</option>)}</select></label>
+                <div className="homepage-gradient-swatches">{GRADIENTS.map(item => <button key={item.name} type="button" title={item.name} aria-label={item.name} style={{ background: item.value }} className={draft.stripBackgroundGradient === item.value ? "is-active" : ""} onClick={() => update({ stripBackgroundGradient: item.value, stripBackgroundImageUrl: "", stripBackgroundMediaKind: "none", stripBackgroundCarouselEnabled: false, stripBackgroundCarouselUrls: [] })} />)}</div>
                 {gradientColours.map((colour, index) => <div className="homepage-banner-colour-row" key={index}><label><span>Gradient colour {index + 1}</span><input type="color" value={colour} onChange={event => setGradientColour(index, event.target.value)} /></label></div>)}
-              </> : <div className="homepage-banner-colour-row"><label><span>Banner colour</span><input type="color" value={/^#[0-9a-f]{6}$/i.test(draft.stripBackground ?? "") ? draft.stripBackground : "#134a57"} onChange={event => update({ stripBackground: event.target.value, stripBackgroundImageUrl: "", stripBackgroundMediaKind: "none" })} /></label></div>}
-              <label className="homepage-promo-upload"><span>{draft.stripBackgroundImageUrl ? "Replace background" : "Upload background image"}</span><input type="file" accept="image/*" disabled={busy} onChange={async (event) => { const file = event.target.files?.[0]; if (!file) return; setBusy(true); setMessage("Uploading background…"); try { const url = await uploadPromoMedia(file, "image"); update({ stripBackgroundImageUrl: url, stripBackgroundMediaKind: "image" }); setMessage("Background ready in preview."); } catch (error) { setMessage(error instanceof Error ? error.message : "Upload failed."); } finally { setBusy(false); } }} /></label>
+              </> : <div className="homepage-banner-colour-row"><label><span>Banner colour</span><input type="color" value={/^#[0-9a-f]{6}$/i.test(draft.stripBackground ?? "") ? draft.stripBackground : "#134a57"} onChange={event => update({ stripBackground: event.target.value, stripBackgroundGradient: "", stripBackgroundImageUrl: "", stripBackgroundMediaKind: "none", stripBackgroundCarouselEnabled: false, stripBackgroundCarouselUrls: [] })} /></label></div>}
+              <label className="homepage-promo-upload"><span>{draft.stripBackgroundImageUrl ? "Replace background" : "Upload background image"}</span><input type="file" accept="image/*" disabled={busy} onChange={async (event) => { const file = event.target.files?.[0]; if (!file) return; setBusy(true); setMessage("Uploading background…"); try { const url = await uploadPromoMedia(file, "image"); update({ stripBackgroundImageUrl: url, stripBackgroundMediaKind: "image", stripBackgroundCarouselEnabled: false, stripBackgroundCarouselUrls: [url] }); setMessage("Background ready in preview."); } catch (error) { setMessage(error instanceof Error ? error.message : "Upload failed."); } finally { setBusy(false); } }} /></label>
             </>
           )}
         </details>
@@ -606,7 +739,7 @@ export function HomepagePromoQuickEditor({ banner, savedBanners = [], status = "
         </details>
 
         <details className="homepage-promo-control-section">
-          <summary>Second image layer</summary>
+          <summary>Image layer</summary>
           <p>Add up to {PROMO_OVERLAY_IMAGE_MAX} images. Each one can be positioned, resized and animated independently.</p>
           {overlayImages.length < PROMO_OVERLAY_IMAGE_MAX ? <div className="homepage-image-source-grid"><button type="button" className="homepage-image-source-button" disabled={busy} onClick={() => pickOverlayImageFile(null)}>Upload image</button><button type="button" className="homepage-image-source-button" disabled={busy} onClick={() => { insertAfterLayerRef.current = null; setOverlayCatalogPickerOpen(true); }}>Select from catalogue</button><button type="button" className="homepage-image-source-button" disabled={busy} onClick={() => { insertAfterLayerRef.current = null; void openMediaBrowser(); }}>Select from media</button></div> : <p className="homepage-promo-note">{`That is all ${PROMO_OVERLAY_IMAGE_MAX} image slots used. Remove one to add another.`}</p>}
           <input
@@ -630,6 +763,7 @@ export function HomepagePromoQuickEditor({ banner, savedBanners = [], status = "
               <div className="homepage-overlay-layer-card" key={layer.id}>
                 <div className="homepage-overlay-layer-head"><input className="homepage-overlay-layer-name" value={layer.name ?? ""} placeholder={`Image ${index + 1}`} aria-label={`Name for image ${index + 1}`} onChange={(event) => updateLayer({ name: event.target.value })} /><div className="homepage-overlay-layer-head-actions">{overlayImages.length < PROMO_OVERLAY_IMAGE_MAX ? <button type="button" className="homepage-overlay-add-here" disabled={busy} title="Add another image with the same controls after this one" onClick={() => addEmptyOverlayAfter(layer.id)}>+ Add image here</button> : null}<button type="button" onClick={() => { const next = overlayImages.filter((item) => item.id !== layer.id); commitOverlayImages(next); }}>Remove</button></div></div>
                 {!layer.imageUrl ? <div className="homepage-image-source-grid"><button type="button" className="homepage-image-source-button" disabled={busy} onClick={() => pickOverlayImageFile(layer.id)}>Upload image</button><button type="button" className="homepage-image-source-button" disabled={busy} onClick={() => { insertAfterLayerRef.current = layer.id; setOverlayCatalogPickerOpen(true); }}>Select from catalogue</button><button type="button" className="homepage-image-source-button" disabled={busy} onClick={() => { insertAfterLayerRef.current = layer.id; void openMediaBrowser(); }}>Select from media</button></div> : null}
+                <label><span>Click URL (optional)</span><input type="text" inputMode="url" autoCapitalize="none" autoCorrect="off" spellCheck={false} value={layer.href ?? ""} placeholder="https://example.com or /product/..." onChange={(event) => updateLayer({ href: event.target.value })} /></label>
                 <div className="homepage-overlay-depth-row">
                   <div className="homepage-overlay-depth-label"><span>Layer depth</span><b>{promoOverlayDepthLabel(depth)}</b></div>
                   <div className="homepage-overlay-depth-buttons">
@@ -642,7 +776,7 @@ export function HomepagePromoQuickEditor({ banner, savedBanners = [], status = "
                 <div className="homepage-promo-range-grid">
                   <label><span>X <b>{Math.round(layer.x)}%</b></span><input type="range" min={0} max={100} value={layer.x} onChange={(event) => updateLayer({ x: Number(event.target.value) })} /></label>
                   <label><span>Y <b>{Math.round(layer.y)}%</b></span><input type="range" min={0} max={100} value={layer.y} onChange={(event) => updateLayer({ y: Number(event.target.value) })} /></label>
-                  <label><span>Scale <b>{Math.round(layer.scale)}%</b></span><input type="range" min={20} max={220} value={layer.scale} onChange={(event) => updateLayer({ scale: Number(event.target.value) })} /></label>
+                  <label><span>Scale <b>{Math.round(layer.scale)}%</b></span><input type="range" min={20} max={270} value={layer.scale} onChange={(event) => updateLayer({ scale: Number(event.target.value) })} /></label>
                   <button type="button" className="homepage-promo-centre-button" onClick={() => updateLayer({ x: 50, y: 50 })}>Centre X/Y</button>
                 </div>
                 <label><span>Animation</span><select value={layer.animation} onChange={(event) => updateLayer({ animation: event.target.value as typeof layer.animation })}><option value="none">None</option><option value="fade">Silk fade</option><option value="slide">Gentle glide</option><option value="pulse">Soft glow</option><option value="zoom">Zoom in</option></select></label>
@@ -731,7 +865,21 @@ export function HomepagePromoQuickEditor({ banner, savedBanners = [], status = "
               {savedBanners.map((item) => <option key={item.id} value={item.id}>{resolvePromoAdminName(item)}{item.active ? " · Live" : ""}</option>)}
             </select>
           </label>
-          <button type="button" className="homepage-promo-delete-button" disabled={busy || !loadId} onClick={() => void deleteSelectedPromo()}>Delete</button>
+          <div className="homepage-promo-saved-list" aria-label="Saved promos">
+            {savedBanners.map((item) => (
+              <div key={item.id}>
+                <span>{resolvePromoAdminName(item)}{item.active ? " · Live" : ""}</span>
+                <button
+                  type="button"
+                  className="homepage-promo-delete-button"
+                  disabled={busy}
+                  onClick={() => void deleteSelectedPromo(item.id)}
+                >
+                  Delete
+                </button>
+              </div>
+            ))}
+          </div>
         </details>
       </div>
       <div className="homepage-promo-quick-actions"><span>{saved || published ? "" : message || "Changes preview here only until you publish."}</span><div><button type="button" className={saved ? "is-saved" : undefined} disabled={busy} onClick={() => void saveCurrentPromo()} title="Save to the promo library without publishing">{saved ? "Saved!" : "Save"}</button><button type="button" disabled={busy} className={`is-primary${published ? " is-saved" : ""}`} onClick={() => void publish()}>{published ? (isScheduled ? "Scheduled!" : "Published!") : isScheduled ? "Schedule promo" : "Publish live"}</button></div></div>

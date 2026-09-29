@@ -36,6 +36,7 @@ function visibleNavBottom(): number {
 
 function shopScrollTarget(): HTMLElement | null {
   return (
+    document.querySelector<HTMLElement>(".bestsellers-scroller") ||
     document.querySelector<HTMLElement>("#shop-search") ||
     document.querySelector<HTMLElement>("#shop .product-database-head") ||
     document.getElementById("shop")

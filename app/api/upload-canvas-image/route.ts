@@ -17,10 +17,20 @@ export async function POST(request: Request) {
 
     const errors: string[] = [];
 
+    const display = form.get("display") as File | null;
+
     if (isCanvasFirebaseConfigured()) {
       try {
         const url = await uploadCanvasFile(file);
-        return NextResponse.json({ url, storage: "firebase" });
+        let displaySrc: string | undefined;
+        if (display && display.size > 0) {
+          try {
+            displaySrc = await uploadCanvasFile(display, "canvas/display");
+          } catch {
+            displaySrc = undefined;
+          }
+        }
+        return NextResponse.json({ url, displaySrc, storage: "firebase" });
       } catch (err) {
         errors.push(err instanceof Error ? err.message : String(err));
         // Always try Blob next — email clients cannot use data: URLs.

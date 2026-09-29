@@ -7,6 +7,7 @@ import { catalogCategories, categoryBySlug } from "./catalog-categories";
 import type { ProductRecord } from "./product-types";
 import { getDisplayImageUrl } from "./product-image";
 import { getGalleryImageUrls } from "./product-gallery";
+import { resolveProductNetMeasure } from "./product-net-measure";
 
 export { SITE_URL };
 
@@ -23,7 +24,7 @@ export function safeMetadataBase(): URL {
   try {
     return new URL(SITE_URL);
   } catch {
-    return new URL("https://maroma.com");
+    return new URL("https://maromashopping.com");
   }
 }
 
@@ -77,7 +78,7 @@ export function buildPageMetadata({
       description: desc,
       images: [imageUrl],
     },
-    robots: noIndex ? { index: false, follow: false } : { index: true, follow: true },
+    robots: noIndex ? { index: false, follow: true } : { index: true, follow: true },
   };
 }
 
@@ -93,7 +94,45 @@ export function organizationJsonLd() {
       url: absoluteUrl("/maroma-logo.png"),
     },
     description:
-      "Maroma makes botanical skincare, body care, natural perfume, incense, candles, and home rituals, handmade in Auroville, India.",
+      "Maroma is an Auroville-born fragrance and wellbeing brand creating natural perfumes, body care, incense and home products with botanical ingredients, refined scent and conscious production.",
+    sameAs: [
+      "https://www.maroma.com/",
+      "https://www.instagram.com/maromaindia/",
+      "https://www.facebook.com/MaromaAuroville/",
+      "https://www.youtube.com/@maroma",
+    ],
+    address: {
+      "@type": "PostalAddress",
+      streetAddress: "Aspiration Road",
+      addressLocality: "Auroville",
+      addressRegion: "Tamil Nadu",
+      postalCode: "605101",
+      addressCountry: "IN",
+    },
+    contactPoint: {
+      "@type": "ContactPoint",
+      email: "maroma@maroma.com",
+      telephone: "+91-413-262-2126",
+      contactType: "customer service",
+      areaServed: "IN",
+      availableLanguage: ["English"],
+    },
+    memberOf: [
+      { "@type": "Organization", name: "World Fair Trade Organization" },
+      { "@type": "Organization", name: "Fair Trade Forum India" },
+    ],
+    subjectOf: {
+      "@type": "WebPage",
+      name: "Maroma Fair Trade and sustainability",
+      url: "https://www.maroma.com/fair-trade-sustainability/",
+    },
+    knowsAbout: [
+      "Natural perfume",
+      "Botanical body care",
+      "Incense",
+      "Home fragrance",
+      "Conscious production",
+    ],
     areaServed: {
       "@type": "Country",
       name: "India",
@@ -190,10 +229,9 @@ export function auditProductSeoFacts(product: ProductRecord): ProductSeoAudit {
     missing.push("Category");
   }
 
-  const size =
-    firstAttribute(product, ["Size", "Volume", "Net Weight", "Weight"]) || inferSizeFromName(product.name);
-  if (size) facts.push({ label: "Size", value: size });
-  else missing.push("Size / volume");
+  const netMeasure = resolveProductNetMeasure(product);
+  facts.push({ label: netMeasure.label, value: netMeasure.value });
+  if (netMeasure.value === "As marked on the pack") missing.push("Size / volume");
 
   const scent = firstAttribute(product, [
     "Fragrance",
@@ -245,6 +283,13 @@ export function productJsonLd(product: ProductRecord, options: { availability: "
   const size =
     firstAttribute(product, ["Size", "Volume", "Net Weight", "Weight"]) || inferSizeFromName(product.name);
   const category = product.categories.map(decodeBasicHtmlEntities).filter(Boolean).join(" > ") || undefined;
+  const gtin = firstAttribute(product, ["GTIN", "Barcode", "EAN", "UPC"]);
+  const scent = firstAttribute(product, ["Fragrance", "Scent", "Scent Notes", "Fragrance Notes", "Aroma"]);
+  const ingredients = firstAttribute(product, ["Full INCI", "INCI", "Full Ingredient List", "Ingredients"]);
+  const benefits = firstAttribute(product, ["Benefits", "Benefit", "Key Benefits", "Key Attributes"]);
+  const concern = firstAttribute(product, ["Concern", "Skin Concern", "Hair Concern"]);
+  const audience = firstAttribute(product, ["Audience", "Suitable For", "For"]);
+  const certifications = firstAttribute(product, ["Certifications", "Certification"]);
   const url = absoluteUrl(`/product/${product.id}`);
 
   const offer =
@@ -266,6 +311,11 @@ export function productJsonLd(product: ProductRecord, options: { availability: "
   if (keyIngredients) {
     additionalProperty.push({ "@type": "PropertyValue", name: "Key Ingredients", value: keyIngredients });
   }
+  if (ingredients) additionalProperty.push({ "@type": "PropertyValue", name: "Ingredients (INCI)", value: ingredients });
+  if (scent) additionalProperty.push({ "@type": "PropertyValue", name: "Scent", value: scent });
+  if (benefits) additionalProperty.push({ "@type": "PropertyValue", name: "Benefits", value: benefits });
+  if (concern) additionalProperty.push({ "@type": "PropertyValue", name: "Concern", value: concern });
+  if (certifications) additionalProperty.push({ "@type": "PropertyValue", name: "Certifications", value: certifications });
   if (stripIndiaOnlyFromProductName(product.name).indiaOnlyNote) {
     additionalProperty.push({
       "@type": "PropertyValue",
@@ -283,11 +333,13 @@ export function productJsonLd(product: ProductRecord, options: { availability: "
     image: images.length ? images : undefined,
     sku: product.sku?.trim() || product.id,
     mpn: product.sku?.trim() || product.id,
+    gtin: gtin?.trim() || undefined,
     brand: {
       "@type": "Brand",
       name: brandName,
     },
     category,
+    audience: audience ? { "@type": "Audience", audienceType: audience } : undefined,
     url,
     offers: offer,
     additionalProperty: additionalProperty.length ? additionalProperty : undefined,

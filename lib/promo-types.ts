@@ -13,6 +13,8 @@ export type PromoOverlayImage = {
   /** Admin label in the editor. Not shown on the live promo. */
   name?: string;
   imageUrl: string;
+  /** Optional destination opened when the image is clicked on the live promo. */
+  href?: string;
   x: number;
   y: number;
   scale: number;
@@ -78,6 +80,10 @@ export type PromoMobileOverlayLayout = {
  */
 export type PromoMobileLayout = {
   enabled: boolean;
+  /** Mobile-only promo strip width as a percentage of the available width. */
+  stripWidthPct?: number;
+  /** Mobile-only vertical nudge for the whole promo strip. Positive moves down. */
+  stripPositionOffsetPx?: number;
   stripHeightPx: number;
   textBannerOffsetX: number;
   textBannerOffsetY: number;
@@ -92,6 +98,7 @@ export type PromoMobileLayout = {
   taglineScale: number;
   ctaOffsetX: number;
   ctaOffsetY: number;
+  ctaScale: number;
   thumbnailOffsetX: number;
   thumbnailOffsetY: number;
   overlay: PromoMobileOverlayLayout[];
@@ -151,6 +158,14 @@ export type PromoBanner = {
   stripBackgroundGradient?: string;
   /** Optional image painted behind strip content; clipped by strip overflow. */
   stripBackgroundImageUrl?: string;
+  /** Extra strip photos that crossfade when the image carousel is on. */
+  stripBackgroundCarouselUrls?: string[];
+  /** When true and two or more photos are set, the strip background fades between them. */
+  stripBackgroundCarouselEnabled?: boolean;
+  /** How long each carousel photo stays on screen (ms). */
+  stripBackgroundCarouselIntervalMs?: number;
+  /** Crossfade duration between carousel photos (ms). */
+  stripBackgroundCarouselFadeMs?: number;
   /** Strip background media type when stripBackgroundImageUrl is set. */
   stripBackgroundMediaKind?: "none" | "image" | "video";
   /** When true (default), strip background video loops; when false, plays once then stops. */
@@ -176,6 +191,8 @@ export type PromoBanner = {
   /** Direct-drag offset for the CTA button (px). */
   ctaOffsetX?: number;
   ctaOffsetY?: number;
+  /** Render-only CTA scale supplied by the hand-tuned mobile layout. */
+  ctaScale?: number;
   /** Direct-drag offset for the product thumbnail group (px). */
   thumbnailOffsetX?: number;
   thumbnailOffsetY?: number;

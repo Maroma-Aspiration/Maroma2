@@ -30,6 +30,29 @@ const PUBLIC = join(ROOT, "public");
 const STORE_BASE = "https://www.maroma.com/wp-json/wc/store/v1/products";
 const PER_PAGE = 100;
 
+// Product-page packaging can be updated before WooCommerce's Store API gallery
+// catches up. Keep verified replacement pack shots here so a later catalog sync
+// cannot restore obsolete packaging.
+const VERIFIED_PRODUCT_IMAGE_REPLACEMENTS = new Map([
+  [
+    "4051",
+    [
+      "/staging-media/wp-content/uploads/2022/02/Under-Eye-Serum-Water-Lily-Extract-01-1.webp",
+      "/staging-media/wp-content/uploads/2022/02/Under-Eye-Serum-Water-Lily-Extract-02.webp",
+      "/staging-media/wp-content/uploads/2022/02/Under-Eye-Serum-Water-Lily-Extract-03.webp",
+    ],
+  ],
+  [
+    "4056",
+    [
+      "/staging-media/wp-content/uploads/2022/02/Under-Eye-Gel-Aloe-Vera-Extract-01-1.webp",
+      "/staging-media/wp-content/uploads/2022/02/Under-Eye-Gel-Aloe-Vera-Extract-02.webp",
+      "/staging-media/wp-content/uploads/2022/02/Under-Eye-Gel-Aloe-Vera-Extract-03.webp",
+    ],
+  ],
+  ["9280", ["/staging-media/product-overrides/under-eye-serum-coffee-9280.png"]],
+]);
+
 const args = new Set(process.argv.slice(2));
 const dryRun = args.has("--dry-run");
 const skipImages = args.has("--skip-images");
@@ -42,7 +65,7 @@ function decodeHtml(text) {
       return Number.isFinite(n) ? String.fromCodePoint(n) : _;
     })
     .replace(/&#x([0-9a-f]+);/gi, (_, hex) => String.fromCodePoint(parseInt(hex, 16)))
-    .replace(/&#8211;|&ndash;/g, "-")
+    .replace(/&#8211;|&ndash;|&#8212;|&mdash;|\u2013|\u2014/g, "-")
     .replace(/&#8217;|&rsquo;/g, "'")
     .replace(/&#8220;|&ldquo;/g, '"')
     .replace(/&#8221;|&rdquo;/g, '"')
@@ -163,12 +186,18 @@ async function mapImages(item) {
   return mapped;
 }
 
-function mapStoreProduct(item, images) {
+function mapStoreProduct(item, images, previous) {
   const description = stripHtml(item.description);
   const shortDescription = stripHtml(item.short_description);
   const categories = (item.categories || [])
     .map((cat) => String(cat?.name || "").trim())
     .filter(Boolean);
+  if (
+    categories.some((name) => /^(lip care|eye care)$/i.test(name)) &&
+    !categories.some((name) => /^face care$/i.test(name))
+  ) {
+    categories.push("Face Care");
+  }
   const tags = (item.tags || [])
     .map((tag) => String(tag?.name || "").trim())
     .filter(Boolean);
@@ -176,8 +205,9 @@ function mapStoreProduct(item, images) {
     (item.brands || [])
       .map((entry) => String(entry?.name || "").trim())
       .filter(Boolean)[0] || "";
-
-  return {
+  const averageRating = Number(item.average_rating);
+  const reviewCount = Number(item.review_count);
+  const mapped = {
     id: String(item.id),
     sku: String(item.sku || "").trim(),
     name: decodeHtml(item.name || "").trim(),
@@ -191,6 +221,12 @@ function mapStoreProduct(item, images) {
     imageUrl: images[0] || "",
     attributes: mapAttributes(item.attributes),
   };
+  if (previous?.salePrice) mapped.salePrice = previous.salePrice;
+  if (Array.isArray(previous?.videos) && previous.videos.length) mapped.videos = previous.videos;
+  if (Number.isFinite(averageRating) && averageRating > 0) mapped.averageRating = averageRating;
+  if (Number.isFinite(reviewCount) && reviewCount > 0) mapped.reviewCount = reviewCount;
+  if (previous?.ukAndChannelIslandsRestricted) mapped.ukAndChannelIslandsRestricted = true;
+  return mapped;
 }
 
 async function fetchAllStoreProducts() {
@@ -214,6 +250,17 @@ async function fetchAllStoreProducts() {
 
 async function main() {
   console.log("Pulling catalogue from maroma.com Store API…");
+  const existingById = new Map();
+  if (existsSync(PRODUCTS_PATH)) {
+    try {
+      const existing = JSON.parse(readFileSync(PRODUCTS_PATH, "utf8"));
+      for (const product of existing.products || existing) {
+        if (product?.id) existingById.set(String(product.id), product);
+      }
+    } catch (err) {
+      console.warn("Could not read existing catalogue for merge:", err.message);
+    }
+  }
   const storeProducts = await fetchAllStoreProducts();
   console.log(`Store returned ${storeProducts.length} products`);
 
@@ -222,9 +269,12 @@ async function main() {
 
   for (let i = 0; i < storeProducts.length; i += 1) {
     const item = storeProducts[i];
-    const images = await mapImages(item);
-    if ((item.images || []).length && images.length === 0) imageFailures += 1;
-    mapped.push(mapStoreProduct(item, images));
+    const previous = existingById.get(String(item.id));
+    const images = VERIFIED_PRODUCT_IMAGE_REPLACEMENTS.get(String(item.id)) ?? await mapImages(item);
+    const resolvedImages =
+      images.length || !previous?.images?.length ? images : previous.images;
+    if ((item.images || []).length && resolvedImages.length === 0) imageFailures += 1;
+    mapped.push(mapStoreProduct(item, resolvedImages, previous));
     if ((i + 1) % 50 === 0) {
       console.log(`Mapped ${i + 1}/${storeProducts.length}…`);
     }

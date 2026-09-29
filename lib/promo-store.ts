@@ -11,6 +11,7 @@ import { normalizeCtaBuyLinks } from "./promo-buy-links-utils";
 import { clampPromoOverlayDepth, PROMO_OVERLAY_IMAGE_MAX } from "./promo-overlay-utils";
 import { normalizePromoMobileLayout } from "./promo-mobile-layout";
 import type { PromoAnimation, PromoBanner, PromoMediaKind, PromoOverlayImage } from "./promo-types";
+import { isUsablePublicMediaUrl } from "./usable-media-url";
 
 export type { PromoAnimation, PromoBanner, PromoMediaKind } from "./promo-types";
 
@@ -21,13 +22,23 @@ const FILE = "promo-banners.json";
 
 const empty = (): PromoStore => ({ banners: [] });
 
+function normalizeOverlayHref(value: unknown): string {
+  if (typeof value !== "string") return "";
+  const href = value.trim().slice(0, 2048);
+  if (!href) return "";
+  const compactProtocol = href.slice(0, 64).replace(/[\x00-\x20]/g, "").toLowerCase();
+  return /^(?:javascript|data|vbscript):/.test(compactProtocol) ? "" : href;
+}
+
 function normalizeOverlayImages(value: unknown): PromoOverlayImage[] {
   if (!Array.isArray(value)) return [];
   return value.slice(0, PROMO_OVERLAY_IMAGE_MAX).flatMap((raw, index) => {
     if (!raw || typeof raw !== "object") return [];
     const row = raw as Record<string, unknown>;
-    const imageUrl = typeof row.imageUrl === "string" ? row.imageUrl.trim() : "";
+    const imageUrlRaw = typeof row.imageUrl === "string" ? row.imageUrl.trim() : "";
+    const imageUrl = isUsablePublicMediaUrl(imageUrlRaw) ? imageUrlRaw : "";
     const name = typeof row.name === "string" ? row.name.trim().slice(0, 80) : "";
+    const href = normalizeOverlayHref(row.href);
     if (!imageUrl && !name) return [];
     const animation = row.animation === "fade" || row.animation === "slide" || row.animation === "pulse" || row.animation === "zoom" ? row.animation : "none";
     const crop = row.crop === "square" || row.crop === "portrait" || row.crop === "landscape" ? row.crop : "none";
@@ -35,9 +46,10 @@ function normalizeOverlayImages(value: unknown): PromoOverlayImage[] {
       id: typeof row.id === "string" && row.id.trim() ? row.id : `overlay-${index + 1}`,
       ...(name ? { name } : {}),
       imageUrl,
+      ...(href ? { href } : {}),
       x: Math.min(100, Math.max(0, Number(row.x) || 50)),
       y: Math.min(100, Math.max(0, Number(row.y) || 50)),
-      scale: Math.min(220, Math.max(20, Number(row.scale) || 75)),
+      scale: Math.min(270, Math.max(20, Number(row.scale) || 75)),
       radius: Math.min(50, Math.max(0, Number(row.radius) || 18)),
       shadow: row.shadow !== false,
       animation,
@@ -69,7 +81,7 @@ function parseBanner(raw: unknown): PromoBanner | null {
       ? row.mediaKind
       : "none";
   const mediaUrlRaw = typeof row.mediaUrl === "string" ? row.mediaUrl.trim() : "";
-  const mediaUrl = mediaKind === "none" ? "" : mediaUrlRaw;
+  const mediaUrl = mediaKind === "none" || !isUsablePublicMediaUrl(mediaUrlRaw) ? "" : mediaUrlRaw;
   const partial = {
     title,
     body: typeof row.body === "string" ? row.body : "",
@@ -239,7 +251,7 @@ export async function upsertPromoBanner(
         : existing?.stripBackgroundGradient ?? "",
     overlayImageX: Math.min(100, Math.max(0, input.overlayImageX ?? existing?.overlayImageX ?? 50)),
     overlayImageY: Math.min(100, Math.max(0, input.overlayImageY ?? existing?.overlayImageY ?? 50)),
-    overlayImageScale: Math.min(220, Math.max(20, input.overlayImageScale ?? existing?.overlayImageScale ?? 75)),
+    overlayImageScale: Math.min(270, Math.max(20, input.overlayImageScale ?? existing?.overlayImageScale ?? 75)),
     overlayImageRadius: Math.min(50, Math.max(0, input.overlayImageRadius ?? existing?.overlayImageRadius ?? 18)),
     overlayImageShadow: input.overlayImageShadow ?? existing?.overlayImageShadow ?? true,
     overlayImageAnimation:

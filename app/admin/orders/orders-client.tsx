@@ -92,6 +92,9 @@ export default function AdminOrdersClient() {
           <Link href="/admin/products" className="button secondary">
             Products
           </Link>
+          <Link href="/admin/marketing" className="button secondary">
+            Marketing
+          </Link>
           <SignOutButton />
         </div>
 

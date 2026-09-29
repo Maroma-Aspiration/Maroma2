@@ -16,6 +16,11 @@ import {
   normalizeIndianPincode,
   pincodeValidationMessage,
 } from "../../lib/indian-pincode";
+import {
+  ccavenueRedirectHref,
+  postCcavenuePayment,
+  type CcavenueBrowserPayment,
+} from "../../lib/ccavenue-browser";
 
 type PlacedOrder = {
   id: string;
@@ -24,19 +29,39 @@ type PlacedOrder = {
   total: number;
 };
 
-type CcavenuePayment = {
-  action: string;
-  accessCode: string;
-  encRequest: string;
-};
+type CcavenuePayment = CcavenueBrowserPayment;
 
-function goToCcavenue(orderNumber: string) {
-  const host = window.location.hostname;
-  const origin =
-    host === "localhost" || host === "127.0.0.1"
-      ? window.location.origin
-      : "https://maromashopping.com";
-  window.location.assign(`${origin}/api/checkout/ccavenue/redirect?order=${encodeURIComponent(orderNumber)}`);
+const CHECKOUT_FIELD_IDS = {
+  email: "checkout-email",
+  phone: "checkout-phone",
+  firstName: "checkout-first",
+  lastName: "checkout-last",
+  address: "checkout-address",
+  city: "checkout-city",
+  pincode: "checkout-pincode",
+  state: "checkout-state",
+  country: "checkout-country",
+} as const;
+
+function readFieldValue(id: string): string {
+  const el = document.getElementById(id) as HTMLInputElement | HTMLSelectElement | null;
+  return el?.value ?? "";
+}
+
+function readShippingFromDom(fallback: CheckoutShippingDraft): CheckoutShippingDraft {
+  if (typeof document === "undefined") return fallback;
+  return {
+    ...fallback,
+    email: readFieldValue(CHECKOUT_FIELD_IDS.email).trim() || fallback.email,
+    phone: readFieldValue(CHECKOUT_FIELD_IDS.phone).trim() || fallback.phone,
+    firstName: readFieldValue(CHECKOUT_FIELD_IDS.firstName).trim() || fallback.firstName,
+    lastName: readFieldValue(CHECKOUT_FIELD_IDS.lastName).trim() || fallback.lastName,
+    address: readFieldValue(CHECKOUT_FIELD_IDS.address).trim() || fallback.address,
+    city: readFieldValue(CHECKOUT_FIELD_IDS.city).trim() || fallback.city,
+    pincode: normalizeIndianPincode(readFieldValue(CHECKOUT_FIELD_IDS.pincode) || fallback.pincode),
+    state: readFieldValue(CHECKOUT_FIELD_IDS.state).trim() || fallback.state,
+    country: readFieldValue(CHECKOUT_FIELD_IDS.country).trim() || fallback.country,
+  };
 }
 
 const DEFAULT_FORM: CheckoutShippingDraft = {
@@ -74,6 +99,7 @@ export default function CheckoutClient() {
   const [error, setError] = useState<string | null>(null);
   const [placedOrder, setPlacedOrder] = useState<PlacedOrder | null>(null);
   const [pincodeLookupStatus, setPincodeLookupStatus] = useState<string | null>(null);
+  const [pendingPayment, setPendingPayment] = useState<CcavenuePayment | null>(null);
   const hydratedRef = useRef(false);
 
   useEffect(() => {
@@ -148,7 +174,7 @@ export default function CheckoutClient() {
   const handleInputChange = (
     e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>
   ) => {
-    const { name, value } = e.target;
+    const { name, value } = e.currentTarget;
     setFormData((prev) => ({
       ...prev,
       [name]: name === "pincode" ? normalizeIndianPincode(value) : value,
@@ -162,25 +188,32 @@ export default function CheckoutClient() {
     }));
   };
 
-  const validateStep1 = (): string | null => {
-    if (!formData.email.trim()) return "Email is required.";
-    if (!formData.phone.trim()) return "Phone number is required.";
-    if (!formData.firstName.trim()) return "First name is required.";
-    if (!formData.lastName.trim()) return "Last name is required.";
-    if (!formData.address.trim()) return "Shipping address is required.";
-    if (!formData.city.trim()) return "City is required.";
-    if (!formData.country.trim()) return "Country is required.";
-    if (formData.country.trim().toLowerCase() === "india") {
-      const pincodeError = pincodeValidationMessage(formData.pincode);
+  const validateStep1 = (data: CheckoutShippingDraft = formData): string | null => {
+    if (!data.email.trim()) return "Email is required.";
+    if (!data.phone.trim()) return "Phone number is required.";
+    if (!data.firstName.trim()) return "First name is required.";
+    if (!data.lastName.trim()) return "Last name is required.";
+    if (!data.address.trim()) return "Shipping address is required.";
+    if (!data.city.trim()) return "City is required.";
+    if (!data.country.trim()) return "Country is required.";
+    if (data.country.trim().toLowerCase() === "india") {
+      const pincodeError = pincodeValidationMessage(data.pincode);
       if (pincodeError) return pincodeError;
-    } else if (!formData.pincode.trim()) {
+    } else if (!data.pincode.trim()) {
       return "Postal code is required.";
     }
     return null;
   };
 
-  const handleContinue = () => {
-    const validationError = validateStep1();
+  const commitShippingFromDom = (): CheckoutShippingDraft => {
+    const next = readShippingFromDom(formData);
+    setFormData(next);
+    return next;
+  };
+
+  const handleContinue = (draft?: CheckoutShippingDraft) => {
+    const next = draft ?? commitShippingFromDom();
+    const validationError = validateStep1(next);
     if (validationError) {
       setError(validationError);
       return;
@@ -189,9 +222,22 @@ export default function CheckoutClient() {
     setStep(2);
   };
 
-  const handlePlaceOrder = async () => {
+  const startCcavenue = (payment: CcavenuePayment, orderNumber: string) => {
+    setPendingPayment(payment);
+    const posted = postCcavenuePayment(payment);
+    if (!posted) {
+      window.location.assign(ccavenueRedirectHref(orderNumber));
+    }
+  };
+
+  const handlePlaceOrder = async (draft?: CheckoutShippingDraft) => {
+    if (pendingPayment) {
+      postCcavenuePayment(pendingPayment);
+      return;
+    }
     if (submitting) return;
-    const validationError = validateStep1();
+    const next = draft ?? commitShippingFromDom();
+    const validationError = validateStep1(next);
     if (validationError) {
       setError(validationError);
       setStep(1);
@@ -200,6 +246,7 @@ export default function CheckoutClient() {
 
     setSubmitting(true);
     setError(null);
+    let leaving = false;
     try {
       const res = await fetch("/api/checkout", {
         method: "POST",
@@ -207,10 +254,10 @@ export default function CheckoutClient() {
         credentials: "same-origin",
         body: JSON.stringify({
           shipping: {
-            ...formData,
-            pincode: normalizeIndianPincode(formData.pincode),
+            ...next,
+            pincode: normalizeIndianPincode(next.pincode),
           },
-          notifications: formData.notifications,
+          notifications: next.notifications,
           displayCurrency: currency,
         }),
       });
@@ -224,7 +271,8 @@ export default function CheckoutClient() {
         throw new Error(data.error || "Could not place your order.");
       }
       if (data.payment?.action && data.payment.encRequest && data.payment.accessCode) {
-        goToCcavenue(data.order.orderNumber);
+        leaving = true;
+        startCcavenue(data.payment, data.order.orderNumber);
         return;
       }
       setPlacedOrder(data.order);
@@ -232,7 +280,19 @@ export default function CheckoutClient() {
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not place your order.");
     } finally {
-      setSubmitting(false);
+      if (!leaving) setSubmitting(false);
+    }
+  };
+
+  const handleCheckoutSubmit = (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    const next = commitShippingFromDom();
+    if (step === 1) {
+      handleContinue(next);
+      return;
+    }
+    if (step === 2) {
+      void handlePlaceOrder(next);
     }
   };
 
@@ -308,8 +368,13 @@ export default function CheckoutClient() {
 
         <div className="maroma-commerce-grid">
           <div className="maroma-checkout-main">
-            {step === 1 && (
-              <section className="maroma-checkout-panel">
+            {step !== 3 ? (
+              <form className="maroma-checkout-form" noValidate onSubmit={handleCheckoutSubmit}>
+              <section
+                className="maroma-checkout-panel"
+                hidden={step !== 1}
+                aria-hidden={step !== 1}
+              >
                 <div className="maroma-checkout-panel-head">
                   <h2 className="maroma-checkout-panel-title">Contact &amp; shipping</h2>
                   <span className="maroma-checkout-badge">Guest checkout</span>
@@ -407,13 +472,14 @@ export default function CheckoutClient() {
                   </div>
                 </div>
 
-                <button type="button" className="maroma-btn maroma-btn-primary maroma-btn-block" onClick={handleContinue}>
-                  Continue to review
-                </button>
+                {step === 1 ? (
+                  <button type="submit" className="maroma-btn maroma-btn-primary maroma-btn-block">
+                    Continue to review
+                  </button>
+                ) : null}
               </section>
-            )}
 
-            {step === 2 && (
+              {step === 2 ? (
               <section className="maroma-checkout-panel">
                 <div className="maroma-checkout-panel-head">
                   <h2 className="maroma-checkout-panel-title">Review &amp; pay</h2>
@@ -463,18 +529,39 @@ export default function CheckoutClient() {
                     Back
                   </button>
                   <button
-                    type="button"
+                    type="submit"
                     className="maroma-btn maroma-btn-primary"
-                    disabled={submitting}
-                    onClick={() => {
-                      void handlePlaceOrder();
-                    }}
+                    disabled={submitting && !pendingPayment}
                   >
-                    {submitting ? "Opening CCAvenue…" : `Pay securely · ${formatItemPrice(total)}`}
+                    {pendingPayment
+                      ? "Continue to CCAvenue"
+                      : submitting
+                        ? "Opening CCAvenue…"
+                        : `Pay securely · ${formatItemPrice(total)}`}
                   </button>
                 </div>
               </section>
-            )}
+              ) : null}
+              </form>
+            ) : null}
+
+            {pendingPayment ? (
+              <form
+                id="maroma-ccavenue-fallback"
+                className="maroma-checkout-pay-fallback"
+                method="post"
+                action={pendingPayment.action}
+                acceptCharset="UTF-8"
+                target="_top"
+              >
+                <input type="hidden" name="encRequest" value={pendingPayment.encRequest} />
+                <input type="hidden" name="access_code" value={pendingPayment.accessCode} />
+                <p>If payment did not open, continue below.</p>
+                <button type="submit" className="maroma-btn maroma-btn-primary maroma-btn-block">
+                  Continue to secure payment
+                </button>
+              </form>
+            ) : null}
 
             {step === 3 && placedOrder && (
               <section className="maroma-checkout-panel maroma-checkout-success">

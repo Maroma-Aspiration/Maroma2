@@ -117,14 +117,36 @@ export function ccavenueAutoSubmitHtml(payment: CcavenueCheckoutForm): string {
   <meta name="referrer" content="origin" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Opening secure payment</title>
+  <style>
+    body { margin: 0; min-height: 100vh; display: grid; place-items: center; background: #f4f1ea; color: #134a57; font-family: Georgia, serif; }
+    .box { width: min(420px, calc(100vw - 32px)); text-align: center; padding: 28px 20px; }
+    p { margin: 0 0 18px; line-height: 1.5; }
+    button { appearance: none; font: inherit; padding: 14px 28px; border: 0; border-radius: 999px; background: #134a57; color: #fff; cursor: pointer; }
+  </style>
 </head>
 <body>
-  <p>Opening secure payment…</p>
-  <form id="ccavenue" method="post" action="${escapeHtmlAttr(payment.action)}" accept-charset="UTF-8" referrerpolicy="origin">
-    <input type="hidden" name="encRequest" value="${escapeHtmlAttr(payment.encRequest)}" />
-    <input type="hidden" name="access_code" value="${escapeHtmlAttr(payment.accessCode)}" />
-  </form>
-  <script>document.getElementById("ccavenue").submit();</script>
+  <div class="box">
+    <p id="status">Opening secure payment…</p>
+    <form id="ccavenue" method="post" action="${escapeHtmlAttr(payment.action)}" accept-charset="UTF-8" referrerpolicy="origin" target="_top">
+      <input type="hidden" name="encRequest" value="${escapeHtmlAttr(payment.encRequest)}" />
+      <input type="hidden" name="access_code" value="${escapeHtmlAttr(payment.accessCode)}" />
+      <button type="submit" id="ccavenue-continue">Continue to secure payment</button>
+    </form>
+  </div>
+  <script>
+    (function () {
+      var form = document.getElementById("ccavenue");
+      var status = document.getElementById("status");
+      function go() {
+        try { HTMLFormElement.prototype.submit.call(form); } catch (e) {}
+      }
+      go();
+      setTimeout(go, 60);
+      setTimeout(function () {
+        if (status) status.textContent = "If payment did not open, click continue.";
+      }, 700);
+    })();
+  </script>
 </body>
 </html>`;
 }

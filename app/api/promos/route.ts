@@ -122,6 +122,15 @@ export async function POST(request: Request) {
       typeof body.stripBackgroundGradient === "string" ? body.stripBackgroundGradient : undefined,
     stripBackgroundImageUrl:
       typeof body.stripBackgroundImageUrl === "string" ? body.stripBackgroundImageUrl : undefined,
+    stripBackgroundCarouselUrls: Array.isArray(body.stripBackgroundCarouselUrls)
+      ? body.stripBackgroundCarouselUrls.filter((item): item is string => typeof item === "string")
+      : undefined,
+    stripBackgroundCarouselEnabled:
+      typeof body.stripBackgroundCarouselEnabled === "boolean"
+        ? body.stripBackgroundCarouselEnabled
+        : undefined,
+    stripBackgroundCarouselIntervalMs: asFiniteNumber(body.stripBackgroundCarouselIntervalMs),
+    stripBackgroundCarouselFadeMs: asFiniteNumber(body.stripBackgroundCarouselFadeMs),
     stripBackgroundMediaKind:
       body.stripBackgroundMediaKind === "video" || body.stripBackgroundMediaKind === "image"
         ? body.stripBackgroundMediaKind

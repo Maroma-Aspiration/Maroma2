@@ -6,7 +6,7 @@ export { averageRating } from "./reviews-types";
 
 type ReviewStore = { reviews: ProductReview[] };
 
-const KEY = "maroma:product-reviews";
+const KEY = "maroma:product-reviews:amazon-v2";
 const FILE = "product-reviews.json";
 
 const empty = (): ReviewStore => ({ reviews: [] });
@@ -28,15 +28,23 @@ function parseReview(raw: unknown): ProductReview | null {
     row.status === "published" || row.status === "hidden" || row.status === "pending"
       ? row.status
       : "pending";
+  const source: ReviewSource =
+    row.source === "amazon" ? "amazon" : row.source === "google" ? "google" : "site";
+  const marketplace = typeof row.marketplace === "string" ? row.marketplace.trim().slice(0, 40) : "";
   return {
     id,
     productId,
     author: typeof row.author === "string" && row.author.trim() ? row.author.trim().slice(0, 80) : "Guest",
     rating: clampRating(row.rating),
+    title: typeof row.title === "string" ? row.title.trim().slice(0, 120) : "",
     body: body.slice(0, 2000),
-    source: row.source === "google" ? "google" : "site",
+    source,
+    ...(marketplace ? { marketplace } : {}),
+    ...(row.translated === true ? { translated: true } : {}),
     status,
     createdAt: typeof row.createdAt === "string" ? row.createdAt : new Date().toISOString(),
+    verifiedPurchase: row.verifiedPurchase === true,
+    helpfulCount: Math.max(0, Math.round(Number(row.helpfulCount) || 0)),
   };
 }
 
@@ -61,6 +69,8 @@ export async function addProductReview(input: {
   author: string;
   rating: number;
   body: string;
+  title?: string;
+  verifiedPurchase?: boolean;
   source?: ReviewSource;
   status?: ReviewStatus;
 }): Promise<ProductReview> {
@@ -70,10 +80,13 @@ export async function addProductReview(input: {
     productId: input.productId.trim(),
     author: input.author.trim().slice(0, 80) || "Guest",
     rating: clampRating(input.rating),
+    title: (input.title ?? "").trim().slice(0, 120),
     body: input.body.trim().slice(0, 2000),
-    source: input.source === "google" ? "google" : "site",
+    source: input.source === "amazon" ? "amazon" : input.source === "google" ? "google" : "site",
     status: input.status ?? "pending",
     createdAt: new Date().toISOString(),
+    verifiedPurchase: input.verifiedPurchase === true,
+    helpfulCount: 0,
   };
   store.reviews = [review, ...store.reviews].slice(0, 5000);
   await writeReviewStore(store);
@@ -93,4 +106,14 @@ export async function setReviewStatus(id: string, status: ReviewStatus): Promise
 export async function listAllReviews(): Promise<ProductReview[]> {
   const store = await readReviewStore();
   return store.reviews;
+}
+
+export async function addReviewHelpfulVote(id: string): Promise<ProductReview | null> {
+  const store = await readReviewStore();
+  const existing = store.reviews.find((review) => review.id === id);
+  if (!existing || existing.status !== "published") return null;
+  const updated = { ...existing, helpfulCount: existing.helpfulCount + 1 };
+  store.reviews = store.reviews.map((review) => (review.id === id ? updated : review));
+  await writeReviewStore(store);
+  return updated;
 }

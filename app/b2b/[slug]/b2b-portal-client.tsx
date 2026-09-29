@@ -65,18 +65,29 @@ function loadRazorpayScript(): Promise<boolean> {
   if (typeof window === "undefined") return Promise.resolve(false);
   if (window.Razorpay) return Promise.resolve(true);
   return new Promise((resolve) => {
+    const finish = () => resolve(Boolean(window.Razorpay));
     const existing = document.querySelector<HTMLScriptElement>('script[data-razorpay="1"]');
     if (existing) {
-      existing.addEventListener("load", () => resolve(Boolean(window.Razorpay)));
-      existing.addEventListener("error", () => resolve(false));
+      if (existing.dataset.loaded === "1" || existing.dataset.failed === "1") {
+        finish();
+        return;
+      }
+      existing.addEventListener("load", finish, { once: true });
+      existing.addEventListener("error", finish, { once: true });
       return;
     }
     const script = document.createElement("script");
     script.src = "https://checkout.razorpay.com/v1/checkout.js";
     script.async = true;
     script.dataset.razorpay = "1";
-    script.onload = () => resolve(Boolean(window.Razorpay));
-    script.onerror = () => resolve(false);
+    script.onload = () => {
+      script.dataset.loaded = "1";
+      finish();
+    };
+    script.onerror = () => {
+      script.dataset.failed = "1";
+      finish();
+    };
     document.body.appendChild(script);
   });
 }
@@ -163,6 +174,10 @@ export default function B2bPortalClient({ slug }: { slug: string }) {
     if (savedView === "grid" || savedView === "list") {
       setCatalogViewMode(savedView);
     }
+  }, []);
+
+  useEffect(() => {
+    void loadRazorpayScript();
   }, []);
 
   const changeCatalogView = (nextView: CatalogViewMode) => {

@@ -3,8 +3,10 @@
 import { memo, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { ProductListingWithFilters } from "./ProductListingWithFilters";
+import { BestsellersScroller } from "./BestsellersScroller";
 import { HomepageStorySections } from "./HomepageStorySections";
 import { catalogCategories } from "../../lib/catalog-categories";
+import { rankBestsellerProducts } from "../../lib/bestsellers";
 import type { ProductRecord } from "../../lib/product-types";
 
 type HomePageBelowFoldProps = {
@@ -42,10 +44,13 @@ export const HomePageBelowFold = memo(function HomePageBelowFold({
     [router]
   );
 
+  const searching = Boolean(productSearch.trim());
+
   return (
     <>
+      {!searching ? <BestsellersScroller products={rankBestsellerProducts(products)} /> : null}
       <section
-        className="product-database"
+        className={`product-database${searching ? " is-searching" : ""}`}
         id="shop"
         aria-label="Searchable product database"
         data-review="Homepage shop search"
@@ -54,7 +59,6 @@ export const HomePageBelowFold = memo(function HomePageBelowFold({
       >
         <div className="product-database-head" id="shop-search">
           <div>
-            <span className="eyebrow scroll-zoom">Shop database</span>
             <h2 className="scroll-zoom">Find Your Product Here</h2>
           </div>
           <label className="product-search">
@@ -82,14 +86,21 @@ export const HomePageBelowFold = memo(function HomePageBelowFold({
         </div>
         <p className="product-status">{productStatus}</p>
         <div className="product-listing-section">
-          <ProductListingWithFilters products={products} searchQuery={productSearch} />
+          {searching ? (
+            <ProductListingWithFilters products={products} searchQuery={productSearch} />
+          ) : null}
         </div>
       </section>
 
       <HomepageStorySections />
 
       <div className="ticker-top-banner">
-        <img src="/staging-media/banners/care-banner.png" alt="" aria-hidden="true" />
+        <div className="ticker-top-banner-track">
+          <img src="/staging-media/banners/care-banner.png" alt="" aria-hidden="true" />
+          <img src="/staging-media/banners/care-banner.png" alt="" aria-hidden="true" />
+          <img src="/staging-media/banners/care-banner.png" alt="" aria-hidden="true" />
+          <img src="/staging-media/banners/care-banner.png" alt="" aria-hidden="true" />
+        </div>
       </div>
 
       <section className="scrolling-ticker-section">

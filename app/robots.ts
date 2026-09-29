@@ -1,11 +1,7 @@
 import type { MetadataRoute } from "next";
 import { SITE_URL } from "../lib/newsletter-archive-seo";
 
-/**
- * Allow major search and AI crawlers. Preview-password gating (when enabled)
- * still blocks anonymous HTML access at the edge — remove MAROMA_PREVIEW_PASSWORD
- * before expecting public indexing.
- */
+/** Allow major search and AI crawlers while keeping private and transactional routes out of the index. */
 export default function robots(): MetadataRoute.Robots {
   return {
     rules: [

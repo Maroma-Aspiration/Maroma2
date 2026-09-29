@@ -137,11 +137,19 @@ function estimateStoryGridCardHeight(
 ): number {
   const cardW = storyGridCardWidth(columns, canvasW);
   const imgH = card.imageUrl ? Math.round(cardW * 0.75) : 0;
-  // Match `.nl-sgrid-card-body` + title/excerpt min-heights in globals.css
+  // Match `.nl-sgrid-card-body`, including the real wrapped copy. A fixed
+  // five-line excerpt estimate clips longer TOP STORIES cards in email.
   const bodyPad = 14 + 22;
   const bodyGap = 10;
-  const titleInk = Math.ceil(14 * 1.35 * 3);
-  const excerptInk = card.excerpt?.trim() ? Math.ceil(12 * 1.5 * 5) : 0;
+  const bodyW = Math.max(40, cardW - 32);
+  const titleCharsPerLine = Math.max(1, Math.floor(bodyW / (14 * 0.58)));
+  const excerptCharsPerLine = Math.max(1, Math.floor(bodyW / (12 * 0.58)));
+  const titleLines = Math.max(1, Math.ceil(card.title.trim().length / titleCharsPerLine));
+  const excerptLines = card.excerpt?.trim()
+    ? Math.max(1, Math.ceil(card.excerpt.trim().length / excerptCharsPerLine))
+    : 0;
+  const titleInk = Math.ceil(14 * 1.35 * titleLines);
+  const excerptInk = Math.ceil(12 * 1.5 * excerptLines);
   return imgH + bodyPad + bodyGap + titleInk + excerptInk;
 }
 

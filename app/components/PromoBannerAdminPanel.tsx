@@ -34,7 +34,7 @@ import {
   toDatetimeLocalValue,
   toIsoScheduleValue,
 } from "../../lib/promo-client-utils";
-import { PROMO_STRIP_DEFAULTS, normalizePromoStripFields, promoStripStyleVars, promoStripBannerClass, PROMO_STRIP_HEIGHT_MAX, PROMO_STRIP_HEIGHT_MIN, PROMO_STRIP_ASPECT_21_9, PROMO_STRIP_POSITION_CM_MIN, PROMO_STRIP_POSITION_CM_MAX, PROMO_STRIP_POSITION_PX_MIN, PROMO_STRIP_POSITION_PX_MAX } from "../../lib/promo-strip-utils";
+import { PROMO_STRIP_DEFAULTS, normalizePromoStripCarouselUrls, normalizePromoStripFields, promoStripStyleVars, promoStripBannerClass, PROMO_STRIP_CAROUSEL_FADE_MS_DEFAULT, PROMO_STRIP_CAROUSEL_FADE_MS_MAX, PROMO_STRIP_CAROUSEL_FADE_MS_MIN, PROMO_STRIP_CAROUSEL_INTERVAL_MS_DEFAULT, PROMO_STRIP_CAROUSEL_INTERVAL_MS_MAX, PROMO_STRIP_CAROUSEL_INTERVAL_MS_MIN, PROMO_STRIP_CAROUSEL_MAX, PROMO_STRIP_HEIGHT_MAX, PROMO_STRIP_HEIGHT_MIN, PROMO_STRIP_ASPECT_21_9, PROMO_STRIP_POSITION_CM_MIN, PROMO_STRIP_POSITION_CM_MAX, PROMO_STRIP_POSITION_PX_MIN, PROMO_STRIP_POSITION_PX_MAX } from "../../lib/promo-strip-utils";
 import { PromoBannerHomePreview } from "./PromoBannerHomePreview";
 import {
   catalogProductToBuyLinkFields,
@@ -243,6 +243,10 @@ export function PromoBannerAdminPanel({
       ctaBuyLinks: banner.ctaBuyLinks,
       stripBackground: strip.stripBackground,
       stripBackgroundImageUrl: strip.stripBackgroundImageUrl,
+      stripBackgroundCarouselUrls: strip.stripBackgroundCarouselUrls,
+      stripBackgroundCarouselEnabled: strip.stripBackgroundCarouselEnabled,
+      stripBackgroundCarouselIntervalMs: strip.stripBackgroundCarouselIntervalMs,
+      stripBackgroundCarouselFadeMs: strip.stripBackgroundCarouselFadeMs,
       stripBackgroundMediaKind: strip.stripBackgroundMediaKind,
       stripBackgroundVideoLoop: strip.stripBackgroundVideoLoop,
       stripBackgroundFallbackImageUrl: strip.stripBackgroundFallbackImageUrl,
@@ -468,6 +472,10 @@ export function PromoBannerAdminPanel({
       ctaBuyLinks: draft.ctaBuyLinks,
       stripBackground: draft.stripBackground,
       stripBackgroundImageUrl: draft.stripBackgroundImageUrl,
+      stripBackgroundCarouselUrls: draft.stripBackgroundCarouselUrls,
+      stripBackgroundCarouselEnabled: draft.stripBackgroundCarouselEnabled,
+      stripBackgroundCarouselIntervalMs: draft.stripBackgroundCarouselIntervalMs,
+      stripBackgroundCarouselFadeMs: draft.stripBackgroundCarouselFadeMs,
       stripBackgroundMediaKind: draft.stripBackgroundMediaKind,
       stripBackgroundVideoLoop: draft.stripBackgroundVideoLoop,
       stripBackgroundFallbackImageUrl: draft.stripBackgroundFallbackImageUrl,
@@ -606,7 +614,16 @@ export function PromoBannerAdminPanel({
       updateDraft({
         stripBackgroundImageUrl: url,
         stripBackgroundMediaKind: mediaKind,
-        ...(mediaKind === "video" ? { stripAspectRatio: PROMO_STRIP_ASPECT_21_9 } : {}),
+        ...(mediaKind === "video"
+          ? {
+              stripAspectRatio: PROMO_STRIP_ASPECT_21_9,
+              stripBackgroundCarouselEnabled: false,
+            }
+          : {
+              stripBackgroundCarouselUrls: draft.stripBackgroundCarouselEnabled
+                ? [...(draft.stripBackgroundCarouselUrls ?? []).filter((item) => item !== url), url].slice(0, 8)
+                : [url],
+            }),
       });
       setStripBgLoadedKind(mediaKind);
       onStatus(`Strip background ${mediaKind} uploaded.`);
@@ -1506,7 +1523,12 @@ export function PromoBannerAdminPanel({
                     className="button secondary promo-admin-buy-link-clear"
                     disabled={busy}
                     onClick={() => {
-                      updateDraft({ stripBackgroundImageUrl: "", stripBackgroundMediaKind: "none" });
+                      updateDraft({
+                        stripBackgroundImageUrl: "",
+                        stripBackgroundMediaKind: "none",
+                        stripBackgroundCarouselEnabled: false,
+                        stripBackgroundCarouselUrls: [],
+                      });
                       setStripBgLoadedKind(null);
                     }}
                   >
@@ -1514,6 +1536,94 @@ export function PromoBannerAdminPanel({
                   </button>
                 ) : null}
               </div>
+              <label className="promo-admin-toggle">
+                <input
+                  type="checkbox"
+                  checked={draft.stripBackgroundCarouselEnabled === true}
+                  disabled={busy || draft.stripBackgroundMediaKind === "video"}
+                  onChange={(event) => {
+                    const enabled = event.target.checked;
+                    const urls = normalizePromoStripCarouselUrls(
+                      draft.stripBackgroundCarouselUrls,
+                      draft.stripBackgroundImageUrl
+                    );
+                    updateDraft({
+                      stripBackgroundCarouselEnabled: enabled,
+                      stripBackgroundCarouselUrls: urls,
+                      stripBackgroundImageUrl: urls[0] ?? draft.stripBackgroundImageUrl,
+                      stripBackgroundMediaKind: urls[0] || draft.stripBackgroundImageUrl ? "image" : "none",
+                      stripBackgroundCarouselIntervalMs:
+                        draft.stripBackgroundCarouselIntervalMs ?? PROMO_STRIP_CAROUSEL_INTERVAL_MS_DEFAULT,
+                      stripBackgroundCarouselFadeMs:
+                        draft.stripBackgroundCarouselFadeMs ?? PROMO_STRIP_CAROUSEL_FADE_MS_DEFAULT,
+                    });
+                  }}
+                />
+                <span>Image carousel with a subtle fade</span>
+              </label>
+              {draft.stripBackgroundCarouselEnabled ? (
+                <>
+                  <p className="promo-admin-hint">
+                    Load more images to fade between them. The first image stays as the opening slide.
+                  </p>
+                  {(draft.stripBackgroundCarouselUrls ?? []).length ? (
+                    <ul className="homepage-promo-carousel-list">
+                      {(draft.stripBackgroundCarouselUrls ?? []).map((url, index) => (
+                        <li key={`${url}-${index}`}>
+                          <img src={url} alt="" />
+                          <span>Slide {index + 1}</span>
+                          <button
+                            type="button"
+                            disabled={busy}
+                            onClick={() => {
+                              const next = (draft.stripBackgroundCarouselUrls ?? []).filter((item) => item !== url);
+                              updateDraft({
+                                stripBackgroundCarouselUrls: next,
+                                stripBackgroundImageUrl: next[0] ?? "",
+                                stripBackgroundMediaKind: next[0] ? "image" : "none",
+                              });
+                            }}
+                          >
+                            Remove
+                          </button>
+                        </li>
+                      ))}
+                    </ul>
+                  ) : null}
+                  <label className="promo-admin-field">
+                    <span>
+                      Hold each image ({((draft.stripBackgroundCarouselIntervalMs ?? PROMO_STRIP_CAROUSEL_INTERVAL_MS_DEFAULT) / 1000).toFixed(1)}s)
+                    </span>
+                    <input
+                      type="range"
+                      min={PROMO_STRIP_CAROUSEL_INTERVAL_MS_MIN}
+                      max={PROMO_STRIP_CAROUSEL_INTERVAL_MS_MAX}
+                      step={100}
+                      value={draft.stripBackgroundCarouselIntervalMs ?? PROMO_STRIP_CAROUSEL_INTERVAL_MS_DEFAULT}
+                      onChange={(event) =>
+                        updateDraft({ stripBackgroundCarouselIntervalMs: Number(event.target.value) })
+                      }
+                      disabled={busy}
+                    />
+                  </label>
+                  <label className="promo-admin-field">
+                    <span>
+                      Fade ({((draft.stripBackgroundCarouselFadeMs ?? PROMO_STRIP_CAROUSEL_FADE_MS_DEFAULT) / 1000).toFixed(1)}s)
+                    </span>
+                    <input
+                      type="range"
+                      min={PROMO_STRIP_CAROUSEL_FADE_MS_MIN}
+                      max={PROMO_STRIP_CAROUSEL_FADE_MS_MAX}
+                      step={50}
+                      value={draft.stripBackgroundCarouselFadeMs ?? PROMO_STRIP_CAROUSEL_FADE_MS_DEFAULT}
+                      onChange={(event) =>
+                        updateDraft({ stripBackgroundCarouselFadeMs: Number(event.target.value) })
+                      }
+                      disabled={busy}
+                    />
+                  </label>
+                </>
+              ) : null}
             </div>
               <label className="promo-admin-field">
                 <span>
@@ -2013,9 +2123,16 @@ export function PromoBannerAdminPanel({
             return;
           }
           if (catalogPickerTarget.mode === "strip-bg") {
+            const next = draft.stripBackgroundCarouselEnabled
+              ? normalizePromoStripCarouselUrls(
+                  [...(draft.stripBackgroundCarouselUrls ?? []), product.imageUrl],
+                  product.imageUrl
+                ).slice(0, PROMO_STRIP_CAROUSEL_MAX)
+              : [product.imageUrl];
             updateDraft({
-              stripBackgroundImageUrl: product.imageUrl,
+              stripBackgroundImageUrl: next[0] ?? product.imageUrl,
               stripBackgroundMediaKind: "image",
+              stripBackgroundCarouselUrls: next,
             });
             setStripBgLoadedKind("image");
             onStatus(`Using strip background from ${product.name}.`);

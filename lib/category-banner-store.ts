@@ -7,6 +7,8 @@ import type {
   ResolvedCategoryCard,
 } from "./category-banner-types";
 import type { CatalogCategory } from "./catalog-categories";
+import { ensureStorefrontMediaOnFirebase } from "./migrate-storefront-media-to-firebase";
+import { firstUsablePublicMediaUrl } from "./usable-media-url";
 
 export type {
   CategoryBannerOverride,
@@ -24,6 +26,11 @@ const legacyDefaultMaxHeight = "min(48vh, 440px)";
 const emptyStore = (): CategoryBannerStore => ({ banners: {} });
 
 export async function readCategoryBannerStore(): Promise<CategoryBannerStore> {
+  try {
+    await ensureStorefrontMediaOnFirebase();
+  } catch (err) {
+    console.error("[category-banners] firebase media migrate skipped", err);
+  }
   const store = await readJsonKv<CategoryBannerStore>(KV_KEY, FILE_NAME, emptyStore());
   if (!store.banners || typeof store.banners !== "object") {
     return emptyStore();
@@ -45,7 +52,7 @@ export async function resolveCategoryBanner(
   const store = await readCategoryBannerStore();
   const o = store.banners[slug] ?? {};
   return {
-    imageUrl: o.imageUrl ?? category.bannerImage,
+    imageUrl: firstUsablePublicMediaUrl(o.imageUrl, category.bannerImage) || undefined,
     heroTitle: o.heroTitle ?? category.heroTitle ?? category.label,
     heroTagline: o.heroTagline ?? category.heroTagline ?? category.description,
     objectPosition: o.objectPosition ?? defaultWideBannerLayout.objectPosition,
@@ -62,7 +69,7 @@ export async function resolveCategoryBanner(
 
 export async function resolveCategoryCard(
   slug: string,
-  category: Pick<CatalogCategory, "bannerImage" | "label" | "description">
+  category: Pick<CatalogCategory, "bannerImage" | "label" | "description" | "tileDescription">
 ): Promise<ResolvedCategoryCard> {
   const store = await readCategoryBannerStore();
   const { resolveCategoryCardFromOverride } = await import("./resolve-category-card");

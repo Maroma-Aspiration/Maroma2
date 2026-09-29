@@ -28,7 +28,24 @@ async function uploadDataUrl(src: string, cache: Map<string, string>): Promise<s
 export function toAbsoluteImageUrl(src: string, siteUrl: string): string {
   const trimmed = src.trim();
   if (!trimmed) return trimmed;
-  if (/^https?:\/\//i.test(trimmed)) return trimmed;
+  if (/^https?:\/\//i.test(trimmed)) {
+    try {
+      const parsed = new URL(trimmed);
+      if (
+        parsed.hostname === "localhost" ||
+        parsed.hostname === "127.0.0.1" ||
+        parsed.hostname === "0.0.0.0"
+      ) {
+        const liveOrigin = new URL(siteUrl);
+        parsed.protocol = liveOrigin.protocol;
+        parsed.host = liveOrigin.host;
+        return parsed.toString();
+      }
+    } catch {
+      return trimmed;
+    }
+    return trimmed;
+  }
   if (trimmed.startsWith("//")) return `https:${trimmed}`;
   if (trimmed.startsWith("/")) {
     const origin = siteUrl.replace(/\/$/, "");

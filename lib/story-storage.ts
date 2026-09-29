@@ -2,6 +2,7 @@ import { promises as fs } from "fs";
 import path from "path";
 import { kv } from "@vercel/kv";
 import { reconcileNewsletterCanvasState } from "./canvas-reconcile-stories";
+import { sanitizeStoriesStateCitations } from "./strip-ai-citation-markers";
 import { syncAllBlocksToLegacy } from "./newsletter-block-legacy-sync";
 import { buildMigratedNewsletterBlocks } from "./newsletter-migrate-legacy-blocks";
 import { parseStoryImageFrame } from "./story-image-frame";
@@ -46,7 +47,7 @@ const defaultState: StoriesState = {
   stories: [],
   socialSources: {
     instagram: "https://www.instagram.com/maromaindia/",
-    facebook: "https://www.facebook.com/maromaindia"
+    facebook: "https://www.facebook.com/MaromaAuroville/"
   },
   rssFeedUrls: [],
   newsletterTitle: "Newsletter",
@@ -997,10 +998,11 @@ export async function readStoriesState(): Promise<StoriesState> {
       if (stored) {
         parsed = parseState(stored);
         const reconciled = reconcileNewsletterCanvasState(parsed);
-        if (newsletterCanvasRepaired(parsed, reconciled)) {
-          return writeStoriesState(reconciled);
+        const cleaned = sanitizeStoriesStateCitations(reconciled);
+        if (newsletterCanvasRepaired(parsed, cleaned.state) || cleaned.changed) {
+          return writeStoriesState(cleaned.state);
         }
-        return reconciled;
+        return cleaned.state;
       }
     } catch {
       // fall back to file state
@@ -1013,10 +1015,11 @@ export async function readStoriesState(): Promise<StoriesState> {
     parsed = parseState({ ...defaultState });
   }
   const reconciled = reconcileNewsletterCanvasState(parsed);
-  if (newsletterCanvasRepaired(parsed, reconciled)) {
-    return writeStoriesState(reconciled);
+  const cleaned = sanitizeStoriesStateCitations(reconciled);
+  if (newsletterCanvasRepaired(parsed, cleaned.state) || cleaned.changed) {
+    return writeStoriesState(cleaned.state);
   }
-  return reconciled;
+  return cleaned.state;
 }
 
 function newsletterCanvasRepaired(before: StoriesState, after: StoriesState): boolean {

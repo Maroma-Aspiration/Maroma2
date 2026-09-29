@@ -7,14 +7,16 @@ import { getJournalStories } from "../../lib/journal-stories";
 import { readStoriesState } from "../../lib/story-storage";
 import { resolveStoryThumbnailUrl } from "../../lib/story-thumbnail";
 import { JournalSubscribeForm } from "./journal-subscribe-form";
+import { buildPageMetadata } from "../../lib/site-seo";
 
 export const dynamic = "force-dynamic";
 
-export const metadata = {
+export const metadata = buildPageMetadata({
   title: "The Maroma Journal | Stories from Auroville",
   description:
     "Stories and events from Maroma — botanical fragrance, natural care, and community life from Auroville, India.",
-};
+  path: "/blog",
+});
 
 export default async function BlogPage() {
   noStore();
