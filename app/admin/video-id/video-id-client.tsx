@@ -1,10 +1,18 @@
 "use client";
 
+import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import { uploadFileToFirebase } from "../../../lib/client-firebase-upload";
 import "./video-id.css";
 
-type ProductOption = { id: string; name: string; searchText?: string };
+type ProductOption = {
+  id: string;
+  name: string;
+  categories: string[];
+  searchText?: string;
+  sizeAudit: { status: "clear" | "unclear" | "mismatch" | "pricing_review"; reason: string; expected: string[]; imageSizes: string[]; fingerprint: string; acknowledged: boolean };
+};
 type VideoRow = { id: string; file: File; previewUrl: string; productId: string; search: string; status: string; needsReview: boolean };
 
 const UNCERTAIN_VIDEO_NAMES = new Set([
@@ -27,13 +35,54 @@ const SEARCH_ALIASES: Record<string, string> = {
 
 const normalizeSearch = (value: string) => value.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
 
+function requiredCorrection(product: ProductOption): string {
+  if (product.sizeAudit.status === "pricing_review") return "Check whether the separate quantities should have different prices.";
+  if (product.sizeAudit.expected.length > 1) return "Split this into one listing per quantity, with one matching main image per listing.";
+  if (product.sizeAudit.status === "mismatch") return "Replace the main image with the pack size recorded for this listing.";
+  if (!product.sizeAudit.imageSizes.length) return "Use a size-specific main image, or confirm its pack size before publishing.";
+  return "Confirm the main image matches the recorded quantity, then correct the listing or image if needed.";
+}
+
 export default function VideoIdClient({ products }: { products: ProductOption[] }) {
+  const router = useRouter();
   const [rows, setRows] = useState<VideoRow[]>([]);
   const [notice, setNotice] = useState("");
+  const [acknowledging, setAcknowledging] = useState<string | null>(null);
+  const [dismissedAudits, setDismissedAudits] = useState<Set<string>>(() => new Set());
 
   useEffect(() => () => rows.forEach((row) => URL.revokeObjectURL(row.previewUrl)), [rows]);
 
   const sortedProducts = useMemo(() => [...products].sort((a, b) => a.name.localeCompare(b.name)), [products]);
+  const unclearSizeProducts = useMemo(
+    () => sortedProducts.filter((product) => (
+      product.sizeAudit.expected.length > 0
+      && product.sizeAudit.status !== "clear"
+      && !product.sizeAudit.acknowledged
+      && !dismissedAudits.has(product.id)
+      && !product.categories.some((category) => /(^|\\s)candles?(\\s|$)/i.test(category))
+    )),
+    [dismissedAudits, sortedProducts]
+  );
+
+  const markAuditAsOk = async (product: ProductOption) => {
+    setAcknowledging(product.id);
+    try {
+      const response = await fetch("/api/admin/product-size-audits", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ productId: product.id }),
+      });
+      const data = await response.json() as { error?: string };
+      if (!response.ok) throw new Error(data.error || "Could not mark this check as OK.");
+      setDismissedAudits((current) => new Set(current).add(product.id));
+      setNotice(`${product.name} marked as OK.`);
+      router.refresh();
+    } catch (error) {
+      setNotice(error instanceof Error ? error.message : "Could not mark this check as OK.");
+    } finally {
+      setAcknowledging(null);
+    }
+  };
 
   const addFiles = (files: FileList | null) => {
     if (!files) return;
@@ -78,8 +127,8 @@ export default function VideoIdClient({ products }: { products: ProductOption[] 
       <header className="video-id-header">
         <div>
           <p>Maroma admin</p>
-          <h1>Video ID</h1>
-          <span>Preview each video, choose its exact product, then publish it to Firebase.</span>
+          <h1>Product Listing Consistency Tool</h1>
+          <span>Review product sizes, images, and pricing consistency across the catalogue.</span>
         </div>
         <a href="/admin">Back to admin</a>
       </header>
@@ -92,6 +141,35 @@ export default function VideoIdClient({ products }: { products: ProductOption[] 
           <input type="file" accept="video/mp4,.mp4" multiple webkitdirectory="" onChange={(event) => { addFiles(event.currentTarget.files); event.currentTarget.value = ""; }} />
         </label>
         <p>{notice || `${rows.length} video${rows.length === 1 ? "" : "s"} in this workspace`}</p>
+      </section>
+
+      <section className="video-id-size-audit" aria-labelledby="video-id-size-audit-title">
+        <div className="video-id-size-audit-heading">
+          <div>
+          <h2 id="video-id-size-audit-title">Product size checks <span>{unclearSizeProducts.length}</span></h2>
+          <p>Review unclear image sizes, catalogue mismatches, and same-price listings with different quantities.</p>
+          </div>
+          <button type="button" className="video-id-refresh" onClick={() => router.refresh()}>Refresh checks</button>
+        </div>
+        {unclearSizeProducts.length ? (
+          <div className="video-id-size-audit-list">
+            {unclearSizeProducts.map((product) => (
+              <article className="video-id-size-audit-card" key={product.id}>
+                <Link href={`/admin/products/${product.id}`} className="video-id-size-audit-link">
+                  <div>
+                  <strong>{product.name}</strong>
+                  <small>{product.id} · {product.sizeAudit.reason}</small>
+                  <span>Catalogue: {product.sizeAudit.expected.join(", ") || "not recorded"} · Image: {product.sizeAudit.imageSizes.join(", ") || "unclear"}</span>
+                  <em>Action: {requiredCorrection(product)}</em>
+                  </div>
+                </Link>
+                <button type="button" className="video-id-mark-ok" disabled={acknowledging === product.id} onClick={() => markAuditAsOk(product)}>
+                  {acknowledging === product.id ? "Saving…" : "Mark as OK"}
+                </button>
+              </article>
+            ))}
+          </div>
+        ) : <p className="video-id-size-audit-clear">All product size and price checks have passed.</p>}
       </section>
 
       <section className="video-id-list" aria-label="Videos to identify">

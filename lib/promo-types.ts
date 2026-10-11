@@ -84,6 +84,11 @@ export type PromoMobileLayout = {
   stripWidthPct?: number;
   /** Mobile-only vertical nudge for the whole promo strip. Positive moves down. */
   stripPositionOffsetPx?: number;
+  /** Mobile-only crop position for the banner artwork. */
+  backgroundImageOffsetX: number;
+  backgroundImageOffsetY: number;
+  /** Mobile-only zoom for the banner artwork. Values above 100 create crop room. */
+  backgroundImageScale: number;
   stripHeightPx: number;
   textBannerOffsetX: number;
   textBannerOffsetY: number;

@@ -8,6 +8,7 @@ import {
   estimateStoryGridHeight,
   isSpacingLocked,
   measureElementHeight,
+  resolveOverlappingStoryFlow,
   storyGridLayoutFloor,
 } from "./canvas-layout";
 import { plainTextFromHtml } from "./newsletter-archive-utils";
@@ -416,6 +417,8 @@ export function reconcileNewsletterCanvasState(state: StoriesState): StoriesStat
   if (stories.length > 0) {
     elements = ensureStoryImageFrames(elements, stories);
   }
+
+  elements = resolveOverlappingStoryFlow(elements);
 
   const nextStories =
     stories.length > 0 && (state.stories ?? []).filter((s) => !s.kind || s.kind === "story").length === 0

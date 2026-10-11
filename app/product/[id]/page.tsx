@@ -4,6 +4,9 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ProductPdpTitle } from "../../components/ProductPdpTitle";
 import { ProductPdpPinnedStage } from "./ProductPdpPinnedStage";
+import { ProductFamilyPdp } from "../../components/ProductFamilyPdp";
+import { VotiveFamilyPdp } from "../../components/VotiveFamilyPdp";
+import { StickIncenseFamilyPdp } from "../../components/StickIncenseFamilyPdp";
 import { ProductPdpBuyRow } from "../../components/ProductPdpBuyRow";
 import { StorefrontProductCard } from "../../components/StorefrontProductCard";
 import { ProductPdpGallery } from "../../components/ProductPdpGallery";
@@ -36,6 +39,9 @@ import {
 } from "../../../lib/site-seo";
 import type { ProductRecord } from "../../../lib/product-types";
 import { productPriceState } from "../../../lib/product-pricing";
+import { resolveClassicPillarFamily } from "../../../lib/product-families";
+import { resolveVotiveFamily } from "../../../lib/votive-family";
+import { resolveStickIncenseFamily } from "../../../lib/stick-incense-family";
 import { readSafetySet } from "../../../lib/safety-guidelines-store";
 import { pickSafetyHighlight, resolveSafetyTranslation, safetySetIdForProductContext } from "../../../lib/safety-guidelines-types";
 import {
@@ -47,7 +53,7 @@ import { getIngredientPage, ingredientSlugFromName } from "../../../lib/ingredie
 
 export const runtime = "nodejs";
 
-type Props = { params: { id: string }; searchParams?: { search?: string; curations?: string } };
+type Props = { params: { id: string }; searchParams?: { search?: string; curations?: string; size?: string } };
 
 async function canPreviewDraftProduct(): Promise<boolean> {
   const secret = getSessionSecret();
@@ -110,9 +116,19 @@ export default async function ProductPage({ params, searchParams }: Props) {
 
   const gallery = getGalleryImageUrls(product);
   const suggested = getSuggestedProducts(liveProducts, product, 8);
+  const family = resolveClassicPillarFamily(product, liveProducts);
+  const votiveFamily = resolveVotiveFamily(product, liveProducts);
+  const stickIncenseFamily = resolveStickIncenseFamily(product, liveProducts);
   const sections = derivePdpSections(product);
   const { displayName, subtitleText } = deriveProductPdpCopy(product.name, product.shortDescription);
   const keyIngredients = product.attributes["Key Ingredients"] ?? [];
+  const quantityValues = [...new Set(
+    Object.entries(product.attributes)
+      .filter(([key]) => /^(size|volume|net volume|net weight|weight|pack size|quantity)$/i.test(key))
+      .flatMap(([, values]) => values)
+      .map((value) => value.trim())
+      .filter(Boolean)
+  )];
   const storedIngredientItems = galleryItemsForProduct(ingredientGallery, product.id);
   const keyIngredientCards: KeyIngredientCard[] = [];
   const seenIngredientSlugs = new Set<string>();
@@ -140,6 +156,7 @@ export default async function ProductPage({ params, searchParams }: Props) {
     });
   }
   const searchQuery = searchParams?.search?.trim().slice(0, 160) ?? "";
+  const requestedSize = searchParams?.size?.trim() ?? "";
   const curationsRaw = searchParams?.curations?.trim() ?? "";
   const curationsHref = curationsRaw.startsWith("/curations") && !curationsRaw.startsWith("//")
     ? curationsRaw
@@ -168,6 +185,37 @@ export default async function ProductPage({ params, searchParams }: Props) {
     ? pickSafetyHighlight(resolveSafetyTranslation(safetySet, "en").translation ?? { title: "", sections: [] })
     : null;
 
+  const familyHeader = <>
+    {curationsHref ? (
+      <Link href={curationsHref} className="product-pdp-back-to-search product-pdp-back-to-curations">
+        <span aria-hidden="true">←</span> Back to Maroma Curations
+      </Link>
+    ) : null}
+    <nav className="product-pdp-breadcrumbs" aria-label="Breadcrumb">
+      <ol>
+        <li><Link href="/">Home</Link></li>
+        {category ? <li><Link href={`/${category.slug}`}>{category.label}</Link></li> : null}
+        <li aria-current="page">{family?.family.title ?? stickIncenseFamily?.title ?? "Votive Candles"}</li>
+      </ol>
+    </nav>
+    {searchQuery ? <Link href={`/?skipIntro=1&q=${encodeURIComponent(searchQuery)}#shop`} className="product-pdp-back-to-search"><span aria-hidden="true">←</span> Back to search results</Link> : null}
+    {isDraftPreview ? <div className="product-pdp-draft-notice" role="status">Admin preview · This product is not yet published on the storefront.</div> : null}
+  </>;
+
+  const familyDetails = <>
+    <div className="product-pdp-accordions">
+      <details className="product-pdp-accordion" open><summary>Description</summary><div className="product-pdp-accordion-body">{sections.description}</div></details>
+      <details className="product-pdp-accordion"><summary>Ingredients (full INCI)</summary><div className="product-pdp-accordion-body">{sections.ingredients}</div></details>
+      <details className="product-pdp-accordion"><summary>Benefits</summary><div className="product-pdp-accordion-body"><ul className="product-pdp-benefits">{sections.benefits.map((item) => <li key={item}>{item}</li>)}</ul></div></details>
+      {keyIngredientCards.length > 0 ? <details className="product-pdp-accordion"><summary>Key Ingredients</summary><div className="product-pdp-accordion-body"><ProductKeyIngredients items={keyIngredientCards} /></div></details> : null}
+      {sections.howToUse ? <details className="product-pdp-accordion"><summary>How to use</summary><div className="product-pdp-accordion-body">{sections.howToUse}</div></details> : null}
+      {safetySet && safetyHighlight ? <details className="product-pdp-accordion"><summary>Safety guidelines</summary><div className="product-pdp-accordion-body"><p>{safetyHighlight.body}</p><Link href={`/safety-guidelines#${safetySet.id}`}>Read the full safety guidelines</Link></div></details> : null}
+    </div>
+    {factRows.length > 0 ? <section className="product-pdp-facts" aria-labelledby="pdp-facts-heading"><h2 id="pdp-facts-heading" className="product-pdp-facts-title">Product details</h2><dl className="product-pdp-facts-list">{factRows.map((fact) => <div key={fact.label} className="product-pdp-facts-row"><dt>{fact.label}</dt><dd>{fact.value}</dd></div>)}</dl></section> : null}
+    {suggested.length > 0 ? <section className="product-pdp-suggestions-inline" aria-labelledby="pdp-suggestions-inline"><h2 id="pdp-suggestions-inline" className="product-pdp-suggestions-inline-title">You may also like</h2><div className="product-pdp-suggestions-track">{suggested.map((item) => <SuggestedCard key={item.id} product={item} />)}</div></section> : null}
+    <ul className="product-pdp-service-list"><li>100% vegan formulations</li><li>Free shipping in India on orders over ₹500</li><li>Free 7-day return on eligible items</li></ul>
+  </>;
+
   return (
     <main className="product-pdp-page">
       <JsonLd
@@ -186,139 +234,162 @@ export default async function ProductPage({ params, searchParams }: Props) {
         data-review-id="pdp-layout"
         data-review-files="app/product/[id]/page.tsx,app/components/ProductPdpBuyRow.tsx,app/components/ProductPdpGallery.tsx"
       >
-        <div className="product-pdp-left-column">
-          <ProductPdpGallery images={gallery} videos={product.videos} productId={product.id} productName={displayName} ready3d={isGiftingProduct(product) && gift3dReady} />
-        </div>
-
-        <div className="product-pdp-details-column">
-          <div className="product-pdp-details-chrome">
-            {curationsHref ? (
-              <Link href={curationsHref} className="product-pdp-back-to-search product-pdp-back-to-curations">
-                <span aria-hidden="true">←</span> Back to Maroma Curations
-              </Link>
-            ) : null}
-            <nav className="product-pdp-breadcrumbs" aria-label="Breadcrumb">
-              <ol>
-                <li>
-                  <Link href="/">Home</Link>
-                </li>
-                {category ? (
-                  <li>
-                    <Link href={`/${category.slug}`}>{category.label}</Link>
-                  </li>
+        {family ? (
+          <ProductFamilyPdp
+            product={product}
+            familyTitle={family.family.title}
+            members={family.members}
+            initialSizeId={requestedSize}
+            videos={product.videos}
+            ready3d={isGiftingProduct(product) && gift3dReady}
+            header={familyHeader}
+          >
+            {familyDetails}
+          </ProductFamilyPdp>
+        ) : votiveFamily ? (
+          <VotiveFamilyPdp product={product} members={votiveFamily} initialSizeId={requestedSize} header={familyHeader}>
+            {familyDetails}
+          </VotiveFamilyPdp>
+        ) : stickIncenseFamily ? (
+          <StickIncenseFamilyPdp product={product} family={stickIncenseFamily} header={familyHeader}>
+            {familyDetails}
+          </StickIncenseFamilyPdp>
+        ) : (
+          <>
+            <div className="product-pdp-left-column">
+              <ProductPdpGallery images={gallery} videos={product.videos} productId={product.id} productName={displayName} ready3d={isGiftingProduct(product) && gift3dReady} />
+            </div>
+            <div className="product-pdp-details-column">
+              <div className="product-pdp-details-chrome">
+                {curationsHref ? (
+                  <Link href={curationsHref} className="product-pdp-back-to-search product-pdp-back-to-curations">
+                    <span aria-hidden="true">←</span> Back to Maroma Curations
+                  </Link>
                 ) : null}
-                <li aria-current="page">{displayName}</li>
-              </ol>
-            </nav>
-            {searchQuery ? (
-              <Link
-                href={`/?skipIntro=1&q=${encodeURIComponent(searchQuery)}#shop`}
-                className="product-pdp-back-to-search"
-              >
-                <span aria-hidden="true">←</span> Back to search results
-              </Link>
-            ) : null}
-            {isDraftPreview ? (
-              <div className="product-pdp-draft-notice" role="status">
-                Admin preview · This product is not yet published on the storefront.
-              </div>
-            ) : null}
-          </div>
-          <ProductPdpTitle>{displayName}</ProductPdpTitle>
-          <div className="product-pdp-info">
-            {subtitleText ? <p className="product-pdp-subtitle">{subtitleText}</p> : null}
-            <div className="product-pdp-price-row">
-            {productPriceState(product).onSale ? (
-              <p className="product-pdp-price is-on-sale"><s><CurrencyPrice raw={productPriceState(product).regular} /></s><span><CurrencyPrice raw={productPriceState(product).active} /></span></p>
-            ) : <p className="product-pdp-price"><CurrencyPrice raw={product.price} /></p>}
-
-              <CurrencySelector compact />
-            </div>
-
-            <ProductPdpBuyRow product={product} />
-
-            <div className="product-pdp-accordions">
-            <details className="product-pdp-accordion" open>
-              <summary>Description</summary>
-              <div className="product-pdp-accordion-body">{sections.description}</div>
-            </details>
-            <details className="product-pdp-accordion">
-              <summary>Ingredients (full INCI)</summary>
-              <div className="product-pdp-accordion-body">{sections.ingredients}</div>
-            </details>
-              <details className="product-pdp-accordion">
-                <summary>Benefits</summary>
-                <div className="product-pdp-accordion-body">
-                  <ul className="product-pdp-benefits">
-                    {sections.benefits.map((item) => (
-                      <li key={item}>{item}</li>
-                    ))}
-                  </ul>
-                </div>
-              </details>
-              {keyIngredientCards.length > 0 ? (
-              <details className="product-pdp-accordion">
-                <summary>Key Ingredients</summary>
-                <div className="product-pdp-accordion-body">
-                  <ProductKeyIngredients items={keyIngredientCards} />
-                </div>
-              </details>
-              ) : null}
-              {sections.howToUse ? (
-                <details className="product-pdp-accordion">
-                  <summary>How to use</summary>
-                  <div className="product-pdp-accordion-body">{sections.howToUse}</div>
-                </details>
-              ) : null}
-              {safetySet && safetyHighlight ? (
-                <details className="product-pdp-accordion">
-                  <summary>Safety guidelines</summary>
-                  <div className="product-pdp-accordion-body">
-                    <p>{safetyHighlight.body}</p>
-                    <Link href={`/safety-guidelines#${safetySet.id}`}>
-                      Read the full safety guidelines
-                    </Link>
+                <nav className="product-pdp-breadcrumbs" aria-label="Breadcrumb">
+                  <ol>
+                    <li>
+                      <Link href="/">Home</Link>
+                    </li>
+                    {category ? (
+                      <li>
+                        <Link href={`/${category.slug}`}>{category.label}</Link>
+                      </li>
+                    ) : null}
+                    <li aria-current="page">{displayName}</li>
+                  </ol>
+                </nav>
+                {searchQuery ? (
+                  <Link
+                    href={`/?skipIntro=1&q=${encodeURIComponent(searchQuery)}#shop`}
+                    className="product-pdp-back-to-search"
+                  >
+                    <span aria-hidden="true">←</span> Back to search results
+                  </Link>
+                ) : null}
+                {isDraftPreview ? (
+                  <div className="product-pdp-draft-notice" role="status">
+                    Admin preview · This product is not yet published on the storefront.
                   </div>
-                </details>
-              ) : null}
-            </div>
-
-            {factRows.length > 0 ? (
-              <section className="product-pdp-facts" aria-labelledby="pdp-facts-heading">
-                <h2 id="pdp-facts-heading" className="product-pdp-facts-title">
-                  Product details
-                </h2>
-                <dl className="product-pdp-facts-list">
-                  {factRows.map((fact) => (
-                    <div key={fact.label} className="product-pdp-facts-row">
-                      <dt>{fact.label}</dt>
-                      <dd>{fact.value}</dd>
-                    </div>
-                  ))}
-                </dl>
-              </section>
-            ) : null}
-
-            {suggested.length > 0 ? (
-              <section className="product-pdp-suggestions-inline" aria-labelledby="pdp-suggestions-inline">
-                <h2 id="pdp-suggestions-inline" className="product-pdp-suggestions-inline-title">
-                  You may also like
-                </h2>
-                <div className="product-pdp-suggestions-track">
-                  {suggested.map((item) => (
-                    <SuggestedCard key={item.id} product={item} />
-                  ))}
+                ) : null}
+              </div>
+              <ProductPdpTitle>{displayName}</ProductPdpTitle>
+              <div className="product-pdp-info">
+                {subtitleText ? <p className="product-pdp-subtitle">{subtitleText}</p> : null}
+                {quantityValues.length ? (
+                  <p className="product-pdp-quantity">
+                    <span>Weight / Quantity</span>
+                    {quantityValues.join(" · ")}
+                  </p>
+                ) : null}
+                <div className="product-pdp-price-row">
+                  {productPriceState(product).onSale ? (
+                    <p className="product-pdp-price is-on-sale"><s><CurrencyPrice raw={productPriceState(product).regular} /></s><span><CurrencyPrice raw={productPriceState(product).active} /></span></p>
+                  ) : <p className="product-pdp-price"><CurrencyPrice raw={product.price} /></p>}
+                  <CurrencySelector compact />
                 </div>
-              </section>
-            ) : null}
-
-            <ul className="product-pdp-service-list">
-              <li>100% vegan formulations</li>
-              <li>Free shipping in India on orders over ₹500</li>
-              <li>Free 7-day return on eligible items</li>
-            </ul>
-          </div>
-        </div>
+                <ProductPdpBuyRow product={product} />
+                <div className="product-pdp-accordions">
+                  <details className="product-pdp-accordion" open>
+                    <summary>Description</summary>
+                    <div className="product-pdp-accordion-body">{sections.description}</div>
+                  </details>
+                  <details className="product-pdp-accordion">
+                    <summary>Ingredients (full INCI)</summary>
+                    <div className="product-pdp-accordion-body">{sections.ingredients}</div>
+                  </details>
+                  <details className="product-pdp-accordion">
+                    <summary>Benefits</summary>
+                    <div className="product-pdp-accordion-body">
+                      <ul className="product-pdp-benefits">
+                        {sections.benefits.map((item) => (
+                          <li key={item}>{item}</li>
+                        ))}
+                      </ul>
+                    </div>
+                  </details>
+                  {keyIngredientCards.length > 0 ? (
+                    <details className="product-pdp-accordion">
+                      <summary>Key Ingredients</summary>
+                      <div className="product-pdp-accordion-body">
+                        <ProductKeyIngredients items={keyIngredientCards} />
+                      </div>
+                    </details>
+                  ) : null}
+                  {sections.howToUse ? (
+                    <details className="product-pdp-accordion">
+                      <summary>How to use</summary>
+                      <div className="product-pdp-accordion-body">{sections.howToUse}</div>
+                    </details>
+                  ) : null}
+                  {safetySet && safetyHighlight ? (
+                    <details className="product-pdp-accordion">
+                      <summary>Safety guidelines</summary>
+                      <div className="product-pdp-accordion-body">
+                        <p>{safetyHighlight.body}</p>
+                        <Link href={`/safety-guidelines#${safetySet.id}`}>
+                          Read the full safety guidelines
+                        </Link>
+                      </div>
+                    </details>
+                  ) : null}
+                </div>
+                {factRows.length > 0 ? (
+                  <section className="product-pdp-facts" aria-labelledby="pdp-facts-heading-plain">
+                    <h2 id="pdp-facts-heading-plain" className="product-pdp-facts-title">
+                      Product details
+                    </h2>
+                    <dl className="product-pdp-facts-list">
+                      {factRows.map((fact) => (
+                        <div key={fact.label} className="product-pdp-facts-row">
+                          <dt>{fact.label}</dt>
+                          <dd>{fact.value}</dd>
+                        </div>
+                      ))}
+                    </dl>
+                  </section>
+                ) : null}
+                {suggested.length > 0 ? (
+                  <section className="product-pdp-suggestions-inline" aria-labelledby="pdp-suggestions-inline-plain">
+                    <h2 id="pdp-suggestions-inline-plain" className="product-pdp-suggestions-inline-title">
+                      You may also like
+                    </h2>
+                    <div className="product-pdp-suggestions-track">
+                      {suggested.map((item) => (
+                        <SuggestedCard key={item.id} product={item} />
+                      ))}
+                    </div>
+                  </section>
+                ) : null}
+                <ul className="product-pdp-service-list">
+                  <li>100% vegan formulations</li>
+                  <li>Free shipping in India on orders over ₹500</li>
+                  <li>Free 7-day return on eligible items</li>
+                </ul>
+              </div>
+            </div>
+          </>
+        )}
       </div>
 
       <footer className="product-pdp-trust" aria-label="Certifications">

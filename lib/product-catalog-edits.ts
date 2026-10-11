@@ -12,6 +12,7 @@ export type ProductCatalogEdit = {
   categories?: string[];
   tags?: string[];
   brand?: string;
+  attributes?: Record<string, string[]>;
   /** When false, product is hidden from storefront regardless of stock. */
   published?: boolean;
   /** Admin deletion marker. The source catalogue remains untouched. */
@@ -73,6 +74,21 @@ function parseStore(value: unknown): ProductCatalogEditStore {
         .slice(0, 24);
     }
     if (typeof row.brand === "string") patch.brand = row.brand.trim().slice(0, 80);
+    if (row.attributes && typeof row.attributes === "object" && !Array.isArray(row.attributes)) {
+      patch.attributes = Object.fromEntries(
+        Object.entries(row.attributes as Record<string, unknown>)
+          .filter(([, values]) => Array.isArray(values))
+          .map(([key, values]) => [
+            key.trim().slice(0, 80),
+            (values as unknown[])
+              .filter((value): value is string => typeof value === "string")
+              .map((value) => value.trim())
+              .filter(Boolean)
+              .slice(0, 24),
+          ])
+          .filter(([key]) => Boolean(key))
+      );
+    }
     if (typeof row.published === "boolean") patch.published = row.published;
     if (typeof row.deleted === "boolean") patch.deleted = row.deleted;
     edits[id] = patch;

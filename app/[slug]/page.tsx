@@ -103,7 +103,6 @@ export default async function CategoryPage({ params }: CategoryPageProps) {
           <p>{intro}</p>
           {related.length > 0 ? (
             <nav className="category-related-nav" aria-label="Related collections">
-              <span className="category-related-label">Explore also</span>
               <ul>
                 {related.map((item) => (
                   <li key={item.href}>

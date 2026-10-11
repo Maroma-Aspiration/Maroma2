@@ -11,6 +11,7 @@ import { resolveCommerceProduct, resolveCommerceProducts } from "./commerce-prod
 import { getRitualSet } from "./commerce-ritual-sets";
 import { buildGiftSetProductId, parseGiftSetProductId, validateGiftSet } from "./gift-builder";
 import { giftSetCartDisplayName, encodeGiftSetVariant } from "./gift-set-variant";
+import { familySizePriceInr, parseFamilySizeVariant } from "./product-families";
 import { hasActivePromo, validateCouponForSubtotal } from "./commerce-coupons";
 import type {
   CartLine,
@@ -172,13 +173,18 @@ export async function buildCartView(cart: CartRecord): Promise<CartView> {
     if (!product || !product.active) continue;
     const quantity = Math.min(line.quantity, product.stock, MAX_LINE_QUANTITY);
     if (quantity < 1) continue;
+    const familySize = parseFamilySizeVariant(line.variant);
+    const familyPrice = familySize ? familySizePriceInr({ price: String(product.price) }, familySize) : null;
+    if (familySize && familyPrice === null) continue;
     items.push({
       id: line.id,
       productId: product.id,
       name: parseGiftSetProductId(product.id)
         ? giftSetCartDisplayName(product.name, line.variant)
-        : product.name,
-      price: product.price,
+        : familySize
+          ? `${product.name} · ${familySize.replace("g", " g")}`
+          : product.name,
+      price: familyPrice ?? product.price,
       image: product.image,
       quantity,
       variant: line.variant,
@@ -216,6 +222,10 @@ export async function addToCartServer(
   const product = await resolveCommerceProduct(productId);
   if (!product) throw new CartError("Product not found.", 404);
   if (!product.active || product.stock < 1) throw new CartError("Product is out of stock.", 409);
+  const requestedSize = parseFamilySizeVariant(variant);
+  if (requestedSize && familySizePriceInr({ price: String(product.price) }, requestedSize) === null) {
+    throw new CartError("This size cannot be ordered until its price is set.", 400);
+  }
 
   const cart = await readCart(cartId);
   const existing = cart.lines.find(

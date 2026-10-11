@@ -359,7 +359,6 @@ export function promoStripStyleVars(banner: Partial<PromoBanner>): CSSProperties
   const frameScale = (strip.stripFrameScale ?? 100) / 100;
   const frameHeight = strip.stripHeightPx * frameScale;
   const usesCarousel = promoStripUsesCarousel(strip);
-  const hasBackgroundImage = Boolean(strip.stripBackgroundImageUrl && strip.stripBackgroundMediaKind === "image");
   const bgImage = usesCarousel
     ? "none"
     : strip.stripBackgroundImageUrl && strip.stripBackgroundMediaKind === "image"
@@ -367,6 +366,13 @@ export function promoStripStyleVars(banner: Partial<PromoBanner>): CSSProperties
       : typeof banner.stripBackgroundGradient === "string" && banner.stripBackgroundGradient.trim()
         ? banner.stripBackgroundGradient.trim()
         : "none";
+  // Older promos stored an uploaded image in the legacy "gradient" field as
+  // `url(...)`. Treat it as an image too, otherwise crop/position controls do
+  // nothing even though the artwork is visibly rendered.
+  const hasBackgroundImage = Boolean(
+    (strip.stripBackgroundImageUrl && strip.stripBackgroundMediaKind === "image") ||
+    /^url\(/i.test(bgImage)
+  );
   return {
     ...(strip.stripWidthPct == null && frameScale === 1 ? {} : { ["--hero-promo-width-pct" as string]: `${(strip.stripWidthPct ?? 100) * frameScale}%` }),
     ["--promo-strip-height" as string]: `${frameHeight}px`,

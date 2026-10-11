@@ -55,8 +55,36 @@ export async function GET(request: Request) {
 }
 
 export async function POST(request: Request) {
-  let body: { name?: string; sku?: string } = {};
+  let body: { name?: string; sku?: string; duplicateFrom?: string } = {};
   try { body = await request.json(); } catch {}
+  const sourceId = body.duplicateFrom?.trim();
+  if (sourceId) {
+    const source = await getAdminProduct(sourceId);
+    if (!source) return NextResponse.json({ error: "Source product not found." }, { status: 404 });
+    const id = `admin-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`;
+    await addCreatedProduct({
+      id,
+      sku: `${source.sku}-COPY`,
+      name: `Copy of ${source.name}`,
+      description: source.description,
+      shortDescription: source.shortDescription,
+      price: source.price,
+      salePrice: source.salePrice,
+      categories: source.categories,
+      tags: source.tags,
+      brand: source.brand,
+      images: source.images,
+      imageUrl: source.imageUrl ?? "",
+      attributes: source.attributes,
+    });
+    await Promise.all([
+      upsertCatalogEdit(id, { published: false }),
+      setProductStock(id, 0),
+    ]);
+    invalidateCatalogCache();
+    const product = await getAdminProduct(id);
+    return NextResponse.json({ ok: true, product }, { status: 201 });
+  }
   const name = body.name?.trim() || "Untitled product";
   const sku = body.sku?.trim() || `NEW-${Date.now().toString(36).toUpperCase()}`;
   const id = `admin-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`;

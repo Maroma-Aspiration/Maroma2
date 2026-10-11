@@ -1,11 +1,14 @@
 import type { CanvasEl, NewsletterCanvas, StoriesState } from "./story-types";
+import { cleanNewsletterCopy, peelTrailingRtfLink } from "./strip-rtf-markup";
 
 const CITE_TOKEN_RE =
   /(?:\[\s*)?(?:cite(?:\s*:)?)?(?:turn0(?:search|news|image|view|file|video)\d+)+(?:\s*\])?/gi;
 
 export function stripAiCitationMarkers(text: string): string {
-  if (!text || !/(?:cite)?turn0/i.test(text)) return text;
-  return text
+  if (!text) return text;
+  const withoutRtf = cleanNewsletterCopy(text);
+  if (!/(?:cite)?turn0/i.test(withoutRtf)) return withoutRtf;
+  return withoutRtf
     .replace(CITE_TOKEN_RE, "")
     .replace(/([.!?])([A-Za-z])/g, "$1 $2")
     .replace(/[ \t]{2,}/g, " ");
@@ -20,7 +23,7 @@ function sanitizeCanvasElements(elements: CanvasEl[]): { elements: CanvasEl[]; c
   let changed = false;
   const next = elements.map((el) => {
     if (el.kind === "text") {
-      const html = stripAiCitationMarkers(el.html);
+      const html = stripAiCitationMarkers(peelTrailingRtfLink(el.html).text);
       if (html === el.html) return el;
       changed = true;
       return { ...el, html };
@@ -52,12 +55,22 @@ export function sanitizeStoriesStateCitations(state: StoriesState): { state: Sto
   const stories = (state.stories ?? []).map((story) => {
     const title = stripAiCitationMarkers(story.title ?? "");
     const excerpt = stripAiCitationMarkers(story.excerpt ?? "");
-    const body = stripAiCitationMarkers(story.body ?? "");
-    if (title === (story.title ?? "") && excerpt === (story.excerpt ?? "") && body === (story.body ?? "")) {
+    const peeled = peelTrailingRtfLink(story.body ?? "");
+    const body = stripAiCitationMarkers(peeled.text);
+    const genericCta = !story.ctaLabel?.trim() || /^read more/i.test(story.ctaLabel.trim());
+    const ctaLabel = genericCta && peeled.label ? peeled.label : stripAiCitationMarkers(story.ctaLabel ?? "");
+    const ctaUrl = genericCta && peeled.url ? peeled.url : stripAiCitationMarkers(story.ctaUrl ?? "");
+    if (
+      title === (story.title ?? "") &&
+      excerpt === (story.excerpt ?? "") &&
+      body === (story.body ?? "") &&
+      ctaLabel === (story.ctaLabel ?? "") &&
+      ctaUrl === (story.ctaUrl ?? "")
+    ) {
       return story;
     }
     changed = true;
-    return { ...story, title, excerpt, body };
+    return { ...story, title, excerpt, body, ctaLabel, ctaUrl };
   });
 
   const stringFields = [
@@ -110,9 +123,25 @@ export function sanitizeStoriesStateCitations(state: StoriesState): { state: Sto
   let canvas = state.newsletterCanvas;
   if (canvas?.elements?.length) {
     const sanitized = sanitizeCanvasElements(canvas.elements);
-    if (sanitized.changed) {
+    let elements = sanitized.elements;
+    let canvasChanged = sanitized.changed;
+    let storyIdx = -1;
+    for (const story of stories) {
+      if (story.kind === "divider" || story.kind === "text") continue;
+      storyIdx += 1;
+      const ctaId = `migrated-cta-${storyIdx}`;
+      elements = elements.map((el) => {
+        if (el.kind !== "cta" || el.id !== ctaId) return el;
+        const label = story.ctaLabel || el.label;
+        const href = story.ctaUrl || el.href;
+        if (label === el.label && href === el.href) return el;
+        canvasChanged = true;
+        return { ...el, label, href };
+      });
+    }
+    if (canvasChanged) {
       changed = true;
-      canvas = { ...canvas, elements: sanitized.elements } satisfies NewsletterCanvas;
+      canvas = { ...canvas, elements } satisfies NewsletterCanvas;
     }
   }
 

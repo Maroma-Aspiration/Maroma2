@@ -42,6 +42,15 @@ export function ProductPdpPinnedStage() {
       }
 
       if (details.contains(target)) {
+        const scroller = details.querySelector<HTMLElement>(".product-pdp-info") ?? details;
+        const nested = target instanceof Element ? target.closest("textarea, select, .product-pdp-thumbs") : null;
+        if (nested instanceof HTMLElement && nested !== scroller && canScroll(nested, event.deltaY)) {
+          return;
+        }
+        if (canScroll(scroller, event.deltaY)) {
+          event.preventDefault();
+          scroller.scrollTop += event.deltaY;
+        }
         return;
       }
 

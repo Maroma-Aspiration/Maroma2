@@ -4,6 +4,8 @@ import { useLayoutEffect, useRef } from "react";
 
 /** Keep the complete product name within two lines at every available width. */
 export function ProductPdpTitle({ children }: { children: string }) {
+  const mistMatch = children.match(/^(.*)\s+(Hair\s*&\s*Body\s+Mist)$/i);
+  const isHairBodyMist = Boolean(mistMatch);
   const ref = useRef<HTMLHeadingElement>(null);
   useLayoutEffect(() => {
     const heading = ref.current;
@@ -51,7 +53,9 @@ export function ProductPdpTitle({ children }: { children: string }) {
   }, [children]);
   return (
     <div className="product-pdp-title-slot">
-      <h1 ref={ref} className="product-pdp-title">{children}</h1>
+      <h1 ref={ref} className={`product-pdp-title${isHairBodyMist ? " product-pdp-title--hair-body-mist" : ""}`}>
+        {mistMatch ? <>{mistMatch[1]}<br />{mistMatch[2]}</> : children}
+      </h1>
     </div>
   );
 }

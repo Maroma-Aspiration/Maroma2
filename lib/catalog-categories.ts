@@ -255,7 +255,7 @@ export function isSuitableForCollection(product: ProductRecord, slug: string): b
     return !isHomeFragranceProduct(product);
   }
 
-  if (slug === "perfumes" && /\bsoap\b/.test(name)) return false;
+  if (slug === "perfumes" && /\b(?:soap|sachet|reed\s*stick|ambient\s*perfume|room\s*mist)\b/.test(name)) return false;
 
   if (slug === "home-essentials" && /\b(beard\s+oil|after\s*-?\s*shave|aftershave)\b/.test(name)) {
     return false;

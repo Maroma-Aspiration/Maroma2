@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 import { SignOutButton } from "../../../components/SignOutButton";
 import { formatInrPrice } from "../../../../lib/format-price";
@@ -19,11 +20,13 @@ type ProductEditClientProps = {
 };
 
 export default function ProductEditClient({ productId }: ProductEditClientProps) {
+  const router = useRouter();
   const [product, setProduct] = useState<AdminProductDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [saveSucceeded, setSaveSucceeded] = useState(false);
   const [uploadingSlot, setUploadingSlot] = useState<string | null>(null);
+  const [deletingSlot, setDeletingSlot] = useState<string | null>(null);
   const [uploadedSlot, setUploadedSlot] = useState<string | null>(null);
   const [status, setStatus] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -41,6 +44,8 @@ export default function ProductEditClient({ productId }: ProductEditClientProps)
   const [categoriesText, setCategoriesText] = useState("");
   const [tagsText, setTagsText] = useState("");
   const [images, setImages] = useState<string[]>([]);
+  const [sizesText, setSizesText] = useState("");
+  const [duplicating, setDuplicating] = useState(false);
 
   const hydrateForm = useCallback((detail: AdminProductDetail) => {
     setName(detail.name);
@@ -56,6 +61,7 @@ export default function ProductEditClient({ productId }: ProductEditClientProps)
     setCategoriesText(detail.categories.join(", "));
     setTagsText(detail.tags.join(", "));
     setImages(detail.images.length > 0 ? detail.images : detail.imageUrl ? [detail.imageUrl] : []);
+    setSizesText((detail.attributes.Size ?? []).join(", "));
   }, []);
 
   const loadProduct = useCallback(async () => {
@@ -111,6 +117,7 @@ export default function ProductEditClient({ productId }: ProductEditClientProps)
           brand,
           categories,
           tags,
+          attributes: { ...product?.attributes, Size: sizesText.split(",").map((size) => size.trim()).filter(Boolean) },
         }),
       });
       const data = (await res.json()) as { product?: AdminProductDetail; error?: string };
@@ -126,6 +133,25 @@ export default function ProductEditClient({ productId }: ProductEditClientProps)
       setError(err instanceof Error ? err.message : "Could not save product.");
     } finally {
       setSaving(false);
+    }
+  };
+
+  const duplicateProduct = async () => {
+    if (duplicating) return;
+    setDuplicating(true);
+    setError(null);
+    try {
+      const res = await fetch("/api/admin/products", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ duplicateFrom: productId }),
+      });
+      const data = (await res.json()) as { product?: AdminProductDetail; error?: string };
+      if (!res.ok || !data.product) throw new Error(data.error || "Could not duplicate product.");
+      router.push(`/admin/products/${data.product.id}`);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not duplicate product.");
+      setDuplicating(false);
     }
   };
 
@@ -158,6 +184,28 @@ export default function ProductEditClient({ productId }: ProductEditClientProps)
       setError(err instanceof Error ? err.message : "Upload failed.");
     } finally {
       setUploadingSlot(null);
+    }
+  };
+
+  const deleteImage = async (slot: string) => {
+    if (deletingSlot) return;
+    setDeletingSlot(slot);
+    setError(null);
+    try {
+      const res = await fetch("/api/products/upload", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "remove-image", productId, slot }),
+      });
+      const data = (await res.json()) as { allImages?: string[]; error?: string };
+      if (!res.ok) throw new Error(data.error || "Could not remove image.");
+      setImages(data.allImages ?? []);
+      setStatus("Image removed.");
+      await loadProduct();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not remove image.");
+    } finally {
+      setDeletingSlot(null);
     }
   };
 
@@ -204,6 +252,9 @@ export default function ProductEditClient({ productId }: ProductEditClientProps)
             <Link href={`/product/${productId}`} className="button secondary" target="_blank">
               View on store
             </Link>
+            <button type="button" className="button secondary" disabled={duplicating} onClick={() => void duplicateProduct()}>
+              {duplicating ? "Creating duplicate…" : "Create new duplicate listing"}
+            </button>
             <SignOutButton />
             <button
               type="button"
@@ -230,6 +281,10 @@ export default function ProductEditClient({ productId }: ProductEditClientProps)
               <label className="catalog-admin-field">
                 <span>Title</span>
                 <input type="text" value={name} onChange={(e) => setName(e.target.value)} />
+              </label>
+              <label className="catalog-admin-field">
+                <span>Size (comma-separated)</span>
+                <input type="text" value={sizesText} onChange={(e) => setSizesText(e.target.value)} placeholder="e.g. 100 ml" />
               </label>
               <label className="catalog-admin-field">
                 <span>Short description</span>
@@ -278,6 +333,16 @@ export default function ProductEditClient({ productId }: ProductEditClientProps)
                           }}
                         />
                       </label>
+                      {imageUrl ? (
+                        <button
+                          type="button"
+                          className="button secondary catalog-admin-upload-btn"
+                          disabled={deletingSlot !== null || uploadingSlot !== null}
+                          onClick={() => void deleteImage(slot.id)}
+                        >
+                          {deletingSlot === slot.id ? "Deleting…" : "Delete image"}
+                        </button>
+                      ) : null}
                     </div>
                   );
                 })}

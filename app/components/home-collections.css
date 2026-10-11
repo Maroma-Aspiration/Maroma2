@@ -108,19 +108,21 @@
 
 .home-collection-card-title {
   position: absolute;
-  top: clamp(12px, 1.2vw, 22px);
-  left: clamp(12px, 1.2vw, 22px);
+  bottom: clamp(14px, 3vw, 30px);
+  left: 50%;
   z-index: 1;
   margin: 0;
   max-width: calc(100% - 24px);
   font-family: var(--font-sans), "Montserrat", "Helvetica", sans-serif;
-  font-size: clamp(1.15rem, 2.4vw, 2.05rem);
-  font-weight: 500;
+  font-size: clamp(1.2rem, 3.36vw, 2.16rem);
+  font-weight: 400;
   line-height: 1.08;
-  letter-spacing: 0.08em;
+  letter-spacing: 0.18em;
   text-transform: uppercase;
   color: #f8f6f1;
   text-shadow: 0 2px 18px rgba(8, 24, 28, 0.45);
+  transform: translateX(-50%);
+  white-space: nowrap;
 }
 
 .page.maroma:not(.is-mobile-layout):not(.is-mobile-document-flow)
@@ -163,12 +165,49 @@
   line-height: 1.3;
   letter-spacing: 0.01em;
   text-align: center;
-  white-space: nowrap;
+  white-space: normal;
 }
 
 .home-collections-section .home-collections-subtitle .scroller-subtitle-line {
-  display: inline;
+  display: block;
   white-space: nowrap;
+}
+
+.home-collections-section .home-collections-subtitle .scroller-subtitle-line + .scroller-subtitle-line::before {
+  content: none;
+}
+
+@media (min-width: 768px) {
+  body:not(.admin-mobile-preview-active) .home-collections-section .scroller-subtitle.home-collections-subtitle {
+    white-space: nowrap;
+  }
+
+  body:not(.admin-mobile-preview-active) .home-collections-section .home-collections-subtitle .scroller-subtitle-line {
+    display: inline;
+  }
+
+  body:not(.admin-mobile-preview-active) .home-collections-section .home-collections-subtitle .scroller-subtitle-line + .scroller-subtitle-line::before {
+    content: " ";
+  }
+}
+
+.page.maroma.is-mobile-layout .home-collections-section .scroller-subtitle.home-collections-subtitle,
+.page.maroma.is-mobile-document-flow .home-collections-section .scroller-subtitle.home-collections-subtitle,
+body.admin-mobile-preview-active .home-collections-section .scroller-subtitle.home-collections-subtitle {
+  white-space: normal;
+}
+
+.page.maroma.is-mobile-layout .home-collections-section .home-collections-subtitle .scroller-subtitle-line,
+.page.maroma.is-mobile-document-flow .home-collections-section .home-collections-subtitle .scroller-subtitle-line,
+body.admin-mobile-preview-active .home-collections-section .home-collections-subtitle .scroller-subtitle-line {
+  display: block;
+  white-space: nowrap;
+}
+
+.page.maroma.is-mobile-layout .home-collections-section .home-collections-subtitle .scroller-subtitle-line + .scroller-subtitle-line::before,
+.page.maroma.is-mobile-document-flow .home-collections-section .home-collections-subtitle .scroller-subtitle-line + .scroller-subtitle-line::before,
+body.admin-mobile-preview-active .home-collections-section .home-collections-subtitle .scroller-subtitle-line + .scroller-subtitle-line::before {
+  content: none;
 }
 
 .home-collection-card-wrap {
@@ -431,16 +470,16 @@
 
 .page.maroma.is-mobile-document-flow .home-collection-card-title,
 .page.maroma.is-mobile-layout .home-collection-card-title {
-  left: 0;
-  right: 0;
-  width: auto;
+  left: 50%;
+  right: auto;
+  width: max-content;
   max-width: none;
-  padding-inline: 14px;
+  padding: 0;
   text-align: center;
   font-family: var(--font-sans), "Montserrat", "Helvetica", sans-serif;
-  font-size: calc(0.78rem * 1.75);
-  font-weight: 500;
-  letter-spacing: 0.12em;
+  font-size: clamp(1.2rem, 3.36vw, 2.16rem);
+  font-weight: 400;
+  letter-spacing: 0.18em;
 }
 
 /* Desktop only: title + tiles, no floral band, stable position below hero overlap. */
@@ -666,7 +705,6 @@
   margin-top: 2px;
   padding-inline: 10px;
   font-size: clamp(0.72rem, 3.2vw, 0.95rem);
-  white-space: normal;
 }
 
 @media (max-width: 760px) {

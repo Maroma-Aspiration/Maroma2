@@ -12,6 +12,13 @@ type Props = {
   videos?: string[];
   productName: string;
   ready3d?: boolean;
+  notice?: string | null;
+  /** Product-family controls can replace gallery views with variation thumbnails. */
+  variantThumbnails?: { id: string; src: string; label: string }[];
+  activeVariantId?: string;
+  onVariantSelect?: (id: string) => void;
+  thumbnailsSide?: "left" | "right";
+  imageScale?: number;
 };
 
 function sourceType(src: string) {
@@ -19,7 +26,7 @@ function sourceType(src: string) {
   return type ? { type } : {};
 }
 
-export function ProductPdpGallery({ images, videos = [], productId = "", productName, ready3d = false }: Props) {
+export function ProductPdpGallery({ images, videos = [], productId = "", productName, ready3d = false, notice, variantThumbnails, activeVariantId, onVariantSelect, thumbnailsSide, imageScale = 1.491 }: Props) {
   const { isAdminUser } = useAdminSession();
   const [uploadedVideos, setUploadedVideos] = useState<string[] | null>(null);
   const [uploading, setUploading] = useState(false);
@@ -46,6 +53,10 @@ export function ProductPdpGallery({ images, videos = [], productId = "", product
   };
   const [active, setActive] = useState(0);
   const lastImageStepRef = useRef(0);
+  const imageKey = images.join("|");
+  useEffect(() => {
+    setActive(0);
+  }, [imageKey]);
   const main = list[active];
 
   useEffect(() => {
@@ -83,14 +94,19 @@ export function ProductPdpGallery({ images, videos = [], productId = "", product
   const decodedName = decodeBasicHtmlEntities(productName);
 
   return (
-    <div className="product-pdp-gallery" aria-label="Product gallery">
+    <div className={`product-pdp-gallery${variantThumbnails ? " product-pdp-gallery--variants" : ""}${thumbnailsSide === "right" ? " product-pdp-gallery--thumbs-right" : ""}`} aria-label="Product gallery">
       <div className="product-pdp-main-visual">
-        {main.type === "video" ? <video controls playsInline autoPlay muted preload="metadata" onEnded={() => setActive(0)} aria-label={`${decodedName} product video`}><source src={main.src} {...sourceType(main.src)} /></video> : <img src={main.src} alt={`${decodedName}, Maroma product photo`} style={{ transform: `${productImageTransform(productId) ?? ""} scale(1.491)`.trim(), transformOrigin: "center" }} fetchPriority="high" />}
+        {main.type === "video" ? <video key={main.src} controls playsInline autoPlay muted preload="metadata" onEnded={() => setActive(0)} aria-label={`${decodedName} product video`}><source src={main.src} {...sourceType(main.src)} /></video> : <img key={main.src} src={main.src} alt={`${decodedName}, Maroma product photo`} style={{ transform: `${productImageTransform(productId) ?? ""} scale(${imageScale})`.trim(), transformOrigin: "center" }} fetchPriority="high" />}
         {badge}
+        {notice ? <p className="product-pdp-image-need">{notice}</p> : null}
       </div>
-      {list.length > 1 || isAdminUser ? (
-        <div className="product-pdp-thumbs" role="tablist" aria-label="Gallery thumbnails">
-          {list.map((item, index) => (
+      {variantThumbnails?.length || list.length > 1 || isAdminUser ? (
+        <div className="product-pdp-thumbs" role="tablist" aria-label={variantThumbnails ? "Votive varieties" : "Gallery thumbnails"}>
+          {variantThumbnails ? variantThumbnails.map((item) => (
+            <button key={item.id} type="button" role="tab" aria-selected={item.id === activeVariantId} className={`product-pdp-thumb product-pdp-variant-thumb${item.id === activeVariantId ? " is-active" : ""}`} onClick={() => onVariantSelect?.(item.id)} aria-label={item.label} title={item.label}>
+              <img src={item.src} alt={`${item.label} votive`} loading="lazy" />
+            </button>
+          )) : list.map((item, index) => (
             <button
               key={`${item.src}-${index}`}
               type="button"

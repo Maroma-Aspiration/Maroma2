@@ -5,6 +5,7 @@ import { decodeBasicHtmlEntities } from "../../lib/decode-html-entities";
 import { isGift3dPreviewProduct } from "../../lib/gift-builder-catalog";
 import { getProductCardImages } from "../../lib/product-gallery";
 import { isGiftingProduct } from "../../lib/product-gifting";
+import { isFamilyListingProduct } from "../../lib/product-families";
 import { resolveProductNetMeasure } from "../../lib/product-net-measure";
 import { productPriceState } from "../../lib/product-pricing";
 import type { ProductRecord } from "../../lib/product-types";
@@ -15,12 +16,14 @@ type StorefrontProductCardProps = {
   product: ProductRecord;
   href?: string;
   compact?: boolean;
+  categorySlug?: string;
 };
 
 export function StorefrontProductCard({
   product,
   href,
   compact = false,
+  categorySlug,
 }: StorefrontProductCardProps) {
   const { formatCatalogPrice, isEstimated } = useCurrency();
   const { front: imageSrc, rear: rearSrc } = getProductCardImages(product);
@@ -31,7 +34,15 @@ export function StorefrontProductCard({
   const productHref = href ?? `/product/${product.id}`;
   const showBadge = isGiftingProduct(product) && isGift3dPreviewProduct(product.id);
   const netMeasure = resolveProductNetMeasure(product);
-  const measureLabel = netMeasure.value !== "As marked on the pack" ? netMeasure.value : "";
+  const familyListing = isFamilyListingProduct(product);
+  const categoryLabel = categorySlug
+    ? categorySlug.replace(/[-_]+/g, " ").replace(/\b\w/g, (letter) => letter.toUpperCase())
+    : "";
+  const measureLabel = familyListing
+    ? "100 g, 300 g, 600 g"
+    : netMeasure.value !== "As marked on the pack"
+      ? netMeasure.value
+      : "";
 
   return (
     <article className={`product-card${compact ? " product-card--compact" : ""}${rearSrc ? " has-rear-image" : ""}`}>
@@ -62,11 +73,18 @@ export function StorefrontProductCard({
           </div>
           {showBadge ? <span className="product-card-3d-badge">3D</span> : null}
         </div>
+      </Link>
+      {categorySlug ? (
+        <Link href={`/${categorySlug}`} className="product-card-collection-link">
+          View in {categoryLabel}
+        </Link>
+      ) : null}
+      <Link href={productHref} className="product-card-link product-card-copy-link">
         <div className="product-copy">
           <h3 className="product-card-title">{name}</h3>
           <p className={priceState.onSale ? "product-card-price is-on-sale" : "product-card-price"}>
             {priceState.onSale ? <s>{formatCatalogPrice(priceState.regular)}</s> : null}
-            <span>{priceLabel}</span>
+            <span>{familyListing ? `From ${priceLabel}` : priceLabel}</span>
             {measureLabel ? <span className="product-card-measure">{measureLabel}</span> : null}
           </p>
         </div>

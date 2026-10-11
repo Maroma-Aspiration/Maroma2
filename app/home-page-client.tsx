@@ -1624,7 +1624,7 @@ export default function HomePageClient({
   }, []);
 
   /** Phone frame on /admin/mobile-promo: take the banner draft straight from the editor panel. */
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (!initialMobilePromoPreview) {
       return;
     }
@@ -1635,10 +1635,14 @@ export default function HomePageClient({
       setMobilePromoPreviewBanner(data.banner);
     };
     window.addEventListener("message", onMessage);
+    // The editor must render the same customer-facing viewport as a phone.
+    // Apply this before paint so the admin bar cannot alter the banner crop.
+    document.documentElement.classList.add("is-promo-preview");
     document.body.classList.add("mobile-promo-frame");
     window.parent?.postMessage({ type: `${PROMO_MOBILE_PREVIEW_MESSAGE}:ready` }, window.location.origin);
     return () => {
       window.removeEventListener("message", onMessage);
+      document.documentElement.classList.remove("is-promo-preview");
       document.body.classList.remove("mobile-promo-frame");
     };
   }, [initialMobilePromoPreview]);
@@ -3153,9 +3157,14 @@ export default function HomePageClient({
     if (initialMobilePromoPreview && !mobilePromoPreviewBanner) return [];
     const selected =
       mobilePromoPreviewBanner ?? (promoEditorOpen ? promoEditorBanners : displayPromoBanners)[0];
-    const enabled = promoEditorOpen && promoEditorModeOverride !== null
-      ? promoEditorModeOverride
-      : isPromoModeEnabled(selected);
+    // The dedicated phone editor must always draw the promo selected in its
+    // control panel. It is also used to prepare inactive promos, so falling
+    // back to the homepage hero here makes every slider appear broken.
+    const enabled = initialMobilePromoPreview
+      ? true
+      : promoEditorOpen && promoEditorModeOverride !== null
+        ? promoEditorModeOverride
+        : isPromoModeEnabled(selected);
     if (!selected || !enabled) return [];
     return [showMobileLayout ? applyPromoMobileLayout(selected) : selected];
   }, [
@@ -4717,7 +4726,7 @@ export default function HomePageClient({
             "--loved-tint2-left-pct": `${lovedTint2LeftPct}%`,
           } as CSSProperties}
           title="Collections"
-          subtitle="Explore sustainable luxury essentials for body, home and wellbeing"
+          subtitle={"Explore sustainable luxury essentials\nfor body, home and wellbeing"}
         />
       ) : null}
     </>
@@ -4735,7 +4744,7 @@ export default function HomePageClient({
 
   const pageContent = (
     <div
-      className={`page maroma${showMobileLayout ? " is-mobile-layout" : ""}${useMobileDocumentFlow ? " is-mobile-document-flow" : ""}${persistLayoutToMobile && useMobileDocumentFlow ? " is-mobile-edit-active" : ""}${adminMobilePreviewActive ? " is-admin-mobile-preview" : ""}${initialPromoPreview ? " is-promo-preview-page" : ""}${introPhase === "playing" ? " is-intro-pending" : ""}`}
+      className={`page maroma${showMobileLayout ? " is-mobile-layout" : ""}${useMobileDocumentFlow ? " is-mobile-document-flow" : ""}${persistLayoutToMobile && useMobileDocumentFlow ? " is-mobile-edit-active" : ""}${adminMobilePreviewActive ? " is-admin-mobile-preview" : ""}${initialPromoPreview ? " is-promo-preview-page" : ""}${initialMobilePromoPreview ? " is-mobile-promo-preview" : ""}${introPhase === "playing" ? " is-intro-pending" : ""}`}
       style={{
         ...pageStackStyle,
         ...(introPhase !== "done"

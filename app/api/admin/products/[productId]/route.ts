@@ -60,6 +60,7 @@ export async function PATCH(request: Request, context: RouteContext) {
   if (body.categories !== undefined) editPatch.categories = body.categories;
   if (body.tags !== undefined) editPatch.tags = body.tags;
   if (body.brand !== undefined) editPatch.brand = body.brand.trim();
+  if (body.attributes !== undefined) editPatch.attributes = body.attributes;
   if (body.published !== undefined) editPatch.published = body.published;
 
   if (Object.keys(editPatch).length > 0) {

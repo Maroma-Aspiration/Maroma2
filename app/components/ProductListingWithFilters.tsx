@@ -24,7 +24,9 @@ import { getDisplayImageUrl } from "../../lib/product-image";
 import { productPriceState } from "../../lib/product-pricing";
 import type { ProductRecord } from "../../lib/product-types";
 import { useAdminSession } from "../../lib/use-admin-session";
+import { collapseProductFamilyListings, isFamilyListingProduct } from "../../lib/product-families";
 import { StorefrontProductCard } from "./StorefrontProductCard";
+import { ProductCardBuyNow } from "./ProductCardBuyNow";
 
 type Props = {
   products: ProductRecord[];
@@ -110,10 +112,21 @@ const SHOP_TYPES: Record<string, ShopType[]> = {
   "home-essentials": [
     { id: "colibri", label: "Colibri", tokens: ["colibri"] },
     { id: "incense", label: "Incense", tokens: ["incense", "smudge"] },
+    { id: "incense-sticks", label: "Incense Sticks", tokens: ["incense sticks"] },
+    { id: "incense-cones", label: "Incense Cones", tokens: ["cone incense", "incense cones"] },
+    { id: "leaf-incense", label: "Leaf Incense", tokens: ["leaf incense", "smudge leaf incense"] },
+    { id: "aromatherapy-incense", label: "Aromatherapy Incense", tokens: ["aromatherapy incense"] },
     { id: "candles", label: "Candles", tokens: ["candle", "votive"] },
-    { id: "holders", label: "Incense & Candle Holders", tokens: ["holder"] },
+    { id: "pillar-candles", label: "Pillar Candles", tokens: ["pillar candle"] },
+    { id: "votive-70g", label: "70 g Votive Candles", tokens: ["70g"] },
+    { id: "votive-95g", label: "95 g Votive Candles", tokens: ["95g"] },
+    { id: "incense-holders", label: "Incense Holders", tokens: ["incense holder"] },
+    { id: "candle-holders", label: "Candle Holders", tokens: ["candle holder"] },
     { id: "diffusers", label: "Diffusers", tokens: ["diffuser", "perfume mat"] },
     { id: "sachets", label: "Sachets", tokens: ["sachet"] },
+    { id: "hanging-sachets", label: "Hanging Sachets", tokens: ["hanging sachet"] },
+    { id: "jute-sachets", label: "Jute Sachets", tokens: ["jute sachet"] },
+    { id: "perfumed-sachets", label: "Perfumed Sachets", tokens: ["perfumed sachet", "perfume sachet"] },
     { id: "home-care", label: "Everyday Care", tokens: ["dish wash", "hand wash"] },
   ],
   colibri: [
@@ -134,12 +147,19 @@ const SHOP_TYPES: Record<string, ShopType[]> = {
   ],
 };
 
+const INCENSE_SUB_TYPE_IDS = new Set(["incense-sticks", "incense-cones", "leaf-incense", "aromatherapy-incense"]);
+const CANDLE_SUB_TYPE_IDS = new Set(["pillar-candles", "votive-70g", "votive-95g"]);
+const SACHET_SUB_TYPE_IDS = new Set(["hanging-sachets", "jute-sachets", "perfumed-sachets"]);
+
 const isHolderProduct = (product: ProductRecord): boolean =>
   catalogKeywordMatches([product.name, ...product.categories, ...product.tags].join(" "), ["holder"]);
 
 const matchesShopType = (product: ProductRecord, tokens: string[]): boolean => {
   const text = [product.name, ...product.categories, ...product.tags].join(" ");
   if (!catalogKeywordMatches(text, tokens)) return false;
+  if (tokens.includes("body spray") && catalogKeywordMatches(text, ["colibri"])) return false;
+      if (tokens.includes("mist") && /sachet|ambient|room\s*mist|home\s*fragrance/i.test(text)) return false;
+  if (tokens.includes("collection") && isHomeFragranceProduct(product)) return false;
   if (tokens.some((token) => ["man", "men", "him", "male"].includes(token)) && isHomeFragranceProduct(product)) {
     return false;
   }
@@ -151,7 +171,10 @@ const matchesShopType = (product: ProductRecord, tokens: string[]): boolean => {
 };
 
 const productSizeRank = (product: ProductRecord): number => {
-  const match = `${product.name} ${product.sku ?? ""}`.match(/(\d+(?:\.\d+)?)\s*(ml|g|kg|l|oz)\b/i);
+  const sizeAttributes = Object.entries(product.attributes ?? {})
+    .filter(([key]) => /^(size|volume|net volume|net weight|weight|pack size)$/i.test(key))
+    .flatMap(([, values]) => values);
+  const match = `${sizeAttributes.join(" ")} ${product.name} ${product.sku ?? ""}`.match(/(\d+(?:\.\d+)?)\s*(ml|g|kg|l|oz)\b/i);
   if (!match) return Number.POSITIVE_INFINITY;
   const amount = Number(match[1]);
   const unit = match[2].toLowerCase();
@@ -159,6 +182,13 @@ const productSizeRank = (product: ProductRecord): number => {
   if (unit === "oz") return amount * 29.57;
   return amount;
 };
+
+const productFamilyKey = (product: ProductRecord): string =>
+  product.name
+    .replace(/\b\d+(?:\.\d+)?\s*(?:ml|g|kg|l|oz)\b/gi, "")
+    .replace(/[^a-z0-9]+/gi, " ")
+    .trim()
+    .toLocaleLowerCase();
 
 const productTypeGroupIndex = (product: ProductRecord, types: ShopType[]): number => {
   const index = types.findIndex((type) => matchesShopType(product, type.tokens));
@@ -168,6 +198,15 @@ const productTypeGroupIndex = (product: ProductRecord, types: ShopType[]): numbe
 const compareFeaturedProducts = (a: ProductRecord, b: ProductRecord, types: ShopType[]): number => {
   const group = productTypeGroupIndex(a, types) - productTypeGroupIndex(b, types);
   if (group) return group;
+  const isConditionerListing = (product: ProductRecord): boolean =>
+    product.categories.some((category) => category.toLowerCase().includes("conditioner")) ||
+    /conditioner/i.test(product.name);
+  if (isConditionerListing(a) && isConditionerListing(b)) {
+    const size = productSizeRank(a) - productSizeRank(b);
+    if (size) return size;
+  }
+  const family = productFamilyKey(a).localeCompare(productFamilyKey(b), undefined, { sensitivity: "base" });
+  if (family) return family;
   const size = productSizeRank(a) - productSizeRank(b);
   if (size) return size;
   return a.name.localeCompare(b.name, undefined, { sensitivity: "base" });
@@ -290,10 +329,16 @@ const matchesGiftPriceBand = (product: ProductRecord, band: GiftPriceBand): bool
 
 export function ProductListingWithFilters({ products, categorySlug, searchQuery = "" }: Props) {
   const { formatMoney, formatCatalogPrice, isEstimated } = useCurrency();
+  const categoryLabel = categorySlug
+    ? categorySlug.replace(/[-_]+/g, " ").replace(/\b\w/g, (letter) => letter.toUpperCase())
+    : "";
   const [selected, setSelected] = useState<Record<string, string[]>>({});
   const [shopTypeId, setShopTypeId] = useState<string | null>(categorySlug ? "all" : null);
   const [sortBy, setSortBy] = useState<ProductSort>("featured");
   const [filtersOpen, setFiltersOpen] = useState(false);
+  const [incenseTypesOpen, setIncenseTypesOpen] = useState(false);
+  const [candleTypesOpen, setCandleTypesOpen] = useState(false);
+  const [sachetTypesOpen, setSachetTypesOpen] = useState(false);
   const [isGridLoading, setIsGridLoading] = useState(false);
   const [priceMinInput, setPriceMinInput] = useState("");
   const [priceMaxInput, setPriceMaxInput] = useState("");
@@ -338,12 +383,31 @@ export function ProductListingWithFilters({ products, categorySlug, searchQuery 
       .map((type) => ({ ...type, count: products.filter((product) => matchesShopType(product, type.tokens)).length }))
       .filter((type) => type.count > 0 || (categorySlug === "gifting" && ["gift-women", "gift-men", "gift-corporate"].includes(type.id)));
   }, [categorySlug, products]);
+  const primaryShopTypes = useMemo(
+    () => availableShopTypes.filter((type) => !INCENSE_SUB_TYPE_IDS.has(type.id) && !CANDLE_SUB_TYPE_IDS.has(type.id) && !SACHET_SUB_TYPE_IDS.has(type.id)),
+    [availableShopTypes]
+  );
+  const incenseShopTypes = useMemo(
+    () => availableShopTypes.filter((type) => INCENSE_SUB_TYPE_IDS.has(type.id)),
+    [availableShopTypes]
+  );
+  const candleShopTypes = useMemo(
+    () => availableShopTypes.filter((type) => CANDLE_SUB_TYPE_IDS.has(type.id)),
+    [availableShopTypes]
+  );
+  const sachetShopTypes = useMemo(
+    () => availableShopTypes.filter((type) => SACHET_SUB_TYPE_IDS.has(type.id)),
+    [availableShopTypes]
+  );
 
   useEffect(() => {
     if (!categorySlug || availableShopTypes.length === 0) return;
     const saved = window.sessionStorage.getItem(`maroma-shop-type:${categorySlug}`);
     if (saved === "all" || (saved && availableShopTypes.some((type) => type.id === saved))) {
       setShopTypeId(saved);
+      if (saved && INCENSE_SUB_TYPE_IDS.has(saved)) setIncenseTypesOpen(true);
+      if (saved && CANDLE_SUB_TYPE_IDS.has(saved)) setCandleTypesOpen(true);
+      if (saved && SACHET_SUB_TYPE_IDS.has(saved)) setSachetTypesOpen(true);
     }
   }, [availableShopTypes, categorySlug]);
 
@@ -481,8 +545,8 @@ export function ProductListingWithFilters({ products, categorySlug, searchQuery 
     } else {
       result.sort((a, b) => compareFeaturedProducts(a, b, availableShopTypes));
     }
-    return result;
-  }, [availableShopTypes, filtered, sortBy]);
+    return collapseProductFamilyListings(result, { preserveIndividuals: Boolean(searchQuery?.trim()) });
+  }, [availableShopTypes, filtered, searchQuery, sortBy]);
 
   const revealLoadingState = useCallback(() => {
     setIsGridLoading(true);
@@ -635,28 +699,36 @@ export function ProductListingWithFilters({ products, categorySlug, searchQuery 
           const convertedPrice = formatCatalogPrice(priceState.active);
           const priceLabel = convertedPrice ? `${isEstimated ? "≈ " : ""}${convertedPrice}` : "Price on request";
           return (
-            <button
+            <article
               key={product.id}
-              type="button"
               className={`collection-recommended-card${activeRecommendationId === product.id ? " is-active" : ""}`}
-              aria-expanded={activeRecommendationId === product.id}
-              onClick={() => {
-                setActiveRecommendationId((current) => current === product.id ? null : product.id);
-                setRecommendationDetails({});
-              }}
             >
-              <div className="collection-recommended-image">
+              <button
+                type="button"
+                className="collection-recommended-card-select"
+                aria-expanded={activeRecommendationId === product.id}
+                onClick={() => {
+                  setActiveRecommendationId((current) => current === product.id ? null : product.id);
+                  setRecommendationDetails({});
+                }}
+              >
+                <div className="collection-recommended-image">
                   {imageSrc ? <img src={imageSrc} alt={`${decodeBasicHtmlEntities(product.name)} - Maroma`} loading="lazy" decoding="async" /> : null}
+                </div>
+                <div className="collection-recommended-copy">
+                  {categoryLabel ? <span className="collection-recommended-category">View in {categoryLabel}</span> : null}
+                  <h3>{decodeBasicHtmlEntities(product.name)}</h3>
+                  <p className={priceState.onSale ? "collection-recommended-price is-on-sale" : "collection-recommended-price"}>
+                    {priceState.onSale ? <s>{formatCatalogPrice(priceState.regular)}</s> : null}
+                    <span>{priceLabel}</span>
+                  </p>
+                </div>
+              </button>
+              <div className="product-card-actions collection-recommended-actions">
+                <Link href={`/product/${product.id}`} className="product-card-cta product-card-cta--primary">Add to Basket</Link>
+                <ProductCardBuyNow product={product} />
               </div>
-              <div className="collection-recommended-copy">
-                <h3>{decodeBasicHtmlEntities(product.name)}</h3>
-                <p className={priceState.onSale ? "collection-recommended-price is-on-sale" : "collection-recommended-price"}>
-                  {priceState.onSale ? <s>{formatCatalogPrice(priceState.regular)}</s> : null}
-                  <span>{priceLabel}</span>
-                </p>
-                <span>Personalise this choice <span aria-hidden="true">→</span></span>
-              </div>
-            </button>
+            </article>
           );
         })}
       </div>
@@ -898,21 +970,47 @@ export function ProductListingWithFilters({ products, categorySlug, searchQuery 
             <span>Browse all</span>
             <small>{products.length}</small>
           </button>
-          {availableShopTypes.map((type) => (
+          {primaryShopTypes.map((type) => {
+            const isIncense = type.id === "incense" && incenseShopTypes.length > 0;
+            const isCandles = type.id === "candles" && candleShopTypes.length > 0;
+            const isSachets = type.id === "sachets" && sachetShopTypes.length > 0;
+            const isExpandable = isIncense || isCandles || isSachets;
+            const incenseSubTypeSelected = incenseShopTypes.some((child) => child.id === shopTypeId);
+            const candleSubTypeSelected = candleShopTypes.some((child) => child.id === shopTypeId);
+            const sachetSubTypeSelected = sachetShopTypes.some((child) => child.id === shopTypeId);
+            const parentOpen = isIncense ? incenseTypesOpen : isCandles ? candleTypesOpen : isSachets ? sachetTypesOpen : false;
+            const subTypeSelected = isIncense ? incenseSubTypeSelected : isCandles ? candleSubTypeSelected : sachetSubTypeSelected;
+            return (
             <button
               key={type.id}
               type="button"
-              className={`collection-shop-type-button${shopTypeId === type.id ? " is-complete" : ""}`}
-              aria-pressed={shopTypeId === type.id}
+              className={`collection-shop-type-button${shopTypeId === type.id || (isExpandable && subTypeSelected) ? " is-complete" : ""}${isExpandable ? " collection-expandable-parent-button" : ""}`}
+              aria-pressed={shopTypeId === type.id || (isExpandable && subTypeSelected)}
+              aria-expanded={isExpandable ? parentOpen : undefined}
               onClick={() => {
                 const selectedGender = perfumeNavSelection.gender;
                 setShopTypeId(type.id);
+                if (isIncense) {
+                  setIncenseTypesOpen((open) => !open);
+                  setCandleTypesOpen(false);
+                  setSachetTypesOpen(false);
+                }
+                if (isCandles) {
+                  setCandleTypesOpen((open) => !open);
+                  setIncenseTypesOpen(false);
+                  setSachetTypesOpen(false);
+                }
+                if (isSachets) {
+                  setSachetTypesOpen((open) => !open);
+                  setIncenseTypesOpen(false);
+                  setCandleTypesOpen(false);
+                }
                 clearAll();
                 if (showPerfumeGenderNav && selectedGender) {
                   setPerfumeNavSelection({ gender: selectedGender, typeKey: null, lineKey: null });
                 }
                 revealLoadingState();
-                scrollToProductResults();
+                if (!isExpandable) scrollToProductResults();
               }}
             >
               <span className="collection-shop-type-photo" aria-hidden="true">
@@ -924,10 +1022,56 @@ export function ProductListingWithFilters({ products, categorySlug, searchQuery 
                   return image ? <img src={image} alt="" /> : <span>✦</span>;
                 })()}
               </span>
-              <span>{type.label}</span><small>{type.count}</small>
+              <span>{type.label}</span><small>{type.count}</small>{isExpandable ? <span className="collection-incense-chevron" aria-hidden="true">⌄</span> : null}
             </button>
-          ))}
+            );
+          })}
         </div>
+        {categorySlug === "home-essentials" && incenseTypesOpen && incenseShopTypes.length > 0 ? (
+          <div className="collection-incense-subtypes" role="group" aria-label="Incense types">
+            {incenseShopTypes.map((type) => (
+              <button
+                key={type.id}
+                type="button"
+                className={`collection-shop-type-button collection-incense-subtype${shopTypeId === type.id ? " is-complete" : ""}`}
+                aria-pressed={shopTypeId === type.id}
+                onClick={() => { setShopTypeId(type.id); clearAll(); revealLoadingState(); scrollToProductResults(); }}
+              >
+                <span>{type.label}</span><small>{type.count}</small>
+              </button>
+            ))}
+          </div>
+        ) : null}
+        {categorySlug === "home-essentials" && candleTypesOpen && candleShopTypes.length > 0 ? (
+          <div className="collection-incense-subtypes collection-candle-subtypes" role="group" aria-label="Candle types">
+            {candleShopTypes.map((type) => (
+              <button
+                key={type.id}
+                type="button"
+                className={`collection-shop-type-button collection-incense-subtype${shopTypeId === type.id ? " is-complete" : ""}`}
+                aria-pressed={shopTypeId === type.id}
+                onClick={() => { setShopTypeId(type.id); clearAll(); revealLoadingState(); scrollToProductResults(); }}
+              >
+                <span>{type.label}</span><small>{type.count}</small>
+              </button>
+            ))}
+          </div>
+        ) : null}
+        {categorySlug === "home-essentials" && sachetTypesOpen && sachetShopTypes.length > 0 ? (
+          <div className="collection-incense-subtypes collection-sachet-subtypes" role="group" aria-label="Sachet types">
+            {sachetShopTypes.map((type) => (
+              <button
+                key={type.id}
+                type="button"
+                className={`collection-shop-type-button collection-incense-subtype${shopTypeId === type.id ? " is-complete" : ""}`}
+                aria-pressed={shopTypeId === type.id}
+                onClick={() => { setShopTypeId(type.id); clearAll(); revealLoadingState(); scrollToProductResults(); }}
+              >
+                <span>{type.label}</span><small>{type.count}</small>
+              </button>
+            ))}
+          </div>
+        ) : null}
       </section> : null}
 
       {categorySlug && recommendationsOpen ? (
@@ -1224,7 +1368,7 @@ export function ProductListingWithFilters({ products, categorySlug, searchQuery 
       ) : null}
 
       <div className="product-listing-toolbar">
-        <span>{filtered.length} {filtered.length === 1 ? "product" : "products"}</span>
+        <span>{sortedProducts.length} {sortedProducts.length === 1 ? "product" : "products"}</span>
         <label>
           <span>Sort by</span>
           <select value={sortBy} onChange={(event) => { setSortBy(event.target.value as ProductSort); revealLoadingState(); }}>
@@ -1249,18 +1393,26 @@ export function ProductListingWithFilters({ products, categorySlug, searchQuery 
               : `/product/${product.id}`;
             return (
               <div key={product.id} className="product-card-wrap">
-                <StorefrontProductCard product={product} href={productHref} />
+                <StorefrontProductCard product={product} href={productHref} categorySlug={categorySlug} />
                 {isAdmin && (
                   <div className="product-admin-upload-panel">
                     <div className="admin-upload-label">Upload images</div>
                     <div className="admin-upload-slots">
-                      {[
-                        { id: "main", label: "Main" },
-                        { id: "view1", label: "view 1" },
-                        { id: "view2", label: "view 2" },
-                        { id: "view3", label: "view 3" },
-                        { id: "view4", label: "view 4" }
-                      ].map((slot) => (
+                      {(isFamilyListingProduct(product)
+                        ? [
+                            { id: "group", label: "All sizes (have)" },
+                            { id: "100g", label: "100 g needed" },
+                            { id: "300g", label: "300 g needed" },
+                            { id: "600g", label: "600 g needed" },
+                          ]
+                        : [
+                            { id: "main", label: "Main" },
+                            { id: "view1", label: "view 1" },
+                            { id: "view2", label: "view 2" },
+                            { id: "view3", label: "view 3" },
+                            { id: "view4", label: "view 4" }
+                          ]
+                      ).map((slot) => (
                         <label key={slot.id} className="admin-upload-slot">
                           <span>{slot.label}</span>
                           <input 

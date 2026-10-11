@@ -19,6 +19,28 @@ export async function POST(request: Request) {
   if (request.headers.get("content-type")?.includes("application/json")) {
     try {
       const body = await request.json();
+      if (body.action === "remove-image") {
+        await requireAdmin();
+        const productId = String(body.productId ?? "").trim();
+        const slot = String(body.slot ?? "").toLowerCase();
+        const slotIndex = slot === "main" ? 0 : /^view[1-4]$/.test(slot) ? Number(slot.slice(4)) : -1;
+        if (!productId || slotIndex < 0) throw new Error("A product image slot is required.");
+        const product = await getAdminProduct(productId);
+        if (!product) throw new Error("Unknown product.");
+        const currentImages = product.images.filter(Boolean);
+        if (!currentImages[slotIndex]) throw new Error("No image is assigned to that slot.");
+        const nextImages = currentImages.filter((_, index) => index !== slotIndex);
+        const store = await readOverrides();
+        const existing = store.overrides[productId] || { updatedAt: "" };
+        store.overrides[productId] = {
+          ...existing,
+          imageUrl: nextImages[0] ?? "",
+          images: nextImages,
+          updatedAt: new Date().toISOString(),
+        };
+        await writeOverrides(store);
+        return NextResponse.json({ productId, allImages: nextImages });
+      }
       if (body.action === "attach-video") {
         await requireAdmin();
         const productId = String(body.productId ?? "");
@@ -69,8 +91,8 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Only image and video uploads are supported." }, { status: 400 });
     }
 
-    const exists = Boolean(await getAdminProduct(productId));
-    if (!exists) {
+    const product = await getAdminProduct(productId);
+    if (!product) {
       return NextResponse.json({ error: "Unknown product id." }, { status: 404 });
     }
 
@@ -80,7 +102,7 @@ export async function POST(request: Request) {
     const store = await readOverrides();
     const existing = store.overrides[productId] || { images: [], updatedAt: "" };
 
-    const nextImages = [...(existing.images || [])];
+    const nextImages = [...product.images];
     let nextImageUrl = existing.imageUrl;
 
     if (slot === "main") {

@@ -4,7 +4,7 @@ export const dynamic = "force-dynamic";
 
 const areas = [
   { href: "/admin/products", title: "Products", text: "Manage your catalog, product details and availability." },
-  { href: "/admin/video-id", title: "Video ID", text: "Preview videos, choose products, and publish Firebase links." },
+  { href: "/admin/video-id", title: "Product Listing Consistency Tool", text: "Review product sizes, images, prices, and video links." },
   { href: "/admin/site", title: "Promo", text: "Manage homepage promotions and sequences." },
   { href: "/admin/marketing", title: "Marketing lookbook", text: "Ananya customer profile, voice, and suggested promotions." },
   { href: "/admin/qr-pages", title: "Product guides & QR", text: "Create customer guides and downloadable QR labels." },

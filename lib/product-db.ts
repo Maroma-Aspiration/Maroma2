@@ -51,8 +51,7 @@ function resolveVideoUrls(urls?: string[]): string[] | undefined {
 }
 
 function usableImageList(overrideImages: string[] | undefined, fallback: string[]): string[] {
-  const fromOverride = (overrideImages ?? []).filter((url) => isUsablePublicMediaUrl(url));
-  if (fromOverride.length > 0) return fromOverride;
+  if (overrideImages !== undefined) return overrideImages.filter((url) => isUsablePublicMediaUrl(url));
   return fallback;
 }
 
@@ -151,10 +150,13 @@ export const withOverrides = (
         videos: resolveVideoUrls(product.videos),
       };
     }
+    const images = usableImageList(override.images, product.images);
     return {
       ...product,
-      imageUrl: firstUsablePublicMediaUrl(override.imageUrl, product.imageUrl) || product.imageUrl,
-      images: usableImageList(override.images, product.images),
+      imageUrl: override.images !== undefined
+        ? firstUsablePublicMediaUrl(override.imageUrl, ...images)
+        : firstUsablePublicMediaUrl(override.imageUrl, product.imageUrl) || product.imageUrl,
+      images,
       videos: resolveVideoUrls(overrideHasVideos(override) ? override.videos : product.videos),
     };
   });

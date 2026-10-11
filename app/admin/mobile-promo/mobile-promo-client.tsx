@@ -272,6 +272,30 @@ export default function MobilePromoClient() {
               <details open>
                 <summary>Strip</summary>
                 <Slider
+                  label="Banner image — left / right"
+                  value={layout.backgroundImageOffsetX}
+                  min={0}
+                  max={100}
+                  suffix="%"
+                  onChange={(value) => update({ backgroundImageOffsetX: value, backgroundImageScale: Math.max(120, layout.backgroundImageScale) })}
+                />
+                <Slider
+                  label="Banner image — up / down"
+                  value={layout.backgroundImageOffsetY}
+                  min={0}
+                  max={100}
+                  suffix="%"
+                  onChange={(value) => update({ backgroundImageOffsetY: value, backgroundImageScale: Math.max(120, layout.backgroundImageScale) })}
+                />
+                <Slider
+                  label="Banner image — zoom"
+                  value={layout.backgroundImageScale}
+                  min={100}
+                  max={240}
+                  suffix="%"
+                  onChange={(value) => update({ backgroundImageScale: value })}
+                />
+                <Slider
                   label="Strip width"
                   value={layout.stripWidthPct ?? banner?.stripWidthPct ?? 100}
                   min={20}

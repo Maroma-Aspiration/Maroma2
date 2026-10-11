@@ -18,6 +18,7 @@ export default function AdminUsersPage() {
   const [savingEmail, setSavingEmail] = useState<string | null>(null);
   const [resetingEmail, setResetingEmail] = useState<string | null>(null);
   const [newPasswords, setNewPasswords] = useState<Record<string, string>>({});
+  const [visiblePasswords, setVisiblePasswords] = useState<Set<string>>(() => new Set());
   const [rowFeedback, setRowFeedback] = useState<Record<string, { ok: boolean; msg: string }>>({});
   const [deletingEmail, setDeletingEmail] = useState<string | null>(null);
   const [editingEmail, setEditingEmail] = useState<string | null>(null);
@@ -280,7 +281,7 @@ export default function AdminUsersPage() {
         ) : (
           <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
             {users.map((row) => (
-              <article key={row.email} style={{
+              <article key={row.email} className="admin-user-card" style={{
                 display: "grid",
                 gridTemplateColumns: "1fr auto",
                 alignItems: "center",
@@ -323,7 +324,7 @@ export default function AdminUsersPage() {
                   </span>
                 )}
 
-                <div style={{ display: "flex", flexDirection: "column", gap: 8, alignItems: "flex-end" }}>
+                <div className="admin-user-actions" style={{ display: "flex", flexDirection: "column", gap: 8, alignItems: "flex-end" }}>
                   <select value={row.role} disabled={savingEmail === row.email} onChange={(event) => void updateRole(row.email, event.target.value as UserRow["role"])} style={{ padding: "6px 10px", borderRadius: 6, background: "#1e2823", color: "#e8f3f0" }}><option value="admin">Admin</option><option value="production">Production</option><option value="newsletter">Newsletter</option><option value="user">Read-only</option></select>
 
                   <div style={{ display: "flex", gap: 7 }}>
@@ -335,10 +336,11 @@ export default function AdminUsersPage() {
                     </button>
                   </div>
 
-                  <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
+                  <div className="admin-user-password-reset" style={{ display: "flex", gap: 6, alignItems: "center" }}>
                     <input
-                      type="password"
-                      placeholder="New password (min 8)"
+                      type={visiblePasswords.has(row.email) ? "text" : "password"}
+                      aria-label={`New password for ${row.email}`}
+                      placeholder="Enter new password (min 8)"
                       minLength={8}
                       autoComplete="new-password"
                       value={newPasswords[row.email] ?? ""}
@@ -350,11 +352,24 @@ export default function AdminUsersPage() {
                         }
                       }}
                       style={{
-                        padding: "6px 10px", borderRadius: 6, fontSize: 12, width: 160,
-                        border: "1px solid rgba(255,255,255,0.15)",
-                        background: "rgba(255,255,255,0.05)", color: "inherit",
+                        padding: "8px 10px", borderRadius: 6, fontSize: 13, width: 190,
+                        border: "1px solid rgba(19,74,87,.35)",
+                        background: "#ffffff", color: "#153f39",
                       }}
                     />
+                    <button
+                      type="button"
+                      className="admin-user-show-password"
+                      aria-pressed={visiblePasswords.has(row.email)}
+                      onClick={() => setVisiblePasswords((current) => {
+                        const next = new Set(current);
+                        if (next.has(row.email)) next.delete(row.email);
+                        else next.add(row.email);
+                        return next;
+                      })}
+                    >
+                      {visiblePasswords.has(row.email) ? "Hide" : "Show"}
+                    </button>
                     <button
                       type="button"
                       onClick={() => void resetPassword(row.email)}

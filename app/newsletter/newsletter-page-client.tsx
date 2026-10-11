@@ -31,6 +31,11 @@ import {
 import { preferServerCanvasOverLocalDraft } from "../../lib/newsletter-restore-issue";
 import { reconcileNewsletterCanvasState } from "../../lib/canvas-reconcile-stories";
 import { sanitizeStoriesStateCitations } from "../../lib/strip-ai-citation-markers";
+import {
+  buildLauraGreetingFromStories,
+  isLauraGreetingPlaceholder,
+  monthLabelFromNewsletterTitle,
+} from "../../lib/laura-greeting";
 import type { NewsletterArchiveSummary } from "../../lib/newsletter-archive-types";
 import { refreshStorySnapshotsInBlocks, storyToBlock } from "../../lib/newsletter-migrate-legacy-blocks";
 import { hideNewsletterExcerptBecauseBodyCoversIt } from "../../lib/newsletter-story-display";
@@ -1603,6 +1608,57 @@ export default function NewsletterPageClient({
     }));
   }, []);
 
+  const writeLauraGreeting = useCallback((force = false) => {
+    setState((prev) => {
+      const canvasGreeting = prev.newsletterCanvas?.elements?.find(
+        (el) => el.id === "migrated-greeting" && el.kind === "text",
+      );
+      const current =
+        (canvasGreeting && canvasGreeting.kind === "text" ? canvasGreeting.html : "") ||
+        prev.newsletterWelcomeLauraHtml ||
+        prev.newsletterWelcomeLaura;
+      if (!force && !isLauraGreetingPlaceholder(current)) return prev;
+      const hasStories = prev.stories.some(
+        (story) => story.kind !== "divider" && story.kind !== "text" && (story.title.trim() || story.excerpt.trim()),
+      );
+      if (!force && !hasStories) return prev;
+
+      const month =
+        monthLabelFromNewsletterTitle(prev.newsletterTitle) ||
+        new Intl.DateTimeFormat("en-US", { month: "long" }).format(new Date());
+      const greeting = buildLauraGreetingFromStories(prev.stories, month);
+      const next = {
+        ...prev,
+        newsletterGreetingHeading: greeting.heading,
+        newsletterWelcomeLaura: greeting.text,
+        newsletterWelcomeLauraHtml: greeting.html,
+      };
+      if (!prev.newsletterCanvas?.enabled) return next;
+
+      const elements = prev.newsletterCanvas.elements ?? [];
+      return {
+        ...next,
+        newsletterCanvas: {
+          ...prev.newsletterCanvas,
+          elements: elements.map((el) => {
+            if (el.id === "migrated-greeting" && el.kind === "text") {
+              return { ...el, html: greeting.html };
+            }
+            if (el.id === "migrated-greeting-hd" && el.kind === "text") {
+              return { ...el, html: `<p>${greeting.heading}</p>` };
+            }
+            return el;
+          }),
+        },
+      };
+    });
+  }, []);
+
+  useEffect(() => {
+    if (!canEdit) return;
+    writeLauraGreeting(false);
+  }, [canEdit, state.stories, writeLauraGreeting]);
+
   // Keep stateRef in sync on every render
   useEffect(() => { stateRef.current = state; }, [state]);
 
@@ -1685,6 +1741,10 @@ export default function NewsletterPageClient({
   const [showGlobalControls, setShowGlobalControls] = useState(false);
   const [importUrls, setImportUrls] = useState("");
   const [webSearchQuery, setWebSearchQuery] = useState("Maroma Auroville");
+  const [igDays, setIgDays] = useState(30);
+  const [igReplace, setIgReplace] = useState(true);
+  const [igBusy, setIgBusy] = useState(false);
+  const [igInfo, setIgInfo] = useState<{ configured: boolean; hint?: string; username?: string } | null>(null);
   const [webSearchMax, setWebSearchMax] = useState(12);
   const [textPourStatus, setTextPourStatus] = useState("");
   const [richPourStatus, setRichPourStatus] = useState("");
@@ -4667,6 +4727,60 @@ export default function NewsletterPageClient({
     void refreshAudience();
   }, [refreshAudience]);
 
+  useEffect(() => {
+    if (openDrawer !== "tools") return;
+    void fetch("/api/stories/instagram")
+      .then((res) => (res.ok ? res.json() : null))
+      .then((payload) => {
+        if (payload && typeof payload === "object") setIgInfo(payload);
+      })
+      .catch(() => setIgInfo(null));
+  }, [openDrawer]);
+
+  const importInstagramMonth = async () => {
+    setIgBusy(true);
+    setStatus("Importing Instagram posts from the last month...");
+    try {
+      const response = await fetch("/api/stories/instagram", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ days: igDays, replaceStories: igReplace }),
+      });
+      const payload = (await response.json()) as {
+        state?: StoriesState;
+        importedCount?: number;
+        withImages?: number;
+        username?: string;
+        error?: string;
+      };
+      if (!response.ok || !payload.state) {
+        throw new Error(payload.error || "Instagram import failed.");
+      }
+      const next = refreshStorySnapshotsInBlocks(payload.state);
+      if (state.newsletterCanvas.enabled) {
+        const canvasEls = buildCanvasElements(next, state.newsletterCanvas.elements, false);
+        setState({
+          ...next,
+          newsletterCanvas: {
+            enabled: true,
+            elements: canvasEls,
+            storySpacingGaps: state.newsletterCanvas.storySpacingGaps,
+          },
+        });
+      } else {
+        setState(next);
+      }
+      const who = payload.username ? `@${payload.username}` : "Instagram";
+      setStatus(
+        `Imported ${payload.importedCount ?? 0} ${who} post(s), ${payload.withImages ?? 0} with images. Review and click Save newsletter.`,
+      );
+    } catch (err) {
+      setStatus(err instanceof Error ? err.message : "Unable to import from Instagram.");
+    } finally {
+      setIgBusy(false);
+    }
+  };
+
   const importStoriesFromUrls = async () => {
     const urls = importUrls
       .split("\n")
@@ -5421,6 +5535,17 @@ export default function NewsletterPageClient({
             </button>
             <button
               type="button"
+              className="button secondary"
+              title="Write a short Laura greeting from the stories in this issue"
+              onClick={() => {
+                writeLauraGreeting(true);
+                setStatus("Laura intro written from this issue's stories. Save the newsletter to keep it.");
+              }}
+            >
+              Write Laura intro
+            </button>
+            <button
+              type="button"
               className={`button secondary${openDrawer === "tools" ? " is-active" : ""}`}
               onClick={() => setOpenDrawer((prev) => (prev === "tools" ? null : "tools"))}
             >
@@ -5762,6 +5887,62 @@ export default function NewsletterPageClient({
             {openDrawer === "tools" ? (
               <div className="newsletter-tool-drawer-body">
                 <section>
+                  <h3>Instagram</h3>
+                  <p className="admin-rss-hint">
+                    Pull posts from the Maroma Instagram account via Meta&apos;s official API, copy images into our
+                    storage, convert captions into stories, and place them on this newsletter.
+                  </p>
+                  {igInfo ? (
+                    <p className={`admin-rss-hint${igInfo.configured ? "" : " admin-status admin-status--warn"}`}>
+                      {igInfo.hint}
+                    </p>
+                  ) : (
+                    <p className="admin-rss-hint">Checking Instagram API…</p>
+                  )}
+                  <label>
+                    Days to import
+                    <input
+                      type="number"
+                      min={1}
+                      max={90}
+                      value={igDays}
+                      onChange={(e) => setIgDays(Math.min(90, Math.max(1, Number(e.target.value) || 30)))}
+                    />
+                  </label>
+                  <label className="newsletter-checkbox-row">
+                    <input
+                      type="checkbox"
+                      checked={igReplace}
+                      onChange={(e) => setIgReplace(e.target.checked)}
+                    />
+                    Replace current stories and fill the canvas
+                  </label>
+                  <button
+                    type="button"
+                    className="button primary"
+                    disabled={igBusy || igInfo?.configured === false}
+                    onClick={() => void importInstagramMonth()}
+                  >
+                    {igBusy ? "Importing..." : `Import last ${igDays} days`}
+                  </button>
+                </section>
+                <section>
+                  <h3>Paste post links</h3>
+                  <p className="admin-rss-hint">
+                    Fallback if the API is not set up. Paste one Instagram or Facebook post URL per line. Instagram
+                    often hides images from this method.
+                  </p>
+                  <textarea
+                    rows={4}
+                    value={importUrls}
+                    onChange={(e) => setImportUrls(e.target.value)}
+                    placeholder={"https://www.instagram.com/p/...\nhttps://www.instagram.com/p/..."}
+                  />
+                  <button type="button" className="button secondary" onClick={() => void importStoriesFromUrls()}>
+                    Import pasted links
+                  </button>
+                </section>
+                <section>
                   <h3>Rich text pour</h3>
                   <p className="admin-rss-hint">
                     Paste from Word, Google Docs, a webpage, or an email.
@@ -5953,6 +6134,10 @@ export default function NewsletterPageClient({
               canvas={state.newsletterCanvas}
               canEdit={!!canEdit}
               storySpacingGaps={storyGaps}
+              onWriteLauraGreeting={() => {
+                writeLauraGreeting(true);
+                setStatus("Laura intro written from this issue's stories. Save the newsletter to keep it.");
+              }}
               onChange={(canvas) =>
                 setState((prev) => ({
                   ...prev,

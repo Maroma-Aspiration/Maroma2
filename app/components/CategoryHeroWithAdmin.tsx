@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type CSSProperties } from "react";
 import { defaultWideBannerLayout } from "../../lib/category-banner-defaults";
 import type { ResolvedCategoryBanner } from "../../lib/category-banner-types";
 import { prepareBannerImageFile } from "../../lib/prepare-banner-image-file";
@@ -22,11 +22,6 @@ function parseObjectPosition(value: string): { x: number; y: number } {
     };
   }
   return { x: 82, y: 38 };
-}
-
-function faceCareMobileObjectPosition(value: string): string {
-  const { x, y } = parseObjectPosition(value);
-  return `calc(${x}% - 2cm) ${y}%`;
 }
 
 function useMobileCategoryHero(): boolean {
@@ -160,13 +155,15 @@ export function CategoryHeroWithAdmin({
 
   const showEditor = isAdminUser && Boolean(imageUrl);
   const heroMods = `${wideCover ? "category-hero--wide" : ""} ${splitThumb ? "category-hero--split" : ""}`.trim();
-  const bannerObjectPosition =
-    wideCover && slug === "face-care" && isMobileCategoryHero
-      ? faceCareMobileObjectPosition(objectPosition)
-      : objectPosition;
+  // Keep the saved crop position usable on every breakpoint. This is especially
+  // important for tall phone banners, where a centred crop can hide the subject.
+  const bannerObjectPosition = objectPosition;
   // Mobile banners historically receive a small crop zoom; retain it while
   // letting the admin slider control the underlying scale.
   const renderedImageScale = (imageScale / 100) * (isMobileCategoryHero ? 1.1 : 1);
+  // The editor previews the customer phone frame, even when the admin is
+  // operating it from a desktop browser.
+  const phonePreviewImageScale = (imageScale / 100) * 1.1;
 
   const backLink = (
     <Link href="/?skipIntro=1" className="category-back">
@@ -452,9 +449,12 @@ export function CategoryHeroWithAdmin({
                 alt={`${categoryLabel} collection — Maroma`}
                 style={{
                   objectPosition: bannerObjectPosition,
+                  "--category-hero-mobile-position": bannerObjectPosition,
+                  "--category-hero-mobile-scale": String(renderedImageScale),
                   transform: `scale(${renderedImageScale})`,
-                }}
+                } as CSSProperties}
               />
+              <span className="category-hero-image-title">{categoryLabel}</span>
               {!isMobileCategoryHero ? (
                 <div className="category-hero-copy category-hero-copy--overlay">{heroCopy}</div>
               ) : null}
@@ -553,17 +553,17 @@ export function CategoryHeroWithAdmin({
                 <>
                   <div className="category-banner-field">
                     <span>Banner crop</span>
-                    <div className="category-banner-live-preview" aria-label="Live banner preview">
+                    <div className="category-banner-live-preview category-banner-live-preview--phone" aria-label="Live phone banner preview">
                       <img
                         src={displayImageUrl}
                         alt="Live banner crop preview"
-                        style={{ objectPosition: bannerObjectPosition, transform: `scale(${renderedImageScale})` }}
+                        style={{ objectPosition: bannerObjectPosition, transform: `scale(${phonePreviewImageScale})` }}
                       />
-                      <span>Live preview · {imageScale}% · X {Math.round(posX)}% · Y {Math.round(posY)}%</span>
+                      <span>Phone preview · zoom {imageScale}% · left/right {Math.round(posX)}% · up/down {Math.round(posY)}%</span>
                     </div>
                     <div className="category-banner-slider-row">
                       <label>
-                        Scale ({imageScale}%)
+                        Image zoom ({imageScale}%)
                         <input
                           type="range"
                           min={50}
@@ -574,7 +574,7 @@ export function CategoryHeroWithAdmin({
                         />
                       </label>
                       <label>
-                        X ({Math.round(posX)}%)
+                        Move left / right ({Math.round(posX)}%)
                         <input
                           type="range"
                           min={0}
@@ -585,23 +585,29 @@ export function CategoryHeroWithAdmin({
                         />
                       </label>
                       <label>
-                        Y ({Math.round(posY)}%)
+                        Move up / down ({Math.round(posY)}%)
                         <input
                           type="range"
                           min={0}
                           max={100}
                           value={posY}
-                          onChange={(event) => setPosY(Number(event.target.value))}
+                          onChange={(event) => {
+                            // At 100% the wide source fills the phone frame's
+                            // height exactly, leaving no vertical crop to move.
+                            // Give the Y control room to work as soon as it is used.
+                            setImageScale((current) => Math.max(current, 120));
+                            setPosY(Number(event.target.value));
+                          }}
                           disabled={busy}
                         />
                       </label>
                     </div>
                     <code className="category-banner-code">
-                      Scale {imageScale}% · X {Math.round(posX)}% · Y {Math.round(posY)}%
+                      Phone preview · zoom {imageScale}% · left/right {Math.round(posX)}% · up/down {Math.round(posY)}%
                     </code>
                   </div>
 
-                  <p className="category-banner-code">Frame: 2048 × 694 (2.95:1), scaled proportionally to the page width.</p>
+                  <p className="category-banner-code">Phone frame: 2048 × 1388. These controls adjust the collection banner, not the homepage promo.</p>
                 </>
               ) : null}
 

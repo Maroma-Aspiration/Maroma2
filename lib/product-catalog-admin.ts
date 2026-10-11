@@ -74,6 +74,7 @@ export function applyCatalogEdit(
     categories: edit.categories ?? product.categories,
     tags: edit.tags ?? product.tags,
     brand: edit.brand ?? product.brand,
+    attributes: edit.attributes ?? product.attributes,
   };
 }
 
@@ -319,6 +320,7 @@ export type ProductCatalogPatch = {
   categories?: string[];
   tags?: string[];
   brand?: string;
+  attributes?: Record<string, string[]>;
   published?: boolean;
   stock?: number;
 };
@@ -340,6 +342,16 @@ export function validateProductCatalogPatch(patch: ProductCatalogPatch): string 
   if (patch.stock !== undefined) {
     if (!Number.isFinite(patch.stock) || patch.stock < 0) {
       return "Stock must be zero or greater.";
+    }
+  }
+  if (patch.attributes !== undefined) {
+    if (!patch.attributes || typeof patch.attributes !== "object" || Array.isArray(patch.attributes)) {
+      return "Product attributes must be a set of named values.";
+    }
+    for (const [key, values] of Object.entries(patch.attributes)) {
+      if (!key.trim() || !Array.isArray(values) || values.some((value) => typeof value !== "string")) {
+        return "Each product attribute needs a name and text values.";
+      }
     }
   }
   return null;

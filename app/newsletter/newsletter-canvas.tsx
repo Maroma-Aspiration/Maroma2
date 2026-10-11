@@ -76,7 +76,9 @@ import {
   paintOrderElements,
   pinIdsForElement,
   clearSpacingLocks,
+  liftElementsOverlappingAnchor,
   pushElementsAfter,
+  resolveOverlappingStoryFlow,
   restoreSpacingLockedY,
   relayoutNewsletterCanvas,
   type RelayoutOptions,
@@ -214,6 +216,7 @@ function relayoutMontageGroupElements(
   frame?: MontageBounds,
 ): CanvasEl[] {
   if (tiles.length < 2) return elements;
+  const oldBounds = montageGroupBounds(tiles);
   const hero = montageHeroTile(tiles);
   const originY = frame?.minY ?? Math.min(...tiles.map((e) => e.y));
   const originX = frame?.minX ?? Math.min(...tiles.map((e) => e.x));
@@ -225,7 +228,13 @@ function relayoutMontageGroupElements(
     frameH: frame?.h ?? hero.montageFrameH,
   });
   const ids = new Set(tiles.map((e) => e.id));
-  return [...elements.filter((e) => !ids.has(e.id)), ...laid];
+  const merged = [...elements.filter((e) => !ids.has(e.id)), ...laid];
+  const newBounds = frame ?? montageGroupBounds(laid);
+  const delta = Math.round(newBounds.minY + newBounds.h - (oldBounds.minY + oldBounds.h));
+  if (Math.abs(delta) < 1) return resolveOverlappingStoryFlow(liftElementsOverlappingAnchor(merged, hero.id));
+  return resolveOverlappingStoryFlow(
+    liftElementsOverlappingAnchor(pushElementsAfter(merged, hero.id, delta, ids), hero.id),
+  );
 }
 
 function elMovesFreely(_el: CanvasEl): boolean {
@@ -805,6 +814,7 @@ function Toolbar({
   onSave, onDuplicate, onUndo, onRedo, canUndo, canRedo,
   montageImageCount, onAddMontageImages, montageBounds, onMontageBoundsChange,
   canvasHeight = 800,
+  onWriteLauraGreeting,
 }: {
   el: CanvasEl;
   rect: DOMRect | null;
@@ -828,6 +838,7 @@ function Toolbar({
   onAddMontageImages?: (files: File[]) => void;
   montageBounds?: MontageBounds | null;
   onMontageBoundsChange?: (w: number, h: number) => void;
+  onWriteLauraGreeting?: () => void;
 }) {
   const [drag, setDrag] = useState<{ x: number; y: number } | null>(null);
   const [saveState, setSaveState] = useState<"idle" | "saving" | "saved" | "error">("idle");
@@ -1107,6 +1118,18 @@ function Toolbar({
 
       {isText(el) && (
         <>
+          {el.id === "migrated-greeting" && onWriteLauraGreeting ? (
+            <div className="nl-tb-section">
+              <div className="nl-tb-section-label">Laura greeting</div>
+              <button
+                type="button"
+                className="nl-tb-centre-btn"
+                onClick={onWriteLauraGreeting}
+              >
+                Write intro from stories
+              </button>
+            </div>
+          ) : null}
           <div className="nl-tb-section">
             {slider("Size", el.fontSize, "fontSize", 10, 120)}
             {slider("Weight", el.fontWeight, "fontWeight", 100, 900, 100)}
@@ -1388,6 +1411,8 @@ type CanvasProps = {
   visualPreview?: CanvasVisualPreviewOptions;
   /** When set, ⇕ Apply spacing in the add bar uses these gaps (see StorySpacingControls). */
   storySpacingGaps?: StorySpacingGaps;
+  /** Fills the Laura greeting from current newsletter stories. */
+  onWriteLauraGreeting?: () => void;
 };
 
 export const NewsletterCanvas = forwardRef<NewsletterCanvasHandle, CanvasProps>(function NewsletterCanvasInner({
@@ -1397,6 +1422,7 @@ export const NewsletterCanvas = forwardRef<NewsletterCanvasHandle, CanvasProps>(
   onSave,
   visualPreview,
   storySpacingGaps,
+  onWriteLauraGreeting,
 }, ref) {
   const elements = canvas.elements;
   const gaps = canvas.storySpacingGaps ?? storySpacingGaps ?? DEFAULT_STORY_SPACING_GAPS;
@@ -1865,9 +1891,25 @@ export const NewsletterCanvas = forwardRef<NewsletterCanvasHandle, CanvasProps>(
     }
 
     if (patchNeedsCompactStack(patch)) {
-      // Standalone images: resize in place — compact stack hides tiles under montages.
+      // Standalone images: grow/shrink in place and shift everything below.
+      // Compact stack is skipped here because it folds montage tiles under the grid.
       if (target && isImage(target) && !target.montageGroup) {
-        upd({ elements: withLock }, opts);
+        if (MASTHEAD_OVERLAY_IDS.has(target.id) || (!("h" in patch) && !("y" in patch))) {
+          upd({ elements: withLock }, opts);
+          return;
+        }
+        const oldBottom =
+          target.y + (typeof target.h === "number" ? target.h : measureElementHeight(target));
+        const nextY = typeof patch.y === "number" ? patch.y : target.y;
+        const patchedH = "h" in patch ? (patch as { h?: number }).h : undefined;
+        const nextH = typeof patchedH === "number" ? patchedH : (target.h ?? measureElementHeight(target));
+        const delta = Math.round(nextY + nextH - oldBottom);
+        const pushed =
+          Math.abs(delta) >= 1 ? pushElementsAfter(withLock, id, delta, new Set()) : withLock;
+        const els = resolveOverlappingStoryFlow(liftElementsOverlappingAnchor(pushed, id));
+        const measuredHeights = { ...(canvasSnapshotRef.current.measuredHeights ?? {}) };
+        if (typeof patchedH === "number") measuredHeights[id] = nextH;
+        upd({ elements: els, measuredHeights }, opts);
         return;
       }
       upd({ elements: applyCompact(withLock, target) }, opts);
@@ -1889,6 +1931,7 @@ export const NewsletterCanvas = forwardRef<NewsletterCanvasHandle, CanvasProps>(
       if (Math.abs(delta) >= 1) {
         els = pushElementsAfter(els, id, delta, new Set());
       }
+      els = resolveOverlappingStoryFlow(liftElementsOverlappingAnchor(els, id));
       const measuredHeights = { ...(canvasSnapshotRef.current.measuredHeights ?? {}) };
       delete measuredHeights[id];
       measuredHeights[id] = newH;
@@ -2691,6 +2734,7 @@ export const NewsletterCanvas = forwardRef<NewsletterCanvasHandle, CanvasProps>(
           canUndo={canUndo}
           canRedo={canRedo}
           onSave={onSave}
+          onWriteLauraGreeting={onWriteLauraGreeting}
           montageImageCount={selectedMontageCount}
           onAddMontageImages={
             selectedEl && isImage(selectedEl) && isMontageTile(selectedEl)

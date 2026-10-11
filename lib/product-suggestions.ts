@@ -1,3 +1,4 @@
+import { isClassicPillarProduct } from "./product-families";
 import { hasDisplayImage } from "./product-image";
 import type { ProductRecord } from "./product-types";
 
@@ -24,7 +25,12 @@ export function getSuggestedProducts(
   current: ProductRecord,
   limit: number
 ): ProductRecord[] {
-  const others = catalog.filter((p) => p.id !== current.id && hasDisplayImage(p));
+  const hideFamilySiblings = isClassicPillarProduct(current);
+  const others = catalog.filter((p) => {
+    if (p.id === current.id || !hasDisplayImage(p)) return false;
+    if (hideFamilySiblings && isClassicPillarProduct(p)) return false;
+    return true;
+  });
   return others
     .map((p) => ({ p, score: scoreProduct(current, p) }))
     .sort((a, b) => b.score - a.score || a.p.name.localeCompare(b.p.name))

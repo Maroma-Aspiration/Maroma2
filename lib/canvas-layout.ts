@@ -1214,6 +1214,46 @@ export function canvasExportMinY(elements: CanvasEl[]): number {
   return Math.min(0, ...elements.map((e) => e.y));
 }
 
+function elementWidth(el: CanvasEl): number {
+  return "w" in el && typeof (el as { w?: number }).w === "number" ? (el as { w: number }).w : NEWSLETTER_CANVAS_WIDTH;
+}
+
+function elementsOverlapX(a: CanvasEl, b: CanvasEl, slop = 8): boolean {
+  return a.x < b.x + elementWidth(b) - slop && b.x < a.x + elementWidth(a) - slop;
+}
+
+function shiftElementsFromY(
+  elements: CanvasEl[],
+  fromY: number,
+  delta: number,
+  excludeIds: Set<string>,
+  options: { ignoreLocks?: boolean } = {},
+): CanvasEl[] {
+  if (Math.abs(delta) < 1) return elements;
+  return elements.map((e) => {
+    if (excludeIds.has(e.id)) return e;
+    if (MASTHEAD_OVERLAY_IDS.has(e.id)) return e;
+    if (!options.ignoreLocks && (e as { locked?: boolean }).locked) return e;
+    if (e.y >= fromY - 2) {
+      const next = { ...e, y: Math.max(0, e.y + delta) } as CanvasEl & {
+        spacingLocked?: boolean;
+        locked?: boolean;
+      };
+      if (options.ignoreLocks) {
+        delete next.spacingLocked;
+        delete next.locked;
+      }
+      return next;
+    }
+    return e;
+  });
+}
+
+function storyIndexFromCanvasId(id: string): number | null {
+  const match = id.match(/^migrated-(?:sdiv|st|si|sb|cta)-(\d+)$/);
+  return match ? Number(match[1]) : null;
+}
+
 export function pushElementsAfter(
   elements: CanvasEl[],
   anchorId: string,
@@ -1225,24 +1265,318 @@ export function pushElementsAfter(
   const anchor = elements.find((e) => e.id === anchorId);
   if (!anchor) return elements;
 
-  let anchorOrder = canvasLayoutOrder(anchor);
+  let fromY = anchor.y;
   if (isImage(anchor) && anchor.montageGroup) {
     const group = elements.filter(
       (e): e is CanvasImageEl => isImage(e) && e.montageGroup === anchor.montageGroup,
     );
-    anchorOrder = Math.max(...group.map(canvasLayoutOrder));
+    fromY = Math.min(...group.map((e) => e.y));
     for (const e of group) excludeIds.add(e.id);
   } else {
     excludeIds.add(anchorId);
   }
 
+  return shiftElementsFromY(elements, fromY, delta, excludeIds);
+}
+
+/** After an image grows, body/CTA on the photo drop below it. Later stories are handled separately. */
+export function liftElementsOverlappingAnchor(
+  elements: CanvasEl[],
+  anchorId: string,
+  gap = DEFAULT_STORY_SPACING_GAPS.belowImage,
+  heightOf: (el: CanvasEl) => number = measureElementHeight,
+): CanvasEl[] {
+  const anchor = elements.find((e) => e.id === anchorId);
+  if (!anchor) return elements;
+
+  const excludeIds = new Set<string>([anchorId]);
+  let top = anchor.y;
+  let bottom = anchor.y + heightOf(anchor);
+  if (isImage(anchor) && anchor.montageGroup) {
+    const group = elements.filter(
+      (e): e is CanvasImageEl => isImage(e) && e.montageGroup === anchor.montageGroup,
+    );
+    for (const tile of group) excludeIds.add(tile.id);
+    top = Math.min(...group.map((e) => e.y));
+    bottom = Math.max(...group.map((e) => e.y + heightOf(e)));
+  }
+
+  const idx = storyIndexFromCanvasId(anchorId);
+  const overlapping = elements
+    .filter((e) => {
+      if (excludeIds.has(e.id)) return false;
+      if (MASTHEAD_OVERLAY_IDS.has(e.id)) return false;
+      const laterIdx = storyIndexFromCanvasId(e.id);
+      if (idx !== null && laterIdx !== null && laterIdx > idx) return false;
+      return e.y >= top - 2 && e.y < bottom - 1;
+    })
+    .sort((a, b) => a.y - b.y || canvasLayoutOrder(a) - canvasLayoutOrder(b));
+
+  let next = elements;
+  let cursor = bottom + gap;
+  for (const el of overlapping) {
+    const current = next.find((e) => e.id === el.id);
+    if (!current) continue;
+    if (current.y < cursor - 1) {
+      const delta = Math.round(cursor - current.y);
+      next = next.map((e) =>
+        e.id === current.id ? ({ ...e, y: current.y + delta } as CanvasEl) : e,
+      );
+    }
+    const placed = next.find((e) => e.id === el.id);
+    if (placed) cursor = placed.y + heightOf(placed) + gap;
+  }
+  return ensureFollowingStoriesBelow(next, anchorId, gap, heightOf);
+}
+
+/** Keep later stories under this image, body, and CTA. */
+export function ensureFollowingStoriesBelow(
+  elements: CanvasEl[],
+  anchorId: string,
+  gap = DEFAULT_STORY_SPACING_GAPS.belowImage,
+  heightOf: (el: CanvasEl) => number = measureElementHeight,
+): CanvasEl[] {
+  const anchor = elements.find((e) => e.id === anchorId);
+  if (!anchor) return elements;
+
+  const excludeIds = new Set<string>([anchorId]);
+  let packBottom = anchor.y + heightOf(anchor);
+  const idx = storyIndexFromCanvasId(anchorId);
+  if (idx !== null) {
+    for (const kind of ["sdiv", "st", "si", "sb", "cta"] as const) {
+      const id = `migrated-${kind}-${idx}`;
+      const el = elements.find((e) => e.id === id);
+      if (!el) continue;
+      excludeIds.add(id);
+      if (kind === "si" || kind === "sb" || kind === "cta") {
+        packBottom = Math.max(packBottom, el.y + heightOf(el));
+      }
+    }
+  }
+  if (isImage(anchor) && anchor.montageGroup) {
+    for (const tile of elements) {
+      if (isImage(tile) && tile.montageGroup === anchor.montageGroup) {
+        excludeIds.add(tile.id);
+        packBottom = Math.max(packBottom, tile.y + heightOf(tile));
+      }
+    }
+  }
+
+  const blocked = elements
+    .filter((e) => {
+      if (excludeIds.has(e.id)) return false;
+      if (MASTHEAD_OVERLAY_IDS.has(e.id)) return false;
+      const laterIdx = storyIndexFromCanvasId(e.id);
+      if (idx !== null && laterIdx !== null && laterIdx <= idx) return false;
+      const bottom = e.y + heightOf(e);
+      return e.y < packBottom + gap - 1 && bottom > anchor.y + 2;
+    })
+    .sort((a, b) => a.y - b.y);
+  if (blocked.length === 0) return elements;
+
+  const extra = Math.round(packBottom + gap - blocked[0].y);
+  if (extra <= 0) return elements;
+  return shiftElementsFromY(elements, blocked[0].y, extra, excludeIds, { ignoreLocks: true });
+}
+
+type FlowImageUnit = {
+  id: string;
+  y: number;
+  h: number;
+  x: number;
+  w: number;
+  exclude: Set<string>;
+};
+
+function flowImageUnits(
+  elements: CanvasEl[],
+  heightOf: (el: CanvasEl) => number,
+): FlowImageUnit[] {
+  const seenMontage = new Set<string>();
+  const units: FlowImageUnit[] = [];
+  for (const el of elements) {
+    if (!isImage(el) || MASTHEAD_OVERLAY_IDS.has(el.id)) continue;
+    if (el.montageGroup) {
+      if (seenMontage.has(el.montageGroup)) continue;
+      seenMontage.add(el.montageGroup);
+      const group = elements.filter(
+        (tile): tile is CanvasImageEl => isImage(tile) && tile.montageGroup === el.montageGroup,
+      );
+      const top = Math.min(...group.map((tile) => tile.y));
+      const bottom = Math.max(...group.map((tile) => tile.y + heightOf(tile)));
+      const left = Math.min(...group.map((tile) => tile.x));
+      const right = Math.max(...group.map((tile) => tile.x + tile.w));
+      units.push({
+        id: el.id,
+        y: top,
+        h: bottom - top,
+        x: left,
+        w: right - left,
+        exclude: new Set(group.map((tile) => tile.id)),
+      });
+      continue;
+    }
+    units.push({
+      id: el.id,
+      y: el.y,
+      h: heightOf(el),
+      x: el.x,
+      w: el.w,
+      exclude: new Set([el.id]),
+    });
+  }
+  units.sort((a, b) => a.y - b.y || canvasLayoutOrder(
+    elements.find((el) => el.id === a.id) ?? elements[0],
+  ) - canvasLayoutOrder(elements.find((el) => el.id === b.id) ?? elements[0]));
+  return units;
+}
+
+/** Push later photos down when they sit on an earlier photo. Never pulls up. */
+export function resolveOverlappingImages(
+  elements: CanvasEl[],
+  gap = DEFAULT_STORY_SPACING_GAPS.belowImage,
+  heightOf: (el: CanvasEl) => number = measureElementHeight,
+): CanvasEl[] {
+  let next = elements;
+  for (let pass = 0; pass < 16; pass++) {
+    const units = flowImageUnits(next, heightOf);
+    let moved = false;
+    for (let i = 0; i < units.length - 1; i++) {
+      const current = units[i];
+      for (let j = i + 1; j < units.length; j++) {
+        const later = units[j];
+        const laterEl = next.find((el) => el.id === later.id);
+        const currentEl = next.find((el) => el.id === current.id);
+        if (!laterEl || !currentEl || !elementsOverlapX(currentEl, laterEl)) continue;
+        const floor = current.y + current.h + gap;
+        if (later.y >= floor - 1) continue;
+        const extra = Math.round(floor - later.y);
+        if (extra < 1) continue;
+        const laterIdx = storyIndexFromCanvasId(later.id);
+        const exclude = new Set(current.exclude);
+        if (laterIdx !== null) {
+          for (const el of next) {
+            const storyIdx = storyIndexFromCanvasId(el.id);
+            if (storyIdx !== null && storyIdx < laterIdx) exclude.add(el.id);
+          }
+          next = shiftElementsFromY(next, later.y, extra, exclude, { ignoreLocks: true });
+        } else {
+          next = next.map((el) => {
+            if (!later.exclude.has(el.id)) return el;
+            return { ...el, y: el.y + extra } as CanvasEl;
+          });
+        }
+        moved = true;
+        break;
+      }
+      if (moved) break;
+    }
+    if (!moved) break;
+  }
+  return next;
+}
+
+const STORY_COPY_GAP_SLACK = 24;
+
+/** Sit each story's body and CTA just under its own photo. Does not compact later stories. */
+export function packStoryInternalSpacing(
+  elements: CanvasEl[],
+  gaps: StorySpacingGaps = DEFAULT_STORY_SPACING_GAPS,
+  heightOf: (el: CanvasEl) => number = measureElementHeight,
+): CanvasEl[] {
+  const byId = new Map(elements.map((e) => [e.id, e]));
+  const yById = new Map<string, number>();
+
+  for (let idx = 0; idx < 50; idx++) {
+    const st = byId.get(`migrated-st-${idx}`);
+    const si = byId.get(`migrated-si-${idx}`);
+    const sb = byId.get(`migrated-sb-${idx}`);
+    const cta = byId.get(`migrated-cta-${idx}`);
+    if (!st && !si && !sb) break;
+
+    let y = 0;
+    if (st && st.kind === "text") {
+      y = st.y + storyHeadlineInkHeight(st) + gaps.belowHeadline;
+    }
+
+    if (si && si.kind === "image") {
+      const imageY = yById.get(si.id) ?? si.y;
+      if (st && st.kind === "text" && imageY < y - 1) {
+        yById.set(si.id, y);
+        y = storyImageBlockBottom(elements, si, y) + gaps.belowImage;
+      } else {
+        y = storyImageBlockBottom(elements, si, imageY) + gaps.belowImage;
+      }
+    }
+
+    if (sb && sb.kind === "text") {
+      const sbY = yById.get(sb.id) ?? sb.y;
+      if (sbY < y - 1 || sbY > y + STORY_COPY_GAP_SLACK) {
+        yById.set(sb.id, y);
+      }
+      const placedBody = yById.get(sb.id) ?? sb.y;
+      y = placedBody + storyBodyInkHeight(sb);
+      if (cta && isCta(cta)) {
+        const ctaTarget = y + gaps.aboveButton;
+        const ctaY = yById.get(cta.id) ?? cta.y;
+        if (ctaY < ctaTarget - 1 || ctaY > ctaTarget + STORY_COPY_GAP_SLACK) {
+          yById.set(cta.id, ctaTarget);
+        }
+      }
+    } else if (cta && isCta(cta)) {
+      const ctaTarget = y + gaps.aboveButton;
+      const ctaY = yById.get(cta.id) ?? cta.y;
+      if (ctaY < ctaTarget - 1 || ctaY > ctaTarget + STORY_COPY_GAP_SLACK) {
+        yById.set(cta.id, ctaTarget);
+      }
+    }
+  }
+
+  if (yById.size === 0) return elements;
+
   return elements.map((e) => {
-    if (excludeIds.has(e.id)) return e;
-    if ((e as { locked?: boolean }).locked) return e;
-    if (MASTHEAD_OVERLAY_IDS.has(e.id)) return e;
-    if (canvasLayoutOrder(e) > anchorOrder) {
-      return { ...e, y: Math.max(0, e.y + delta) } as CanvasEl;
+    const ny = yById.get(e.id);
+    if (ny !== undefined) {
+      const next = { ...e, y: ny } as CanvasEl & { spacingLocked?: boolean };
+      delete next.spacingLocked;
+      return next;
+    }
+    if (isImage(e) && e.montageGroup) {
+      for (const [anchorId, anchorY] of yById) {
+        const anchor = byId.get(anchorId);
+        if (
+          anchor?.kind === "image" &&
+          anchor.montageGroup === e.montageGroup &&
+          anchor.id.startsWith("migrated-si-")
+        ) {
+          const delta = anchorY - anchor.y;
+          if (Math.abs(delta) >= 1) return { ...e, y: e.y + delta } as CanvasEl;
+        }
+      }
     }
     return e;
   });
+}
+
+/** Unstack overlapping photos, pack each story's copy under its image, then push later stories. */
+export function resolveOverlappingStoryFlow(
+  elements: CanvasEl[],
+  gaps: StorySpacingGaps = DEFAULT_STORY_SPACING_GAPS,
+  heightOf: (el: CanvasEl) => number = measureElementHeight,
+): CanvasEl[] {
+  let next = packStoryInternalSpacing(elements, gaps, heightOf);
+  next = resolveOverlappingImages(next, gaps.belowImage, heightOf);
+  next = packStoryInternalSpacing(next, gaps, heightOf);
+  for (let idx = 0; idx < 50; idx++) {
+    const image = next.find((el) => el.id === `migrated-si-${idx}`);
+    const body = next.find((el) => el.id === `migrated-sb-${idx}`);
+    const cta = next.find((el) => el.id === `migrated-cta-${idx}`);
+    const anchor = cta ?? body ?? image;
+    if (!anchor) {
+      if (!next.some((el) => el.id === `migrated-st-${idx}`)) break;
+      continue;
+    }
+    next = ensureFollowingStoriesBelow(next, anchor.id, gaps.belowButton, heightOf);
+  }
+  return packStoryInternalSpacing(next, gaps, heightOf);
 }

@@ -8,23 +8,28 @@ import type { ProductRecord } from "../../lib/product-types";
 
 type Props = {
   product: ProductRecord;
+  variant?: string;
+  disabled?: boolean;
+  disabledReason?: string;
 };
 
-export function ProductPdpBuyRow({ product }: Props) {
+export function ProductPdpBuyRow({ product, variant, disabled = false, disabledReason }: Props) {
   const router = useRouter();
   const { addToCart } = useCart();
   const [qty, setQty] = useState(1);
   const [added, setAdded] = useState(false);
 
   const handleAddToBasket = async () => {
-    const ok = await addToCart(product, undefined, qty);
+    if (disabled) return;
+    const ok = await addToCart(product, variant, qty);
     if (!ok) return;
     setAdded(true);
     window.setTimeout(() => setAdded(false), 2000);
   };
 
   const handleBuyNow = async () => {
-    const ok = await addToCart(product, undefined, qty);
+    if (disabled) return;
+    const ok = await addToCart(product, variant, qty);
     if (!ok) return;
     router.push("/checkout");
   };
@@ -51,16 +56,18 @@ export function ProductPdpBuyRow({ product }: Props) {
           type="button"
           className={`button primary product-pdp-cta-main product-pdp-basket-btn${added ? " is-added" : ""}`}
           onClick={handleAddToBasket}
+          disabled={disabled}
         >
           {added ? "Added to Basket ✓" : "Add to Basket"}
         </button>
-        <button type="button" className="button primary product-pdp-cta-main product-pdp-basket-btn" onClick={handleBuyNow}>
+        <button type="button" className="button primary product-pdp-cta-main product-pdp-basket-btn" onClick={handleBuyNow} disabled={disabled}>
           Buy Now
         </button>
         <button type="button" className="product-pdp-wish" aria-label="Add to wishlist">
           ♡
         </button>
       </div>
+      {disabled && disabledReason ? <p className="product-family-buy-note">{disabledReason}</p> : null}
       <Link href="/cart" className="product-pdp-view-basket">
         View your basket
       </Link>

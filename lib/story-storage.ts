@@ -1025,11 +1025,21 @@ export async function readStoriesState(): Promise<StoriesState> {
 function newsletterCanvasRepaired(before: StoriesState, after: StoriesState): boolean {
   const afterCanvas = after.newsletterCanvas;
   if (!afterCanvas?.enabled) return false;
-  const beforeIds = new Set((before.newsletterCanvas?.elements ?? []).map((e) => e.id));
-  const addedElement = (afterCanvas.elements ?? []).some((e) => !beforeIds.has(e.id));
+  const beforeEls = before.newsletterCanvas?.elements ?? [];
+  const afterEls = afterCanvas.elements ?? [];
+  const beforeIds = new Set(beforeEls.map((e) => e.id));
+  const addedElement = afterEls.some((e) => !beforeIds.has(e.id));
   const beforeStories = (before.stories ?? []).filter((s) => !s.kind || s.kind === "story").length;
   const afterStories = (after.stories ?? []).filter((s) => !s.kind || s.kind === "story").length;
-  return addedElement || afterStories > beforeStories;
+  const beforeById = new Map(beforeEls.map((e) => [e.id, e]));
+  const movedElement = afterEls.some((e) => {
+    const prev = beforeById.get(e.id);
+    if (!prev) return true;
+    const prevH = "h" in prev ? (prev as { h?: number }).h : undefined;
+    const nextH = "h" in e ? (e as { h?: number }).h : undefined;
+    return prev.y !== e.y || prevH !== nextH;
+  });
+  return addedElement || afterStories > beforeStories || movedElement;
 }
 
 export async function writeStoriesState(state: StoriesState): Promise<StoriesState> {

@@ -29,7 +29,7 @@ export type PerfumeNavSelection = {
 };
 
 const EXCLUDE_PRODUCT =
-  /incense|diffuser|essential oil|room mist|potpourri|reed stick|ceramic|gift voucher|shaving|bath salt|spiral|ambient perfume|perfume spiral|home fragrance|aromatherapy spray|aromatherapy roll|perfume mat|spa blend|colibri roll|foot soak|shampoo|soap|lotion|body wash|uplifting room|delight room|recharge room|stress away|nurture room|dream room|gift set|set of 2|set of 3|\(p\/2\)/i;
+  /incense|diffuser|essential oil|room mist|potpourri|reed stick|ceramic|gift voucher|shaving|bath salt|spiral|ambient perfume|perfume spiral|home fragrance|aromatherapy spray|aromatherapy roll|perfume mat|spa blend|colibri roll|foot soak|shampoo|soap|lotion|body wash|sachet|uplifting room|delight room|recharge room|stress away|nurture room|dream room|gift set|set of 2|set of 3|\(p\/2\)/i;
 
 const MEN_PATTERN = /\bmen\b|for man\b|for men\b|men's|men’s/i;
 
